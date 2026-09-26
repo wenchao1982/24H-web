@@ -493,3 +493,49 @@ describe("AgentsPage T16.2 创建/克隆", () => {
   });
 });
 
+describe("AgentsPage T16.3 编辑", () => {
+  it("saving SOUL calls profiles.configure with soul and disabled_skills", async () => {
+    const gateway = createFakeGateway((method) => {
+      if (method === "profiles.list") {
+        return { profiles: [{ name: "writer", display_name: "写作" }] };
+      }
+      if (method === "profiles.describe") {
+        return {
+          name: "writer",
+          soul: "旧的人设",
+          model: { provider: "openai", default: "gpt-4o" },
+          skills: [
+            { name: "web_search", enabled: true },
+            { name: "ppt", enabled: false },
+          ],
+        };
+      }
+      if (method === "profiles.configure") {
+        return { ok: true, applied: { soul: true, skills: true } };
+      }
+      return {};
+    });
+    vi.stubGlobal(
+      "fetch",
+      stubFetch([{ path: "/api/hermes/skills", method: "GET", status: 200, body: SKILLS }]),
+    );
+    const user = userEvent.setup();
+
+    renderAgents(gateway);
+    await user.click(await screen.findByRole("button", { name: /写作/ }));
+    await user.click(await screen.findByRole("button", { name: "编辑" }));
+
+    const soul = (await screen.findByLabelText("SOUL 内容")) as HTMLTextAreaElement;
+    expect(soul.value).toBe("旧的人设");
+    await user.clear(soul);
+    await user.type(soul, "新的人设");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(gateway.paramsOf("profiles.configure")).toEqual([
+        { name: "writer", soul: "新的人设", disabled_skills: ["ppt"] },
+      ]);
+    });
+  });
+});
+

@@ -1489,3 +1489,48 @@ button.danger {
   color: var(--ds-label-tertiary);
   text-decoration: line-through;
 }
+
+/* ---------- 智能体：编辑表单 ---------- */
+
+.agent-edit .agent-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-1);
+  margin-bottom: var(--ds-space-3);
+  color: var(--ds-label-tertiary);
+  font-size: var(--ds-font-size-xs);
+}
+
+.agent-soul-input {
+  min-height: 140px;
+  padding: var(--ds-space-3);
+  border: var(--ds-border-1) solid var(--ds-border-l2);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-l2);
+  color: var(--ds-label-primary);
+  font-family: var(--ds-font-mono);
+  font-size: var(--ds-font-size-xs);
+  resize: vertical;
+}
+
+.agent-skills-edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-1);
+  margin: 0 0 var(--ds-space-3);
+  padding: var(--ds-space-2) var(--ds-space-3);
+  border: var(--ds-hairline) solid var(--ds-border-l1);
+  border-radius: var(--ds-radius-sm);
+}
+
+.agent-skills-edit legend {
+  padding: 0 var(--ds-space-1);
+  color: var(--ds-label-tertiary);
+  font-size: var(--ds-font-size-xs);
+}
+
+.agent-skills-edit .skill-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+}

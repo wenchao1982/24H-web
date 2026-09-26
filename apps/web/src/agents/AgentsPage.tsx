@@ -9,6 +9,7 @@ import {
 import AgentList from "./AgentList";
 import AgentDetail from "./AgentDetail";
 import AgentCreatePanel, { type CreateProfileParams } from "./AgentCreatePanel";
+import AgentEditPanel, { type ConfigureProfileParams } from "./AgentEditPanel";
 import SkillsPanel from "./SkillsPanel";
 import ToolsetsPanel from "./ToolsetsPanel";
 import McpPanel from "./McpPanel";
@@ -48,6 +49,10 @@ export default function AgentsPage() {
   );
   const [createBusy, setCreateBusy] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+
+  const [editing, setEditing] = useState(false);
+  const [configureBusy, setConfigureBusy] = useState(false);
+  const [configureError, setConfigureError] = useState<string | null>(null);
 
   const loadAgents = useCallback(async () => {
     setListLoading(true);
@@ -130,6 +135,7 @@ export default function AgentsPage() {
         await gateway.request("profiles.create", params);
         setCreate(null);
         await loadAgents();
+        setEditing(false);
         setSelected(params.name);
       } catch (err) {
         setCreateError(err instanceof Error ? err.message : "创建智能体失败");
@@ -138,6 +144,41 @@ export default function AgentsPage() {
       }
     },
     [gateway, loadAgents],
+  );
+
+  const loadDetail = useCallback(
+    async (name: string) => {
+      await gateway.connect().catch(() => undefined);
+      const result = await gateway.request("profiles.describe", { name });
+      setDetail(normalizeAgentDetail(result));
+    },
+    [gateway],
+  );
+
+  const submitConfigure = useCallback(
+    async (params: ConfigureProfileParams) => {
+      setConfigureBusy(true);
+      setConfigureError(null);
+      try {
+        await gateway.connect().catch(() => undefined);
+        const result = await gateway.request<{ confirm_required?: boolean; confirm_message?: string }>(
+          "profiles.configure",
+          params,
+        );
+        if (result?.confirm_required) {
+          setConfigureError(result.confirm_message || "该模型需要确认，请改用其他模型");
+          return;
+        }
+        setEditing(false);
+        await loadDetail(params.name);
+        await loadAgents();
+      } catch (err) {
+        setConfigureError(err instanceof Error ? err.message : "保存智能体失败");
+      } finally {
+        setConfigureBusy(false);
+      }
+    },
+    [gateway, loadAgents, loadDetail],
   );
 
   const runLearn = async (event: FormEvent) => {
@@ -176,7 +217,10 @@ export default function AgentsPage() {
               activeName={selected}
               filter={filter}
               onFilterChange={setFilter}
-              onSelect={setSelected}
+              onSelect={(name) => {
+                setSelected(name);
+                setEditing(false);
+              }}
               onCreate={() => openCreate("new")}
             />
           )}
@@ -195,21 +239,33 @@ export default function AgentsPage() {
             />
           ) : null}
 
-          <AgentDetail
-            agent={detail}
-            loading={detailLoading}
-            error={detailError}
-            actions={
-              detail ? (
-                <button
-                  type="button"
-                  onClick={() => openCreate("clone", detail.name)}
-                >
-                  克隆
-                </button>
-              ) : null
-            }
-          />
+          {editing && detail ? (
+            <AgentEditPanel
+              agent={detail}
+              busy={configureBusy}
+              error={configureError}
+              onCancel={() => setEditing(false)}
+              onSave={(params) => void submitConfigure(params)}
+            />
+          ) : (
+            <AgentDetail
+              agent={detail}
+              loading={detailLoading}
+              error={detailError}
+              actions={
+                detail ? (
+                  <>
+                    <button type="button" onClick={() => setEditing(true)}>
+                      编辑
+                    </button>
+                    <button type="button" onClick={() => openCreate("clone", detail.name)}>
+                      克隆
+                    </button>
+                  </>
+                ) : null
+              }
+            />
+          )}
 
           <form className="card learn-action" onSubmit={runLearn}>
             <div className="row">
