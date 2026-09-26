@@ -12,6 +12,7 @@ import {
   errorText,
   isSameSession,
   normalizeCreatedId,
+  normalizeReplayed,
   normalizeSessions,
   parseStatus,
   toolDetail,
@@ -154,6 +155,35 @@ export default function ChatPage() {
       });
     }
   }, [gateway, nextId]);
+
+  // 断线重放：切换会话时拉取待处理服务端请求快照，重新渲染卡片。
+  useEffect(() => {
+    if (!activeId) {
+      return;
+    }
+    let alive = true;
+    gateway
+      .request("session.events.since", { session_id: activeId })
+      .then((result) => {
+        if (!alive) {
+          return;
+        }
+        const replayed = normalizeReplayed(result);
+        if (replayed.length === 0) {
+          return;
+        }
+        setPending((current) => {
+          const ids = new Set(current.map((entry) => entry.id));
+          return [...current, ...replayed.filter((entry) => !ids.has(entry.id))];
+        });
+      })
+      .catch(() => {
+        // 重放失败不阻断对话
+      });
+    return () => {
+      alive = false;
+    };
+  }, [activeId, gateway]);
 
   const createSession = useCallback(async () => {
     try {

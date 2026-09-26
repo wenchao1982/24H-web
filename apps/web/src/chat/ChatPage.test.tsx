@@ -316,3 +316,31 @@ describe("ChatPage T6.9 会话管理", () => {
     expect(screen.queryByRole("button", { name: "会话一" })).not.toBeInTheDocument();
   });
 });
+
+describe("ChatPage T6.10 断线重放", () => {
+  it("restores a pending server request from session.events.since", async () => {
+    const gateway = createFakeGateway((method) => {
+      if (method === "session.list") {
+        return { sessions: [{ id: "s1", title: "会话一" }] };
+      }
+      if (method === "session.events.since") {
+        return {
+          pending_requests: [
+            {
+              request_id: "r1",
+              method: "approval",
+              params: { prompt: "恢复的审批", options: ["once", "deny"] },
+            },
+          ],
+        };
+      }
+      return {};
+    });
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+
+    expect(await screen.findByText("恢复的审批")).toBeInTheDocument();
+    expect(gateway.paramsOf("session.events.since")).toEqual([{ session_id: "s1" }]);
+  });
+});

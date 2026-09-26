@@ -253,6 +253,38 @@ function lastToolIndex(items: TranscriptItem[], id: string): number {
   return -1;
 }
 
+const METHOD_KIND: Record<string, RequestKind> = {
+  approval: "approval",
+  clarify: "clarify",
+  sudo: "sudo",
+  secret: "secret",
+  "mcp.setup": "mcp.setup",
+};
+
+/**
+ * `session.events.since` 返回的**待处理服务端请求快照**（断线重放）。
+ * 快照条目只用于重新渲染卡片；真实回包由重连后的实时请求完成。
+ */
+export function normalizeReplayed(result: unknown): PendingRequest[] {
+  if (!result || typeof result !== "object") {
+    return [];
+  }
+  const record = result as Record<string, unknown>;
+  const raw = record.pending_requests ?? record.requests ?? record.pending;
+  return arr(raw).flatMap((entry) => {
+    const id = str(entry.request_id) ?? str(entry.id);
+    const method = str(entry.method);
+    if (!id || !method) {
+      return [];
+    }
+    const params =
+      entry.params && typeof entry.params === "object"
+        ? (entry.params as Record<string, unknown>)
+        : entry;
+    return [{ id: `replay:${id}`, kind: METHOD_KIND[method] ?? "approval", params }];
+  });
+}
+
 /** 合并（或新建）一张工具卡。 */
 export function upsertTool(
   items: TranscriptItem[],
