@@ -11,11 +11,14 @@ import { adminRoutes } from "../routes/admin";
 import { adminConnectionsRoutes } from "../routes/adminConnections";
 import { hermesRoutes } from "../routes/hermes";
 import { hermesWsRoutes } from "../hermes/proxy";
+import { integrationsRoutes } from "../routes/integrations";
+import type { GhRunner } from "../integrations/github";
 import { registerSessionMiddleware } from "../session/middleware";
 
 export interface BuildAppOptions {
   logger?: boolean;
   hermesBaseUrl?: string;
+  githubRunner?: GhRunner;
 }
 
 export function buildApp(db: Db, options: BuildAppOptions = {}): FastifyInstance {
@@ -49,6 +52,10 @@ export function buildApp(db: Db, options: BuildAppOptions = {}): FastifyInstance
   app.register(hermesWsRoutes, {
     db,
     defaultBaseUrl: options.hermesBaseUrl ?? config.hermesBaseUrl,
+  });
+  app.register(integrationsRoutes, {
+    db,
+    ...(options.githubRunner ? { githubRunner: options.githubRunner } : {}),
   });
 
   app.get("/health", async () => ({ ok: true }));

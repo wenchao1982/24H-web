@@ -6,6 +6,7 @@ import { openDb, type Db } from "../db";
 import { migrate } from "../db/migrate";
 import { ensureFirstAdmin } from "../users/repo";
 import { buildApp } from "../http/app";
+import type { GhRunner } from "../integrations/github";
 
 export const TEST_ADMIN_USERNAME = "admin";
 export const TEST_ADMIN_PASSWORD = "test-admin-password";
@@ -45,7 +46,9 @@ export interface TestContext {
   close: () => Promise<void>;
 }
 
-export async function createTestContext(options: { hermesBaseUrl?: string } = {}): Promise<TestContext> {
+export async function createTestContext(
+  options: { hermesBaseUrl?: string; githubRunner?: GhRunner } = {},
+): Promise<TestContext> {
   const dir = mkdtempSync(join(tmpdir(), "24h-test-"));
   const db = openDb(join(dir, "test.db"));
   migrate(db);
@@ -57,6 +60,7 @@ export async function createTestContext(options: { hermesBaseUrl?: string } = {}
   const app = buildApp(db, {
     logger: false,
     ...(options.hermesBaseUrl ? { hermesBaseUrl: options.hermesBaseUrl } : {}),
+    ...(options.githubRunner ? { githubRunner: options.githubRunner } : {}),
   });
 
   return {

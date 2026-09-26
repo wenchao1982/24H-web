@@ -289,3 +289,47 @@ describe("SettingsPage T8.6 模型服务商 OAuth", () => {
     expect(screen.getByText(/ABCD-1234/)).toBeInTheDocument();
   });
 });
+
+describe("SettingsPage T8.7 GitHub 集成", () => {
+  it("shows the gh status and connects with a token", async () => {
+    const fetchMock = stubFetch([
+      { path: "/api/hermes/env", method: "GET", status: 200, body: { keys: [] } },
+      {
+        path: "/api/integrations/github",
+        method: "GET",
+        status: 200,
+        body: { connected: false, username: null },
+      },
+      {
+        path: "/api/integrations/github",
+        method: "POST",
+        status: 200,
+        body: { connected: true, username: "octocat" },
+      },
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<SettingsPage />);
+    await user.click(screen.getByRole("button", { name: "GitHub 集成" }));
+
+    expect(await screen.findByLabelText("GitHub 状态")).toHaveTextContent("未连接");
+
+    await user.type(screen.getByLabelText("GitHub 访问令牌"), "ghp_abc");
+    await user.click(screen.getByRole("button", { name: "连接" }));
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (entry) =>
+          String(entry[0]).endsWith("/api/integrations/github") &&
+          (entry[1] as RequestInit | undefined)?.method === "POST",
+      );
+      expect(call).toBeTruthy();
+      expect(JSON.parse(String((call?.[1] as RequestInit).body))).toEqual({
+        action: "connect",
+        token: "ghp_abc",
+      });
+    });
+    expect(await screen.findByText(/octocat/)).toBeInTheDocument();
+  });
+});
