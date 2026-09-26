@@ -855,6 +855,29 @@ button {
   white-space: nowrap;
 }
 
+.skill-editor {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+}
+
+.skill-content {
+  min-height: 120px;
+  resize: vertical;
+  padding: var(--ds-space-2);
+  border: var(--ds-border-1) solid var(--ds-border-l2);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-l2);
+  color: var(--ds-label-primary);
+  font-family: var(--ds-font-mono);
+  font-size: var(--ds-font-size-xs);
+}
+
+.skill-editor .primary {
+  align-self: flex-end;
+}
+
 /* ---------- 通用表单 / 页面 ---------- */
 
 .page {

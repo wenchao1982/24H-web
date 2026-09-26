@@ -87,7 +87,6 @@ export interface HubSkillEntry {
   name: string;
   description: string;
 }
-
 /** 解析 hub 搜索结果（`GET /api/skills/hub`）。 */
 export function normalizeHubSkills(payload: unknown): HubSkillEntry[] {
   const raw = asRecord(payload);
@@ -109,4 +108,15 @@ export function normalizeHubSkills(payload: unknown): HubSkillEntry[] {
   }
   return out;
 }
+
+/** 解析技能内容响应为纯文本（`GET /api/skills/content`）。 */
+export function normalizeSkillContent(payload: unknown): string {
+  if (typeof payload === "string") {
+    return payload;
+  }
+  const source = asRecord(payload);
+  const content = source.content ?? source.body ?? source.text ?? source.markdown;
+  return typeof content === "string" ? content : "";
+}
+
 

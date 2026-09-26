@@ -278,3 +278,44 @@ describe("AgentsPage T7.6 技能安装（hub）", () => {
   });
 });
 
+describe("AgentsPage T7.7 技能内容编辑", () => {
+  it("loads skill content and saves the edited text", async () => {
+    const fetchMock = stubFetch([
+      { path: "/api/hermes/skills", method: "GET", status: 200, body: SKILLS },
+      {
+        path: "/api/hermes/skills/content",
+        method: "GET",
+        status: 200,
+        body: { name: "web_search", content: "# web_search\n步骤一" },
+      },
+      { path: "/api/hermes/skills/content", method: "PUT", status: 200, body: { ok: true } },
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<AgentsPage />);
+    await screen.findByRole("heading", { name: "检索" });
+
+    await user.click(screen.getByLabelText("编辑 web_search"));
+    const textarea = (await screen.findByLabelText("技能内容 web_search")) as HTMLTextAreaElement;
+    expect(textarea.value).toContain("# web_search");
+
+    await user.clear(textarea);
+    await user.type(textarea, "新内容");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (entry) =>
+          String(entry[0]).endsWith("/api/hermes/skills/content") &&
+          (entry[1] as RequestInit | undefined)?.method === "PUT",
+      );
+      expect(call).toBeTruthy();
+      expect(JSON.parse(String((call?.[1] as RequestInit).body))).toEqual({
+        name: "web_search",
+        content: "新内容",
+      });
+    });
+  });
+});
+

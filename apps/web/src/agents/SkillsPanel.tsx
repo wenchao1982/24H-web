@@ -3,6 +3,7 @@ import { api } from "../api/client";
 import {
   groupByCategory,
   normalizeHubSkills,
+  normalizeSkillContent,
   normalizeSkills,
   type HubSkillEntry,
   type SkillEntry,
@@ -18,6 +19,9 @@ export default function SkillsPanel() {
   const [hubQuery, setHubQuery] = useState("");
   const [hubResults, setHubResults] = useState<HubSkillEntry[] | null>(null);
   const [hubBusy, setHubBusy] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [content, setContent] = useState("");
+  const [contentBusy, setContentBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -99,6 +103,47 @@ export default function SkillsPanel() {
     [load],
   );
 
+  const openEditor = useCallback(
+    async (skill: SkillEntry) => {
+      if (editing === skill.name) {
+        setEditing(null);
+        return;
+      }
+      setContentBusy(true);
+      try {
+        const payload = await api<unknown>(
+          `/api/hermes/skills/content?name=${encodeURIComponent(skill.name)}`,
+        );
+        setContent(normalizeSkillContent(payload));
+        setEditing(skill.name);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "加载技能内容失败");
+      } finally {
+        setContentBusy(false);
+      }
+    },
+    [editing],
+  );
+
+  const saveContent = useCallback(async () => {
+    if (!editing) {
+      return;
+    }
+    setContentBusy(true);
+    try {
+      await api("/api/hermes/skills/content", {
+        method: "PUT",
+        body: JSON.stringify({ name: editing, content }),
+      });
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "保存技能内容失败");
+    } finally {
+      setContentBusy(false);
+    }
+  }, [content, editing]);
+
   return (
     <div className="skills">
       {error ? <p className="err">{error}</p> : null}
@@ -165,6 +210,33 @@ export default function SkillsPanel() {
                   <span className="skill-name">{skill.name}</span>
                   {skill.description ? (
                     <span className="skill-desc muted">{skill.description}</span>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="ghost"
+                    aria-label={`编辑 ${skill.name}`}
+                    disabled={contentBusy && editing !== skill.name}
+                    onClick={() => void openEditor(skill)}
+                  >
+                    {editing === skill.name ? "收起" : "编辑"}
+                  </button>
+                  {editing === skill.name ? (
+                    <div className="skill-editor">
+                      <textarea
+                        className="skill-content"
+                        aria-label={`技能内容 ${skill.name}`}
+                        value={content}
+                        onChange={(event) => setContent(event.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className="primary"
+                        disabled={contentBusy}
+                        onClick={() => void saveContent()}
+                      >
+                        保存
+                      </button>
+                    </div>
                   ) : null}
                 </li>
               ))}
