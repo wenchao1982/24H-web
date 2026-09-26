@@ -159,3 +159,45 @@ describe("AgentsPage T7.3 工具 / Toolsets", () => {
   });
 });
 
+describe("AgentsPage T7.4 MCP 管理", () => {
+  it("lists MCP servers and adds one with the exact POST body", async () => {
+    const fetchMock = stubFetch([
+      { path: "/api/hermes/skills", method: "GET", status: 200, body: SKILLS },
+      {
+        path: "/api/hermes/mcp/servers",
+        method: "GET",
+        status: 200,
+        body: {
+          servers: [{ name: "filesystem", command: "npx mcp-fs", enabled: true }],
+        },
+      },
+      { path: "/api/hermes/mcp/servers", method: "POST", status: 201, body: { ok: true } },
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<AgentsPage />);
+    await user.click(await screen.findByRole("tab", { name: "MCP" }));
+
+    expect(await screen.findByText("filesystem")).toBeInTheDocument();
+    expect(screen.getByLabelText("启用 MCP filesystem")).toBeChecked();
+
+    await user.type(screen.getByLabelText("MCP 名称"), "github");
+    await user.type(screen.getByLabelText("MCP 命令"), "npx mcp-github");
+    await user.click(screen.getByRole("button", { name: "添加" }));
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (entry) =>
+          String(entry[0]).endsWith("/api/hermes/mcp/servers") &&
+          (entry[1] as RequestInit | undefined)?.method === "POST",
+      );
+      expect(call).toBeTruthy();
+      expect(JSON.parse(String((call?.[1] as RequestInit).body))).toEqual({
+        name: "github",
+        command: "npx mcp-github",
+      });
+    });
+  });
+});
+
