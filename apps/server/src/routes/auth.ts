@@ -145,4 +145,33 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, opt
 
     return { ok: true };
   });
+
+  app.patch("/api/auth/profile", { preHandler: requireAuth }, async (request) => {
+    const user = request.user;
+    if (!user) {
+      throw new ApiError(401, "UNAUTHENTICATED", "未登录");
+    }
+
+    const username = readString(request.body, "username").trim();
+    if (!username) {
+      throw new ApiError(400, "INVALID_INPUT", "用户名不能为空");
+    }
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]{2,31}$/.test(username)) {
+      throw new ApiError(400, "INVALID_USERNAME", "用户名格式不正确");
+    }
+
+    if (username !== user.username) {
+      const existing = findUserByUsername(db, username);
+      if (existing && existing.id !== user.id) {
+        throw new ApiError(409, "USERNAME_TAKEN", "用户名已被占用");
+      }
+      db.prepare("UPDATE users SET username = ?, updated_at = ? WHERE id = ?").run(
+        username,
+        Date.now(),
+        user.id,
+      );
+    }
+
+    return { ok: true, username };
+  });
 };
