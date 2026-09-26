@@ -62,3 +62,26 @@ describe("ChatPage T6.1 会话列表", () => {
     expect(screen.getByRole("heading", { name: "第一会话" })).toBeInTheDocument();
   });
 });
+
+describe("ChatPage T6.2 新建会话", () => {
+  it("calls session.create and selects the new session", async () => {
+    const gateway = createFakeGateway((method) => {
+      if (method === "session.list") {
+        return SESSIONS;
+      }
+      if (method === "session.create") {
+        return { session_id: "s3" };
+      }
+      return {};
+    });
+    renderChat(gateway);
+    await screen.findByText("第一会话");
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "新建会话" }));
+
+    expect(gateway.paramsOf("session.create")).toHaveLength(1);
+    expect(await screen.findByRole("heading", { name: "新会话" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "新会话" })).toHaveAttribute("data-active", "true");
+  });
+});

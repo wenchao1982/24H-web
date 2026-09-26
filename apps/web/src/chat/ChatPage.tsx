@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useGateway } from "./GatewayProvider";
 import SessionList from "./SessionList";
-import { normalizeSessions, type SessionSummary } from "./types";
+import { normalizeCreatedId, normalizeSessions, type SessionSummary } from "./types";
 
 export default function ChatPage() {
   const gateway = useGateway();
@@ -35,6 +35,24 @@ export default function ChatPage() {
     };
   }, [gateway]);
 
+  const createSession = useCallback(async () => {
+    try {
+      const result = await gateway.request("session.create", {});
+      const id = normalizeCreatedId(result);
+      if (!id) {
+        return;
+      }
+      setSessions((current) =>
+        current.some((session) => session.id === id)
+          ? current
+          : [{ id, title: "新会话" }, ...current],
+      );
+      setActiveId(id);
+    } catch {
+      setError("无法新建会话");
+    }
+  }, [gateway]);
+
   const visible = useMemo(() => {
     const query = filter.trim().toLowerCase();
     if (!query) {
@@ -54,6 +72,7 @@ export default function ChatPage() {
           filter={filter}
           onFilterChange={setFilter}
           onSelect={setActiveId}
+          onCreate={createSession}
         />
       </aside>
 
