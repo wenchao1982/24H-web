@@ -255,3 +255,46 @@ describe("proxy error normalisation", () => {
     expect(res.json()).toEqual({ error: "UPSTREAM_ERROR", message: "{not-json" });
   });
 });
+
+describe("GET /api/hermes/health", () => {
+  it("reports ok with the upstream version when healthy", async () => {
+    upstream = await startMockHermes({ version: "1.2.3" });
+    ctx = await createTestContext({ hermesBaseUrl: upstream.baseUrl });
+    const { session } = await loginAndGetCookies(ctx.app);
+
+    const res = await ctx.app.inject({
+      method: "GET",
+      url: "/api/hermes/health",
+      cookies: { "24h_session": session },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, version: "1.2.3", baseUrl: upstream.baseUrl });
+  });
+
+  it("reports ok:false with a 200 when the upstream is down", async () => {
+    upstream = await startMockHermes();
+    const baseUrl = upstream.baseUrl;
+    ctx = await createTestContext({ hermesBaseUrl: baseUrl });
+    const { session } = await loginAndGetCookies(ctx.app);
+    await upstream.close();
+    upstream = undefined;
+
+    const res = await ctx.app.inject({
+      method: "GET",
+      url: "/api/hermes/health",
+      cookies: { "24h_session": session },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: false, baseUrl });
+  });
+
+  it("requires authentication", async () => {
+    upstream = await startMockHermes();
+    ctx = await createTestContext({ hermesBaseUrl: upstream.baseUrl });
+
+    const res = await ctx.app.inject({ method: "GET", url: "/api/hermes/health" });
+    expect(res.statusCode).toBe(401);
+  });
+});

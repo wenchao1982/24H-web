@@ -51,6 +51,25 @@ function assertProfileAccess(db: Db, request: FastifyRequest): void {
 export const hermesRoutes: FastifyPluginAsync<HermesRoutesOptions> = async (app, opts) => {
   const defaultBaseUrl = opts.defaultBaseUrl;
 
+  app.get("/api/hermes/health", { preHandler: requireAuth }, async () => {
+    const upstream = hermesUpstream({ hermesBaseUrl: defaultBaseUrl });
+    try {
+      const token = await getHermesToken(upstream.baseUrl);
+      const response = await fetch(`${upstream.baseUrl}/api/status`, {
+        headers: { "x-hermes-session-token": token },
+        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+      });
+      if (!response.ok) {
+        return { ok: false, baseUrl: upstream.baseUrl };
+      }
+      const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+      const version = typeof data.version === "string" ? data.version : undefined;
+      return { ok: true, ...(version ? { version } : {}), baseUrl: upstream.baseUrl };
+    } catch {
+      return { ok: false, baseUrl: upstream.baseUrl };
+    }
+  });
+
   app.all("/api/hermes/*", { preHandler: requireAuth }, async (request, reply) => {
     assertProfileAccess(opts.db, request);
 
