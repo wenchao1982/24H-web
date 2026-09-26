@@ -11,18 +11,31 @@ export interface SessionListProps {
   onRename?: (id: string, title: string) => void;
   onDelete?: (id: string) => void;
   onResume?: (id: string) => void;
+  onPrune?: () => void;
+  onBulkDelete?: (ids: string[]) => void;
 }
 
 interface SessionRowProps {
   session: SessionSummary;
   active: boolean;
+  selected: boolean;
   onSelect: (id: string) => void;
+  onToggleSelect: (id: string) => void;
   onRename?: (id: string, title: string) => void;
   onDelete?: (id: string) => void;
   onResume?: (id: string) => void;
 }
 
-function SessionRow({ session, active, onSelect, onRename, onDelete, onResume }: SessionRowProps) {
+function SessionRow({
+  session,
+  active,
+  selected,
+  onSelect,
+  onToggleSelect,
+  onRename,
+  onDelete,
+  onResume,
+}: SessionRowProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(session.title);
@@ -60,6 +73,13 @@ function SessionRow({ session, active, onSelect, onRename, onDelete, onResume }:
 
   return (
     <li className="session-row">
+      <input
+        type="checkbox"
+        className="session-check"
+        aria-label={`选择 ${session.title}`}
+        checked={selected}
+        onChange={() => onToggleSelect(session.id)}
+      />
       <button
         type="button"
         className="session-item"
@@ -128,7 +148,18 @@ export default function SessionList({
   onRename,
   onDelete,
   onResume,
+  onPrune,
+  onBulkDelete,
 }: SessionListProps) {
+  const [selected, setSelected] = useState<string[]>([]);
+  const [cleanupOpen, setCleanupOpen] = useState(false);
+
+  const toggleSelect = (id: string) => {
+    setSelected((current) =>
+      current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id],
+    );
+  };
+
   return (
     <div className="session-list">
       <div className="session-list-head">
@@ -145,7 +176,33 @@ export default function SessionList({
             新建
           </button>
         ) : null}
+        {onPrune || onBulkDelete ? (
+          <button
+            type="button"
+            className="ghost session-clean"
+            aria-label="清理"
+            aria-expanded={cleanupOpen}
+            onClick={() => setCleanupOpen((value) => !value)}
+          >
+            清理
+          </button>
+        ) : null}
       </div>
+
+      {cleanupOpen ? (
+        <div className="session-cleanup">
+          <button type="button" onClick={() => onPrune?.()}>
+            清理旧会话
+          </button>
+          <button
+            type="button"
+            disabled={selected.length === 0}
+            onClick={() => onBulkDelete?.(selected)}
+          >
+            批量删除（{selected.length}）
+          </button>
+        </div>
+      ) : null}
 
       {sessions.length === 0 ? (
         <p className="empty session-empty">暂无会话</p>
@@ -156,7 +213,9 @@ export default function SessionList({
               key={session.id}
               session={session}
               active={session.id === activeId}
+              selected={selected.includes(session.id)}
               onSelect={onSelect}
+              onToggleSelect={toggleSelect}
               onRename={onRename}
               onDelete={onDelete}
               onResume={onResume}

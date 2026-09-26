@@ -442,3 +442,42 @@ describe("ChatPage T6.13 导入/导出/分享", () => {
     });
   });
 });
+
+describe("ChatPage T6.14 清理", () => {
+  it("prunes and bulk-deletes via the L2 proxy", async () => {
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        ({ ok: true, status: 200, text: async () => JSON.stringify({ ok: true }) }) as Response,
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const gateway = createFakeGateway((method) =>
+      method === "session.list" ? { sessions: [{ id: "s1", title: "会话一" }] } : {},
+    );
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await screen.findByText("会话一");
+
+    await user.click(screen.getByRole("button", { name: "清理" }));
+    await user.click(screen.getByRole("button", { name: "清理旧会话" }));
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some((call) => String(call[0]).endsWith("/api/hermes/sessions/prune")),
+      ).toBe(true);
+    });
+
+    await user.click(screen.getByLabelText("选择 会话一"));
+    await user.click(screen.getByRole("button", { name: /批量删除/ }));
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some((call) =>
+          String(call[0]).endsWith("/api/hermes/sessions/bulk-delete"),
+        ),
+      ).toBe(true);
+    });
+    const call = fetchMock.mock.calls.find((entry) =>
+      String(entry[0]).endsWith("/api/hermes/sessions/bulk-delete"),
+    );
+    expect(JSON.parse(String((call?.[1] as RequestInit).body))).toEqual({ ids: ["s1"] });
+  });
+});

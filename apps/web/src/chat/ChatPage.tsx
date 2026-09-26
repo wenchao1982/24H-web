@@ -264,6 +264,32 @@ export default function ChatPage() {
     [gateway],
   );
 
+  const pruneSessions = useCallback(async () => {
+    try {
+      await api("/api/hermes/sessions/prune", { method: "POST", body: JSON.stringify({}) });
+      const result = await gateway.request("session.list", {});
+      setSessions(normalizeSessions(result));
+    } catch {
+      setError("清理失败");
+    }
+  }, [gateway]);
+
+  const bulkDeleteSessions = useCallback(async (ids: string[]) => {
+    if (ids.length === 0) {
+      return;
+    }
+    try {
+      await api("/api/hermes/sessions/bulk-delete", {
+        method: "POST",
+        body: JSON.stringify({ ids }),
+      });
+      setSessions((current) => current.filter((session) => !ids.includes(session.id)));
+      setActiveId((current) => (current && ids.includes(current) ? null : current));
+    } catch {
+      setError("批量删除失败");
+    }
+  }, []);
+
   const handleSend = useCallback(
     (text: string) => {
       const sessionId = activeIdRef.current;
@@ -437,6 +463,8 @@ export default function ChatPage() {
           onRename={renameSession}
           onDelete={deleteSession}
           onResume={resumeSession}
+          onPrune={pruneSessions}
+          onBulkDelete={bulkDeleteSessions}
         />
       </aside>
 

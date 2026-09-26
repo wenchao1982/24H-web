@@ -479,6 +479,31 @@ button {
   width: 100%;
 }
 
+.session-check {
+  flex: 0 0 auto;
+}
+
+.session-cleanup {
+  display: flex;
+  gap: var(--ds-space-2);
+  flex-wrap: wrap;
+  padding: var(--ds-space-1);
+}
+
+.session-cleanup button {
+  border: var(--ds-border-1) solid var(--ds-border-l2);
+  border-radius: var(--ds-radius-sm);
+  background: transparent;
+  color: var(--ds-label-secondary);
+  font-size: var(--ds-font-size-xs);
+  padding: 2px var(--ds-space-2);
+}
+
+.session-cleanup button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .chat-main {
   flex: 1;
   min-width: 0;
