@@ -811,6 +811,31 @@ button {
   min-width: 0;
 }
 
+.segmented {
+  display: inline-flex;
+  border: var(--ds-border-1) solid var(--ds-border-l2);
+  border-radius: var(--ds-radius-sm);
+  overflow: hidden;
+}
+
+.segmented-btn {
+  border: none;
+  background: transparent;
+  color: var(--ds-label-secondary);
+  padding: 0 var(--ds-space-3);
+  min-height: var(--ds-row-h);
+  font-size: var(--ds-font-size-sm);
+}
+
+.segmented-btn + .segmented-btn {
+  border-left: var(--ds-border-1) solid var(--ds-border-l1);
+}
+
+.segmented-btn[data-active="true"] {
+  background: var(--ds-accent-weak);
+  color: var(--ds-accent);
+}
+
 .skills {
   display: flex;
   flex-direction: column;

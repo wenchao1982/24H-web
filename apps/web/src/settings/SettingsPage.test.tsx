@@ -32,6 +32,7 @@ function stubFetch(handlers: StubRoute[]) {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  localStorage.clear();
 });
 
 describe("SettingsPage T8.1 Keys 管理", () => {
@@ -136,5 +137,26 @@ describe("SettingsPage T8.2 模型设置", () => {
       expect(call).toBeTruthy();
       expect(JSON.parse(String((call?.[1] as RequestInit).body))).toEqual({ enabled: true });
     });
+  });
+});
+
+describe("SettingsPage T8.3 外观", () => {
+  it("toggles the theme and persists it", async () => {
+    vi.stubGlobal(
+      "fetch",
+      stubFetch([{ path: "/api/hermes/env", method: "GET", status: 200, body: { keys: [] } }]),
+    );
+    const user = userEvent.setup();
+
+    render(<SettingsPage />);
+    await user.click(screen.getByRole("button", { name: "外观" }));
+
+    await user.click(screen.getByRole("radio", { name: "深色" }));
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(localStorage.getItem("24h.theme")).toBe("dark");
+
+    await user.click(screen.getByRole("radio", { name: "跟随系统" }));
+    expect(localStorage.getItem("24h.theme")).toBe("system");
+    expect(document.documentElement.dataset.theme).toBe("light");
   });
 });
