@@ -179,6 +179,46 @@ export default function ChatPage() {
     setItems([]);
   }, []);
 
+  const renameSession = useCallback(
+    async (id: string, title: string) => {
+      try {
+        await gateway.request("session.title", { session_id: id, title });
+        setSessions((current) =>
+          current.map((session) => (session.id === id ? { ...session, title } : session)),
+        );
+      } catch {
+        setError("重命名失败");
+      }
+    },
+    [gateway],
+  );
+
+  const deleteSession = useCallback(
+    async (id: string) => {
+      try {
+        await gateway.request("session.delete", { session_id: id });
+        setSessions((current) => current.filter((session) => session.id !== id));
+        setActiveId((current) => (current === id ? null : current));
+      } catch {
+        setError("删除失败");
+      }
+    },
+    [gateway],
+  );
+
+  const resumeSession = useCallback(
+    async (id: string) => {
+      try {
+        await gateway.request("session.resume", { session_id: id });
+        setActiveId(id);
+        setItems([]);
+      } catch {
+        setError("恢复失败");
+      }
+    },
+    [gateway],
+  );
+
   const handleSend = useCallback(
     (text: string) => {
       const sessionId = activeIdRef.current;
@@ -248,6 +288,9 @@ export default function ChatPage() {
           onFilterChange={setFilter}
           onSelect={selectSession}
           onCreate={createSession}
+          onRename={renameSession}
+          onDelete={deleteSession}
+          onResume={resumeSession}
         />
       </aside>
 

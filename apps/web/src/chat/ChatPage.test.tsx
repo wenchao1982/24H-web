@@ -265,3 +265,54 @@ describe("ChatPage T6.8 状态条", () => {
     expect(bar).toHaveTextContent("62 tok/s");
   });
 });
+
+describe("ChatPage T6.9 会话管理", () => {
+  function makeGateway() {
+    return createFakeGateway((method) =>
+      method === "session.list" ? { sessions: [{ id: "s1", title: "会话一" }] } : {},
+    );
+  }
+
+  it("renames a session via session.title", async () => {
+    const gateway = makeGateway();
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await screen.findByRole("button", { name: "会话一" });
+
+    await user.click(screen.getByRole("button", { name: "会话操作 会话一" }));
+    await user.click(screen.getByRole("menuitem", { name: "重命名" }));
+    const input = screen.getByLabelText("重命名 会话一");
+    await user.clear(input);
+    await user.type(input, "新名字");
+    await user.click(screen.getByRole("button", { name: "确定" }));
+
+    expect(gateway.paramsOf("session.title")).toEqual([{ session_id: "s1", title: "新名字" }]);
+    expect(screen.getByRole("button", { name: "新名字" })).toBeInTheDocument();
+  });
+
+  it("resumes a session via session.resume and selects it", async () => {
+    const gateway = makeGateway();
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await screen.findByRole("button", { name: "会话一" });
+
+    await user.click(screen.getByRole("button", { name: "会话操作 会话一" }));
+    await user.click(screen.getByRole("menuitem", { name: "恢复" }));
+
+    expect(gateway.paramsOf("session.resume")).toEqual([{ session_id: "s1" }]);
+    expect(screen.getByRole("button", { name: "会话一" })).toHaveAttribute("data-active", "true");
+  });
+
+  it("deletes a session via session.delete", async () => {
+    const gateway = makeGateway();
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await screen.findByRole("button", { name: "会话一" });
+
+    await user.click(screen.getByRole("button", { name: "会话操作 会话一" }));
+    await user.click(screen.getByRole("menuitem", { name: "删除" }));
+
+    expect(gateway.paramsOf("session.delete")).toEqual([{ session_id: "s1" }]);
+    expect(screen.queryByRole("button", { name: "会话一" })).not.toBeInTheDocument();
+  });
+});

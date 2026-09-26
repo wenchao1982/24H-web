@@ -428,6 +428,57 @@ button {
   color: var(--ds-accent);
 }
 
+.session-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ds-space-1);
+}
+
+.session-row .session-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.session-menu-btn {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+}
+
+.session-menu {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: var(--ds-space-1);
+  gap: 2px;
+}
+
+.session-menu button {
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--ds-label-secondary);
+  font-size: var(--ds-font-size-xs);
+  padding: 2px var(--ds-space-2);
+  border-radius: var(--ds-radius-sm);
+}
+
+.session-menu button:hover {
+  background: var(--ds-surface-l3);
+  color: var(--ds-label-primary);
+}
+
+.session-menu button.danger {
+  color: var(--ds-danger);
+}
+
+.session-rename {
+  display: flex;
+  gap: var(--ds-space-1);
+  width: 100%;
+}
+
 .chat-main {
   flex: 1;
   min-width: 0;
