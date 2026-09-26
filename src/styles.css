@@ -1,0 +1,36 @@
+:root {
+  --bg: #f7f7f8;
+  --panel: #ffffff;
+  --border: #e4e4e7;
+  --text: #18181b;
+  --muted: #71717a;
+  --accent: #2563eb;
+}
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+.app { display: flex; height: 100%; }
+.rail { width: 72px; border-right: 1px solid var(--border); background: var(--panel); display: flex; flex-direction: column; align-items: center; padding: 12px 0; gap: 8px; }
+.rail button { width: 56px; padding: 8px 0; border: none; background: transparent; color: var(--muted); cursor: pointer; border-radius: 8px; font-size: 12px; }
+.rail button.active { background: #eef2ff; color: var(--accent); }
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.topbar { height: 48px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; padding: 0 16px; background: var(--panel); }
+.content { flex: 1; min-height: 0; overflow: auto; padding: 16px; }
+.muted { color: var(--muted); }
+.chat { display: flex; flex-direction: column; height: 100%; }
+.messages { flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 12px; }
+.msg { max-width: 720px; padding: 10px 14px; border-radius: 12px; white-space: pre-wrap; line-height: 1.6; }
+.msg.user { align-self: flex-end; background: var(--accent); color: #fff; }
+.msg.assistant { align-self: flex-start; background: var(--panel); border: 1px solid var(--border); }
+.composer { display: flex; gap: 8px; padding-top: 12px; }
+.composer textarea { flex: 1; resize: vertical; min-height: 44px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; font: inherit; }
+button.primary { background: var(--accent); color: #fff; border: none; border-radius: 10px; padding: 0 20px; cursor: pointer; font: inherit; }
+button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+.row { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+.row input, .row select { flex: 1; padding: 8px; border: 1px solid var(--border); border-radius: 8px; font: inherit; }
+.err { color: #dc2626; }
