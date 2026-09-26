@@ -31,6 +31,27 @@ function readString(body: unknown, key: string): string {
   return "";
 }
 
+function readProfileList(body: unknown): string[] | null {
+  if (!body || typeof body !== "object") {
+    return null;
+  }
+  const value = (body as Record<string, unknown>).profiles;
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  const profiles: string[] = [];
+  for (const item of value) {
+    if (typeof item !== "string" || item.trim() === "") {
+      throw new ApiError(400, "INVALID_INPUT", "profiles 必须是非空字符串数组");
+    }
+    const name = item.trim();
+    if (!profiles.includes(name)) {
+      profiles.push(name);
+    }
+  }
+  return profiles;
+}
+
 function currentUser(request: FastifyRequest): UserRow {
   const user = request.user;
   if (!user) {
@@ -176,4 +197,51 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
 
     return { ok: true };
   });
+
+  app.put(
+    "/api/admin/users/:id/profiles",
+    { preHandler: requireSuperAdmin },
+    async (request) => {
+      const actor = currentUser(request);
+      const id = readIdParam(request);
+
+      const target = findUserById(db, id);
+      if (!target) {
+        throw new ApiError(404, "USER_NOT_FOUND", "用户不存在");
+      }
+
+      const profiles = readProfileList(request.body);
+      if (profiles === null) {
+        throw new ApiError(400, "INVALID_INPUT", "profiles 必须是数组");
+      }
+      const defaultProfile = readString(request.body, "defaultProfile").trim();
+      if (defaultProfile && !profiles.includes(defaultProfile)) {
+        throw new ApiError(400, "INVALID_INPUT", "defaultProfile 必须是 profiles 之一");
+      }
+
+      const replace = db.transaction(() => {
+        db.prepare("DELETE FROM user_profiles WHERE user_id = ?").run(target.id);
+        const insert = db.prepare(
+          `INSERT INTO user_profiles (user_id, profile_name, is_default, created_at)
+           VALUES (?, ?, ?, ?)`,
+        );
+        const now = Date.now();
+        for (const profile of profiles) {
+          insert.run(target.id, profile, profile === defaultProfile ? 1 : 0, now);
+        }
+      });
+      replace();
+
+      logAudit(db, {
+        actorId: actor.id,
+        action: "user.profiles.set",
+        targetType: "user",
+        targetId: String(target.id),
+        ip: request.ip,
+        detail: JSON.stringify({ profiles, defaultProfile: defaultProfile || null }),
+      });
+
+      return getUserSummary(db, target.id);
+    },
+  );
 };

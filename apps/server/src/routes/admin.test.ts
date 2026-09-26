@@ -383,3 +383,86 @@ describe("DELETE /api/admin/users/:id", () => {
   });
 });
 
+describe("PUT /api/admin/users/:id/profiles", () => {
+  async function seedAlice(): Promise<{ id: number; session: string; csrf: string }> {
+    const alice = await createUser(ctx!.db, {
+      username: "alice",
+      password: "alice-password-123",
+      role: "admin",
+    });
+    const { session, csrf } = await loginAndGetCookies(ctx!.app);
+    return { id: alice.id, session, csrf };
+  }
+
+  it("replaces the profile assignment and marks the default", async () => {
+    ctx = await createTestContext();
+    const { id, session, csrf } = await seedAlice();
+    const put = (payload: Record<string, unknown>) =>
+      ctx!.app.inject({
+        method: "PUT",
+        url: `/api/admin/users/${id}/profiles`,
+        cookies: { "24h_session": session, "24h_csrf": csrf },
+        headers: { "x-csrf-token": csrf },
+        payload,
+      });
+
+    const first = await put({ profiles: ["alpha", "beta"], defaultProfile: "beta" });
+    expect(first.statusCode).toBe(200);
+    expect(first.json()).toMatchObject({
+      profiles: ["alpha", "beta"],
+      default_profile: "beta",
+    });
+
+    const second = await put({ profiles: ["gamma"], defaultProfile: "gamma" });
+    expect(second.statusCode).toBe(200);
+    expect(second.json()).toMatchObject({ profiles: ["gamma"], default_profile: "gamma" });
+
+    const rows = ctx.db
+      .prepare("SELECT profile_name, is_default FROM user_profiles WHERE user_id = ? ORDER BY profile_name")
+      .all(id) as { profile_name: string; is_default: number }[];
+    expect(rows).toEqual([{ profile_name: "gamma", is_default: 1 }]);
+
+    const audit = ctx.db
+      .prepare("SELECT action FROM audit WHERE action = ?")
+      .get("user.profiles.set") as Record<string, unknown>;
+    expect(audit.action).toBe("user.profiles.set");
+  });
+
+  it("allows clearing profiles with an empty array", async () => {
+    ctx = await createTestContext();
+    const { id, session, csrf } = await seedAlice();
+    ctx.db
+      .prepare(
+        "INSERT INTO user_profiles (user_id, profile_name, is_default, created_at) VALUES (?, ?, ?, ?)",
+      )
+      .run(id, "alpha", 1, Date.now());
+
+    const res = await ctx.app.inject({
+      method: "PUT",
+      url: `/api/admin/users/${id}/profiles`,
+      cookies: { "24h_session": session, "24h_csrf": csrf },
+      headers: { "x-csrf-token": csrf },
+      payload: { profiles: [] },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ profiles: [], default_profile: null });
+  });
+
+  it("rejects a defaultProfile that is not in profiles with 400", async () => {
+    ctx = await createTestContext();
+    const { id, session, csrf } = await seedAlice();
+
+    const res = await ctx.app.inject({
+      method: "PUT",
+      url: `/api/admin/users/${id}/profiles`,
+      cookies: { "24h_session": session, "24h_csrf": csrf },
+      headers: { "x-csrf-token": csrf },
+      payload: { profiles: ["alpha"], defaultProfile: "beta" },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe("INVALID_INPUT");
+  });
+});
+
