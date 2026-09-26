@@ -539,3 +539,99 @@ describe("AgentsPage T16.3 编辑", () => {
   });
 });
 
+describe("AgentsPage T16.4 删除/导出导入", () => {
+  const gatewayWith = () =>
+    createFakeGateway((method) => {
+      if (method === "profiles.list") {
+        return { profiles: [{ name: "writer", display_name: "写作" }] };
+      }
+      if (method === "profiles.describe") {
+        return { name: "writer" };
+      }
+      return {};
+    });
+
+  it("deletes the selected profile after confirmation", async () => {
+    const fetchMock = stubFetch([
+      { path: "/api/hermes/skills", method: "GET", status: 200, body: SKILLS },
+      { path: "/api/hermes/profiles/writer", method: "DELETE", status: 200, body: { ok: true } },
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    renderAgents(gatewayWith());
+    await user.click(await screen.findByRole("button", { name: /写作/ }));
+    await user.click(await screen.findByRole("button", { name: "删除" }));
+    await user.click(await screen.findByRole("button", { name: "确认删除" }));
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (entry) =>
+          String(entry[0]).includes("/api/hermes/profiles/writer") &&
+          (entry[1] as RequestInit | undefined)?.method === "DELETE",
+      );
+      expect(call).toBeTruthy();
+    });
+  });
+
+  it("exports the selected profile via POST", async () => {
+    const fetchMock = stubFetch([
+      { path: "/api/hermes/skills", method: "GET", status: 200, body: SKILLS },
+      {
+        path: "/api/hermes/profiles/writer/export",
+        method: "POST",
+        status: 200,
+        body: { ok: true, archive: "/tmp/writer.zip" },
+      },
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    renderAgents(gatewayWith());
+    await user.click(await screen.findByRole("button", { name: /写作/ }));
+    await user.click(await screen.findByRole("button", { name: "导出" }));
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (entry) =>
+          String(entry[0]).includes("/api/hermes/profiles/writer/export") &&
+          (entry[1] as RequestInit | undefined)?.method === "POST",
+      );
+      expect(call).toBeTruthy();
+    });
+    expect(await screen.findByText("已导出：/tmp/writer.zip")).toBeInTheDocument();
+  });
+
+  it("imports a profile with the archive path", async () => {
+    const fetchMock = stubFetch([
+      { path: "/api/hermes/skills", method: "GET", status: 200, body: SKILLS },
+      {
+        path: "/api/hermes/profiles/import",
+        method: "POST",
+        status: 200,
+        body: { ok: true, name: "restored" },
+      },
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    renderAgents();
+    await user.click(await screen.findByRole("button", { name: "导入" }));
+    await user.type(screen.getByLabelText("导入归档路径"), "/tmp/backup.zip");
+    await user.click(screen.getByLabelText("确认导入"));
+    await user.click(screen.getByRole("button", { name: "执行导入" }));
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (entry) =>
+          String(entry[0]).endsWith("/api/hermes/profiles/import") &&
+          (entry[1] as RequestInit | undefined)?.method === "POST",
+      );
+      expect(call).toBeTruthy();
+      expect(JSON.parse(String((call?.[1] as RequestInit).body))).toEqual({
+        archive: "/tmp/backup.zip",
+      });
+    });
+  });
+});
+

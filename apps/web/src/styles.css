@@ -1534,3 +1534,16 @@ button.danger {
   align-items: center;
   gap: var(--ds-space-2);
 }
+
+.agent-import-confirm {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  margin: var(--ds-space-2) 0;
+  color: var(--ds-label-secondary);
+  font-size: var(--ds-font-size-sm);
+}
+
+.agent-op-message {
+  margin: 0 0 var(--ds-space-3);
+}

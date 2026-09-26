@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useGateway } from "../chat/GatewayProvider";
+import { api } from "../api/client";
 import {
   normalizeAgentDetail,
   normalizeAgentList,
+  withProfile,
   type AgentDetail as AgentDetailData,
   type AgentSummary,
 } from "./agents";
@@ -10,6 +12,7 @@ import AgentList from "./AgentList";
 import AgentDetail from "./AgentDetail";
 import AgentCreatePanel, { type CreateProfileParams } from "./AgentCreatePanel";
 import AgentEditPanel, { type ConfigureProfileParams } from "./AgentEditPanel";
+import AgentImportPanel, { type ImportProfileParams } from "./AgentImportPanel";
 import SkillsPanel from "./SkillsPanel";
 import ToolsetsPanel from "./ToolsetsPanel";
 import McpPanel from "./McpPanel";
@@ -53,6 +56,12 @@ export default function AgentsPage() {
   const [editing, setEditing] = useState(false);
   const [configureBusy, setConfigureBusy] = useState(false);
   const [configureError, setConfigureError] = useState<string | null>(null);
+
+  const [importOpen, setImportOpen] = useState(false);
+  const [importBusy, setImportBusy] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [deleteArmed, setDeleteArmed] = useState(false);
+  const [opMessage, setOpMessage] = useState<string | null>(null);
 
   const loadAgents = useCallback(async () => {
     setListLoading(true);
@@ -181,6 +190,70 @@ export default function AgentsPage() {
     [gateway, loadAgents, loadDetail],
   );
 
+  const openImport = useCallback(() => {
+    setImportOpen(true);
+    setImportError(null);
+    setOpMessage(null);
+  }, []);
+
+  const closeImport = useCallback(() => {
+    setImportOpen(false);
+    setImportError(null);
+  }, []);
+
+  const submitImport = useCallback(
+    async (params: ImportProfileParams) => {
+      setImportBusy(true);
+      setImportError(null);
+      try {
+        await api(withProfile("/api/hermes/profiles/import", params.name), {
+          method: "POST",
+          body: JSON.stringify(params),
+        });
+        setImportOpen(false);
+        setOpMessage(`已导入：${params.name || params.archive}`);
+        await loadAgents();
+      } catch (err) {
+        setImportError(err instanceof Error ? err.message : "导入智能体失败");
+      } finally {
+        setImportBusy(false);
+      }
+    },
+    [loadAgents],
+  );
+
+  const exportProfile = useCallback(async (name: string) => {
+    setOpMessage(null);
+    try {
+      const result = await api<{ archive?: string }>(
+        withProfile(`/api/hermes/profiles/${encodeURIComponent(name)}/export`, name),
+        { method: "POST", body: JSON.stringify({}) },
+      );
+      setOpMessage(result?.archive ? `已导出：${result.archive}` : "已导出");
+    } catch (err) {
+      setOpMessage(err instanceof Error ? err.message : "导出智能体失败");
+    }
+  }, []);
+
+  const deleteProfile = useCallback(
+    async (name: string) => {
+      setOpMessage(null);
+      try {
+        await api(withProfile(`/api/hermes/profiles/${encodeURIComponent(name)}`, name), {
+          method: "DELETE",
+        });
+        setDeleteArmed(false);
+        setEditing(false);
+        setSelected(null);
+        setDetail(null);
+        await loadAgents();
+      } catch (err) {
+        setOpMessage(err instanceof Error ? err.message : "删除智能体失败");
+      }
+    },
+    [loadAgents],
+  );
+
   const runLearn = async (event: FormEvent) => {
     event.preventDefault();
     const args = learnArgs.trim();
@@ -220,8 +293,11 @@ export default function AgentsPage() {
               onSelect={(name) => {
                 setSelected(name);
                 setEditing(false);
+                setDeleteArmed(false);
+                setOpMessage(null);
               }}
               onCreate={() => openCreate("new")}
+              onImport={openImport}
             />
           )}
         </aside>
@@ -236,6 +312,15 @@ export default function AgentsPage() {
               error={createError}
               onCancel={closeCreate}
               onSubmit={(params) => void submitCreate(params)}
+            />
+          ) : null}
+
+          {importOpen ? (
+            <AgentImportPanel
+              busy={importBusy}
+              error={importError}
+              onCancel={closeImport}
+              onSubmit={(params) => void submitImport(params)}
             />
           ) : null}
 
@@ -261,11 +346,38 @@ export default function AgentsPage() {
                     <button type="button" onClick={() => openCreate("clone", detail.name)}>
                       克隆
                     </button>
+                    <button type="button" onClick={() => void exportProfile(detail.name)}>
+                      导出
+                    </button>
+                    {deleteArmed ? (
+                      <>
+                        <button
+                          type="button"
+                          className="danger"
+                          onClick={() => void deleteProfile(detail.name)}
+                        >
+                          确认删除
+                        </button>
+                        <button type="button" className="ghost" onClick={() => setDeleteArmed(false)}>
+                          取消
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        className="danger"
+                        onClick={() => setDeleteArmed(true)}
+                      >
+                        删除
+                      </button>
+                    )}
                   </>
                 ) : null
               }
             />
           )}
+
+          {opMessage ? <p className="muted agent-op-message">{opMessage}</p> : null}
 
           <form className="card learn-action" onSubmit={runLearn}>
             <div className="row">
