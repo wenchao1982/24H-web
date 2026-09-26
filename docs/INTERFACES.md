@@ -91,7 +91,6 @@
 | 用量 | L2 `/api/analytics/*` `/api/system/stats` | BFF→L2 |
 | 设置（Keys/模型） | L2 `/api/env` `/api/model/*` `/api/config` | BFF→L2 |
 | 面板（文件/日志/预览） | L2 `/api/files` `/api/logs` | BFF→L2 |
-| 命令面板 | 前端本地 + L1 `commands.catalog` | BFF→L1 |
 
 ## 5. 约定
 
