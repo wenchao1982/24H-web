@@ -8,6 +8,7 @@ import {
   appendDelta,
   completeAssistant,
   deltaText,
+  errorText,
   isSameSession,
   normalizeCreatedId,
   normalizeSessions,
@@ -32,6 +33,7 @@ export default function ChatPage() {
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<TranscriptItem[]>([]);
   const [pending, setPending] = useState<PendingRequest[]>([]);
+  const [running, setRunning] = useState(false);
 
   const activeIdRef = useRef<string | null>(null);
   const respondersRef = useRef(new Map<string, (result: Record<string, unknown>) => void>());
@@ -113,6 +115,22 @@ export default function ChatPage() {
         }),
       );
     });
+    gateway.on("done", (payload) => {
+      if (!isSameSession(payload, activeIdRef.current)) {
+        return;
+      }
+      setRunning(false);
+    });
+    gateway.on("error", (payload) => {
+      if (!isSameSession(payload, activeIdRef.current)) {
+        return;
+      }
+      setRunning(false);
+      setItems((current) => [
+        ...current,
+        { kind: "notice", id: nextId(), level: "error", text: errorText(payload) },
+      ]);
+    });
   }, [gateway, nextId]);
 
   useEffect(() => {
@@ -159,12 +177,27 @@ export default function ChatPage() {
         ...current,
         { kind: "message", id: nextId(), role: "user", text },
       ]);
+      setRunning(true);
       gateway.request("prompt.submit", { session_id: sessionId, text }).catch(() => {
+        setRunning(false);
         setError("发送失败");
       });
     },
     [gateway, nextId],
   );
+
+  const handleStop = useCallback(() => {
+    const sessionId = activeIdRef.current;
+    if (!sessionId) {
+      return;
+    }
+    gateway
+      .request("session.interrupt", { session_id: sessionId })
+      .catch(() => {
+        setError("无法中断");
+      })
+      .finally(() => setRunning(false));
+  }, [gateway]);
 
   const answerRequest = useCallback(
     (requestId: string, result: Record<string, unknown>) => {
@@ -222,7 +255,7 @@ export default function ChatPage() {
                 ))}
               </div>
             ) : null}
-            <Composer onSend={handleSend} />
+            <Composer running={running} onSend={handleSend} onStop={handleStop} />
           </>
         ) : (
           <p className="empty chat-hint">选择或新建一个会话开始对话。</p>

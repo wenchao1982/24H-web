@@ -106,6 +106,11 @@ export function deltaText(payload: Record<string, unknown>): string {
   return str(payload.text) ?? str(payload.delta) ?? str(payload.content) ?? "";
 }
 
+/** `error` 事件的提示文本。 */
+export function errorText(payload: Record<string, unknown>): string {
+  return str(payload.message) ?? str(payload.error) ?? "发生错误";
+}
+
 export function isSameSession(payload: Record<string, unknown>, activeId: string | null): boolean {
   const id = str(payload.session_id) ?? str(payload.sessionId);
   return !id || id === activeId;

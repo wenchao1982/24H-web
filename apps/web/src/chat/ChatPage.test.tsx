@@ -219,3 +219,24 @@ describe("ChatPage T6.6 其它服务端请求", () => {
     expect(respond).toHaveBeenCalledWith({ value: "sk-123" });
   });
 });
+
+describe("ChatPage T6.7 中断", () => {
+  it("turns the primary action into stop while running and interrupts", async () => {
+    const gateway = createFakeGateway((method) =>
+      method === "session.list" ? { sessions: [{ id: "s1", title: "会话一" }] } : {},
+    );
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+
+    await user.type(screen.getByLabelText("消息"), "跑起来");
+    await user.click(screen.getByRole("button", { name: "发送" }));
+
+    const stop = screen.getByRole("button", { name: "停止" });
+    expect(stop).toBeInTheDocument();
+    await user.click(stop);
+
+    expect(gateway.paramsOf("session.interrupt")).toEqual([{ session_id: "s1" }]);
+    expect(await screen.findByRole("button", { name: "发送" })).toBeInTheDocument();
+  });
+});

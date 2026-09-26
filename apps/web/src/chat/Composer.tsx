@@ -2,14 +2,16 @@ import { useState } from "react";
 
 export interface ComposerProps {
   onSend: (text: string) => void;
+  running?: boolean;
+  onStop?: () => void;
 }
 
-export default function Composer({ onSend }: ComposerProps) {
+export default function Composer({ onSend, running = false, onStop }: ComposerProps) {
   const [draft, setDraft] = useState("");
 
   const submit = () => {
     const text = draft.trim();
-    if (!text) {
+    if (!text || running) {
       return;
     }
     setDraft("");
@@ -38,9 +40,20 @@ export default function Composer({ onSend }: ComposerProps) {
           }
         }}
       />
-      <button type="submit" className="primary composer-send" aria-label="发送" disabled={draft.trim() === ""}>
-        发送
-      </button>
+      {running ? (
+        <button type="button" className="primary composer-stop" aria-label="停止" onClick={onStop}>
+          停止
+        </button>
+      ) : (
+        <button
+          type="submit"
+          className="primary composer-send"
+          aria-label="发送"
+          disabled={draft.trim() === ""}
+        >
+          发送
+        </button>
+      )}
     </form>
   );
 }
