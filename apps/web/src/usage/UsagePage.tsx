@@ -3,7 +3,9 @@ import { api } from "../api/client";
 import {
   normalizeSystemStats,
   normalizeUsage,
+  normalizeUsageByModel,
   type SystemStats,
+  type UsageByModel,
   type UsageSummary,
 } from "./analytics";
 
@@ -27,18 +29,21 @@ export default function UsagePage() {
     cost: 0,
   });
   const [stats, setStats] = useState<SystemStats | null>(null);
+  const [models, setModels] = useState<UsageByModel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [usagePayload, statsPayload] = await Promise.all([
+      const [usagePayload, statsPayload, modelsPayload] = await Promise.all([
         api<unknown>(`/api/hermes/analytics/usage?days=${DAYS}`),
         api<unknown>("/api/hermes/system/stats"),
+        api<unknown>(`/api/hermes/analytics/models?days=${DAYS}`),
       ]);
       setUsage(normalizeUsage(usagePayload));
       setStats(normalizeSystemStats(statsPayload));
+      setModels(normalizeUsageByModel(modelsPayload));
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "加载用量统计失败");
@@ -104,6 +109,34 @@ export default function UsagePage() {
           </p>
         </div>
       ) : null}
+
+      <div className="card">
+        <h3>按模型用量（近 {DAYS} 天）</h3>
+        {models.length === 0 ? (
+          <p className="empty">暂无模型用量。</p>
+        ) : (
+          <table className="table">
+            <thead>
+              <tr>
+                <th>模型</th>
+                <th>令牌</th>
+                <th>消息</th>
+                <th>费用（USD）</th>
+              </tr>
+            </thead>
+            <tbody>
+              {models.map((item) => (
+                <tr key={item.model}>
+                  <td>{item.model}</td>
+                  <td>{item.tokens}</td>
+                  <td>{item.messages}</td>
+                  <td>{item.cost.toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }
