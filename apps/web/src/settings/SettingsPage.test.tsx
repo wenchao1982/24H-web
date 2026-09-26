@@ -205,3 +205,41 @@ describe("SettingsPage T8.4 配置中心", () => {
     expect(await screen.findByText("已保存")).toBeInTheDocument();
   });
 });
+
+describe("SettingsPage T8.5 审批策略", () => {
+  it("reads and writes approvals.mode", async () => {
+    const fetchMock = stubFetch([
+      { path: "/api/hermes/env", method: "GET", status: 200, body: { keys: [] } },
+      {
+        path: "/api/hermes/config",
+        method: "GET",
+        status: 200,
+        body: { config: { approvals: { mode: "manual" } } },
+      },
+      { path: "/api/hermes/config", method: "PUT", status: 200, body: { ok: true } },
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<SettingsPage />);
+    await user.click(screen.getByRole("button", { name: "审批策略" }));
+
+    const select = (await screen.findByLabelText("审批模式")) as HTMLSelectElement;
+    expect(select.value).toBe("manual");
+
+    await user.selectOptions(select, "off");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (entry) =>
+          String(entry[0]).endsWith("/api/hermes/config") &&
+          (entry[1] as RequestInit | undefined)?.method === "PUT",
+      );
+      expect(call).toBeTruthy();
+      expect(JSON.parse(String((call?.[1] as RequestInit).body))).toEqual({
+        approvals: { mode: "off" },
+      });
+    });
+  });
+});
