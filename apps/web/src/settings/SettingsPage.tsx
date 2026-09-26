@@ -4,6 +4,7 @@ import ModelPanel from "./ModelPanel";
 import AppearancePanel from "./AppearancePanel";
 import ConfigPanel from "./ConfigPanel";
 import ApprovalPanel from "./ApprovalPanel";
+import OAuthPanel from "./OAuthPanel";
 
 interface SectionDef {
   id: string;
@@ -16,6 +17,7 @@ const SECTIONS: SectionDef[] = [
   { id: "appearance", label: "外观" },
   { id: "config", label: "配置中心" },
   { id: "approvals", label: "审批策略" },
+  { id: "oauth", label: "服务商登录" },
 ];
 
 /** 设置页：分区导航 + 分区详情（M6）。 */
@@ -44,6 +46,7 @@ export default function SettingsPage() {
         {section === "appearance" ? <AppearancePanel /> : null}
         {section === "config" ? <ConfigPanel /> : null}
         {section === "approvals" ? <ApprovalPanel /> : null}
+        {section === "oauth" ? <OAuthPanel /> : null}
       </div>
     </div>
   );

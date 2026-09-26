@@ -845,6 +845,14 @@ button {
   color: var(--ds-label-secondary);
 }
 
+.oauth-url {
+  margin: var(--ds-space-2) 0;
+  font-family: var(--ds-font-mono);
+  font-size: var(--ds-font-size-xs);
+  color: var(--ds-accent);
+  word-break: break-all;
+}
+
 .skills {
   display: flex;
   flex-direction: column;

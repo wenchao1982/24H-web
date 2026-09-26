@@ -243,3 +243,49 @@ describe("SettingsPage T8.5 审批策略", () => {
     });
   });
 });
+
+describe("SettingsPage T8.6 模型服务商 OAuth", () => {
+  it("lists providers and starts the OAuth flow", async () => {
+    const fetchMock = stubFetch([
+      { path: "/api/hermes/env", method: "GET", status: 200, body: { keys: [] } },
+      {
+        path: "/api/hermes/providers/oauth",
+        method: "GET",
+        status: 200,
+        body: {
+          providers: [
+            { id: "openai", name: "OpenAI", connected: false },
+            { id: "anthropic", name: "Anthropic", connected: true },
+          ],
+        },
+      },
+      {
+        path: "/api/hermes/providers/oauth/openai/start",
+        method: "POST",
+        status: 200,
+        body: { url: "https://auth.openai.com/device", user_code: "ABCD-1234" },
+      },
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<SettingsPage />);
+    await user.click(screen.getByRole("button", { name: "服务商登录" }));
+
+    expect(await screen.findByText("OpenAI")).toBeInTheDocument();
+    expect(screen.getByText("未连接")).toBeInTheDocument();
+    expect(screen.getByText("已连接")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "授权" }));
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (entry) =>
+          String(entry[0]).endsWith("/api/hermes/providers/oauth/openai/start") &&
+          (entry[1] as RequestInit | undefined)?.method === "POST",
+      );
+      expect(call).toBeTruthy();
+    });
+    expect(await screen.findByText("https://auth.openai.com/device")).toBeInTheDocument();
+    expect(screen.getByText(/ABCD-1234/)).toBeInTheDocument();
+  });
+});
