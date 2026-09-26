@@ -1,5 +1,6 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import FilesPanel from "../details/FilesPanel";
+import PreviewPanel from "../details/PreviewPanel";
 import LogsPanel from "../details/LogsPanel";
 
 export const DETAILS_TABS = [
@@ -19,6 +20,21 @@ export interface DetailsPanelProps {
 }
 
 export default function DetailsPanel({ tab, onTabChange, onClose, children }: DetailsPanelProps) {
+  const [previewPath, setPreviewPath] = useState<string | null>(null);
+
+  const renderTab = (): ReactNode => {
+    switch (tab) {
+      case "files":
+        return <FilesPanel onSelect={setPreviewPath} />;
+      case "preview":
+        return <PreviewPanel path={previewPath} />;
+      case "logs":
+        return <LogsPanel />;
+      default:
+        return <p className="empty">暂无内容</p>;
+    }
+  };
+
   return (
     <aside className="details" aria-label="详情面板">
       <div className="details-tabs" role="tablist" aria-label="详情标签">
@@ -39,19 +55,8 @@ export default function DetailsPanel({ tab, onTabChange, onClose, children }: De
         </button>
       </div>
       <div className="details-body" role="tabpanel">
-        {children ?? renderTab(tab)}
+        {children ?? renderTab()}
       </div>
     </aside>
   );
-}
-
-function renderTab(tab: DetailsTab): ReactNode {
-  switch (tab) {
-    case "files":
-      return <FilesPanel />;
-    case "logs":
-      return <LogsPanel />;
-    default:
-      return <p className="empty">暂无内容</p>;
-  }
 }
