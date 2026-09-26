@@ -4,6 +4,7 @@ import RequireAuth from "./auth/RequireAuth";
 import ShellLayout from "./shell/ShellLayout";
 import LoginPage from "./pages/LoginPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
+import { ToastProvider } from "./ui/Toast";
 
 /** 路由表（可注入 MemoryRouter 单测）。 */
 export function AppRoutes() {
@@ -32,9 +33,11 @@ export function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
-      <SessionProvider>
-        <AppRoutes />
-      </SessionProvider>
+      <ToastProvider>
+        <SessionProvider>
+          <AppRoutes />
+        </SessionProvider>
+      </ToastProvider>
     </BrowserRouter>
   );
 }
