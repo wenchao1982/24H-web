@@ -169,3 +169,72 @@ export function parseStatus(payload: Record<string, unknown>): Omit<StatusInfo, 
     tps: num(payload.tps) ?? num(payload.tokens_per_second),
   };
 }
+
+function stringify(value: unknown): string | undefined {
+  if (value == null) {
+    return undefined;
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return undefined;
+  }
+}
+
+/** `tool.*` 事件里的输入/详情预览。 */
+export function toolDetail(payload: Record<string, unknown>): string | undefined {
+  return (
+    str(payload.detail) ??
+    str(payload.preview) ??
+    str(payload.command) ??
+    stringify(payload.input) ??
+    stringify(payload.args)
+  );
+}
+
+/** `tool.complete` 的结果文本。 */
+export function toolResult(payload: Record<string, unknown>): string | undefined {
+  return str(payload.result) ?? str(payload.output) ?? str(payload.content) ?? stringify(payload.result);
+}
+
+function lastToolIndex(items: TranscriptItem[], id: string): number {
+  for (let i = items.length - 1; i >= 0; i -= 1) {
+    const item = items[i];
+    if (item.kind === "tool" && item.id === id) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+/** 合并（或新建）一张工具卡。 */
+export function upsertTool(
+  items: TranscriptItem[],
+  id: string,
+  name: string,
+  status: ToolStatus,
+  extra: { detail?: string; result?: string } = {},
+): TranscriptItem[] {
+  const index = lastToolIndex(items, id);
+  if (index >= 0) {
+    const existing = items[index];
+    if (existing.kind !== "tool") {
+      return items;
+    }
+    const merged: TranscriptItem = {
+      ...existing,
+      name: name || existing.name,
+      status,
+      ...(extra.detail ? { detail: extra.detail } : {}),
+      ...(extra.result ? { result: extra.result } : {}),
+    };
+    return [...items.slice(0, index), merged, ...items.slice(index + 1)];
+  }
+  return [
+    ...items,
+    { kind: "tool", id, name, status, ...(extra.detail ? { detail: extra.detail } : {}), ...(extra.result ? { result: extra.result } : {}) },
+  ];
+}

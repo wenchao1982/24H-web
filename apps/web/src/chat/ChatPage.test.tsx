@@ -113,3 +113,42 @@ describe("ChatPage T6.3 流式消息", () => {
     expect(screen.getByText("收到了，请稍等。")).toBeInTheDocument();
   });
 });
+
+describe("ChatPage T6.4 工具卡", () => {
+  it("renders tool cards across start/generating/complete", async () => {
+    const gateway = createFakeGateway((method) =>
+      method === "session.list" ? { sessions: [{ id: "s1", title: "会话一" }] } : {},
+    );
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+
+    act(() => {
+      gateway.emit("tool.start", { session_id: "s1", id: "t1", name: "web_search" });
+    });
+    expect(screen.getByText("web_search")).toBeInTheDocument();
+    expect(screen.getByText("已开始")).toBeInTheDocument();
+
+    act(() => {
+      gateway.emit("tool.generating", {
+        session_id: "s1",
+        id: "t1",
+        name: "web_search",
+        detail: "正在搜索",
+      });
+    });
+    expect(screen.getByText("生成中")).toBeInTheDocument();
+    expect(screen.getByText("正在搜索")).toBeInTheDocument();
+
+    act(() => {
+      gateway.emit("tool.complete", {
+        session_id: "s1",
+        id: "t1",
+        name: "web_search",
+        result: "3 条结果",
+      });
+    });
+    expect(screen.getByText("完成")).toBeInTheDocument();
+    expect(screen.getByText("3 条结果")).toBeInTheDocument();
+  });
+});

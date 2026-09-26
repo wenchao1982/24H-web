@@ -482,6 +482,50 @@ button {
   color: var(--ds-danger);
 }
 
+.tool-card {
+  align-self: flex-start;
+  max-width: 88%;
+  padding: var(--ds-space-2) var(--ds-space-3);
+  border: var(--ds-hairline) solid var(--ds-border-l1);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-l2);
+  font-size: var(--ds-font-size-sm);
+}
+
+.tool-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  cursor: pointer;
+}
+
+.tool-name {
+  font-family: var(--ds-font-mono);
+}
+
+.tool-status {
+  font-size: var(--ds-font-size-xs);
+  color: var(--ds-label-tertiary);
+}
+
+.tool-status[data-status="generating"] {
+  color: var(--ds-accent);
+}
+
+.tool-status[data-status="complete"] {
+  color: var(--ds-success);
+}
+
+.tool-detail,
+.tool-result {
+  margin: var(--ds-space-2) 0 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--ds-font-mono);
+  font-size: var(--ds-font-size-xs);
+  color: var(--ds-label-secondary);
+}
+
 .composer {
   display: flex;
   gap: var(--ds-space-2);

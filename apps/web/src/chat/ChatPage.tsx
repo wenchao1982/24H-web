@@ -10,6 +10,11 @@ import {
   isSameSession,
   normalizeCreatedId,
   normalizeSessions,
+  toolDetail,
+  toolId,
+  toolName,
+  toolResult,
+  upsertTool,
   type SessionSummary,
   type TranscriptItem,
 } from "./types";
@@ -70,6 +75,36 @@ export default function ChatPage() {
         return;
       }
       setItems((current) => completeAssistant(current, deltaText(payload), nextId()));
+    });
+    gateway.on("tool.start", (payload) => {
+      if (!isSameSession(payload, activeIdRef.current)) {
+        return;
+      }
+      setItems((current) =>
+        upsertTool(current, toolId(payload), toolName(payload), "start", {
+          detail: toolDetail(payload),
+        }),
+      );
+    });
+    gateway.on("tool.generating", (payload) => {
+      if (!isSameSession(payload, activeIdRef.current)) {
+        return;
+      }
+      setItems((current) =>
+        upsertTool(current, toolId(payload), toolName(payload), "generating", {
+          detail: toolDetail(payload),
+        }),
+      );
+    });
+    gateway.on("tool.complete", (payload) => {
+      if (!isSameSession(payload, activeIdRef.current)) {
+        return;
+      }
+      setItems((current) =>
+        upsertTool(current, toolId(payload), toolName(payload), "complete", {
+          result: toolResult(payload),
+        }),
+      );
     });
   }, [gateway, nextId]);
 

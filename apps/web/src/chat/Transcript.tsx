@@ -1,3 +1,4 @@
+import ToolCard from "./ToolCard";
 import type { TranscriptItem } from "./types";
 
 export default function Transcript({ items }: { items: TranscriptItem[] }) {
@@ -16,7 +17,15 @@ export default function Transcript({ items }: { items: TranscriptItem[] }) {
           );
         }
         if (item.kind === "tool") {
-          return null;
+          return (
+            <ToolCard
+              key={item.id}
+              name={item.name}
+              status={item.status}
+              detail={item.detail}
+              result={item.result}
+            />
+          );
         }
         return (
           <p key={item.id} className="notice" data-level={item.level}>
