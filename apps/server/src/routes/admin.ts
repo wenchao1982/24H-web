@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import type { Db } from "../db";
 import { ApiError } from "../http/errors";
+import { hashPassword } from "../auth/password";
 import { logAudit } from "../audit/repo";
 import {
   countActiveSuperAdmins,
@@ -242,6 +243,43 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
       });
 
       return getUserSummary(db, target.id);
+    },
+  );
+
+  app.post(
+    "/api/admin/users/:id/password",
+    { preHandler: requireSuperAdmin },
+    async (request) => {
+      const actor = currentUser(request);
+      const id = readIdParam(request);
+
+      const target = findUserById(db, id);
+      if (!target) {
+        throw new ApiError(404, "USER_NOT_FOUND", "用户不存在");
+      }
+
+      const password = readString(request.body, "password");
+      if (!password) {
+        throw new ApiError(400, "INVALID_INPUT", "新密码不能为空");
+      }
+      if (password.length < 8) {
+        throw new ApiError(400, "WEAK_PASSWORD", "密码至少 8 位");
+      }
+
+      const passwordHash = await hashPassword(password);
+      db.prepare(
+        "UPDATE users SET password_hash = ?, must_change_password = 1, updated_at = ? WHERE id = ?",
+      ).run(passwordHash, Date.now(), target.id);
+
+      logAudit(db, {
+        actorId: actor.id,
+        action: "user.password.reset",
+        targetType: "user",
+        targetId: String(target.id),
+        ip: request.ip,
+      });
+
+      return { ok: true };
     },
   );
 };

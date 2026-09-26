@@ -466,3 +466,75 @@ describe("PUT /api/admin/users/:id/profiles", () => {
   });
 });
 
+describe("POST /api/admin/users/:id/password", () => {
+  it("resets the password, forces a change, and records an audit row", async () => {
+    ctx = await createTestContext();
+    const alice = await createUser(ctx.db, {
+      username: "alice",
+      password: "alice-password-123",
+      role: "admin",
+    });
+    const { session, csrf } = await loginAndGetCookies(ctx.app);
+
+    const res = await ctx.app.inject({
+      method: "POST",
+      url: `/api/admin/users/${alice.id}/password`,
+      cookies: { "24h_session": session, "24h_csrf": csrf },
+      headers: { "x-csrf-token": csrf },
+      payload: { password: "brand-new-password" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true });
+
+    const oldLogin = await ctx.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: "alice", password: "alice-password-123" },
+    });
+    expect(oldLogin.statusCode).toBe(401);
+
+    const newLogin = await ctx.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: "alice", password: "brand-new-password" },
+    });
+    expect(newLogin.statusCode).toBe(200);
+    expect(newLogin.json().user.must_change_password).toBe(1);
+
+    const audit = ctx.db
+      .prepare("SELECT action, target_id FROM audit WHERE action = ?")
+      .get("user.password.reset") as Record<string, unknown>;
+    expect(audit.target_id).toBe(String(alice.id));
+  });
+
+  it("rejects a weak password and an unknown user", async () => {
+    ctx = await createTestContext();
+    const alice = await createUser(ctx.db, {
+      username: "alice",
+      password: "alice-password-123",
+      role: "admin",
+    });
+    const { session, csrf } = await loginAndGetCookies(ctx.app);
+
+    const weak = await ctx.app.inject({
+      method: "POST",
+      url: `/api/admin/users/${alice.id}/password`,
+      cookies: { "24h_session": session, "24h_csrf": csrf },
+      headers: { "x-csrf-token": csrf },
+      payload: { password: "short" },
+    });
+    expect(weak.statusCode).toBe(400);
+    expect(weak.json().error).toBe("WEAK_PASSWORD");
+
+    const missing = await ctx.app.inject({
+      method: "POST",
+      url: "/api/admin/users/999999/password",
+      cookies: { "24h_session": session, "24h_csrf": csrf },
+      headers: { "x-csrf-token": csrf },
+      payload: { password: "brand-new-password" },
+    });
+    expect(missing.statusCode).toBe(404);
+  });
+});
+
