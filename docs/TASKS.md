@@ -1,8 +1,8 @@
 # 任务拆解（最小可实现）
 
-> 目标：把全部功能拆成"一个任务 = 一次最小提交"。
-> 依赖列里的 ID 表示前置任务。接口列标明走 BFF / L1(网关 WS) / L2(REST)。
-> 里程碑：M0 工程基线 · M1 BFF+认证 · M2 用户管理 · M3 代理 · M4 对话 · M5 技能/设置 · M6 任务/用量/面板 · M7 体验 · M8 future。
+> 目标：一个任务 = 一次最小提交。依赖列 = 前置 ID。接口列 = BFF / L1(网关 WS) / L2(REST)。
+> 契约以官方为准（`gateway-contract.generated.ts` / `web_routers/*.py`）。
+> 里程碑：M0 基线 · M1 BFF+认证 · M2 用户管理 · M3 代理 · M4 前端骨架 · M5 对话 · M6 技能/工具/设置 · M7 任务/用量/面板 · M8 Agent/Profile（待决策） · M9 体验 · M10 future。
 
 ## M0 工程基线
 
@@ -24,12 +24,13 @@
 | T2.2 | 口令哈希 | argon2id 封装（hash/verify） | T1.1 | — | 单测通过 |
 | T2.3 | 首启引导 | 无用户时创建 super_admin（一次性 token/CLI），标记须改密 | T2.1,T2.2 | BFF | 首次可登录 |
 | T2.4 | 登录 | `POST /api/auth/login` 校验 + 建会话 cookie | T2.3 | BFF | 登录成功/失败 |
-| T2.5 | 当前用户 | `GET /api/auth/me` | T2.4 | BFF | 返回 id/username/role/profiles |
+| T2.5 | 当前用户 | `GET /api/auth/me`（id/username/role/profiles） | T2.4 | BFF | 返回正确 |
 | T2.6 | 登出 | `POST /api/auth/logout` | T2.4 | BFF | cookie 清除 |
 | T2.7 | 会话中间件 | cookie→req.user；无会话 401 | T2.4 | BFF | 受保护路由 401 |
 | T2.8 | 角色守卫 | `requireSuperAdmin` | T2.7 | BFF | admin 访问管理路由 403 |
 | T2.9 | 改密 | `POST /api/auth/change-password`（首登强制） | T2.7 | BFF | 改密后可继续 |
 | T2.10 | 登录限流 | `login_attempts` 计数 + 锁定 | T2.4 | BFF | 多次失败锁定 |
+| T2.11 | CSRF 防护 | 同源 + CSRF token（cookie 会话必需） | T1.3,T2.7 | BFF | 跨站写被拒 |
 
 ## M2 用户与角色管理（super_admin）
 
@@ -52,30 +53,50 @@
 | T4.3 | profile 守卫 | 解析请求的目标 profile 并校验权限 | T4.2,T3.5 | BFF | 越权 403 |
 | T4.4 | WS 代理 | `/api/ws`：先认证再代理到 Hermes | T4.1,T2.7 | BFF→L1 | 收发事件 |
 | T4.5 | 代理错误归一 | 上游错误 → 统一结构 | T4.2 | BFF | 错误一致 |
+| T4.6 | 上游健康探测 | BFF→Hermes `/api/status` 探活 + 降级提示 | T4.1 | BFF→L2 | 断开可提示 |
 
-## M4 对话（核心）
+## M4 前端骨架
 
 | ID | 任务 | 说明 | 依赖 | 接口 | 验收 |
 | --- | --- | --- | --- | --- | --- |
-| T6.1 | 会话列表 | 拉取会话（经 BFF 代理 L2） | T4.2 | L2 | 列表渲染 |
+| T5.1 | 布局与导航 | 侧栏（对话/技能/任务/用量/设置）+ 顶栏 | — | — | 可切换 |
+| T5.2 | API client | `src/api` 指向 BFF，带 cookie + CSRF；`/api/hermes/ws` | T0.2 | BFF | 请求成功 |
+| T5.3 | 路由 + 登录守卫 | 未登录跳登录页；按 role 隐藏管理入口 | T5.1,T2.5 | BFF | 守卫生效 |
+| T5.4 | 登录页 | 你自己的登录页（用户名/密码） | T2.4,T5.2 | BFF | 可登录 |
+| T5.5 | 全局 401/错误处理 | 401→登录页；错误 toast | T5.2 | BFF | 401 被处理 |
+| T5.6 | 用户管理页 | 列表/建/改/禁用/分配 profile（仅 super_admin 可见） | T3.1,T5.3 | BFF | admin 可见、普通不可见 |
+
+## M5 对话（核心）
+
+| ID | 任务 | 说明 | 依赖 | 接口 | 验收 |
+| --- | --- | --- | --- | --- | --- |
+| T6.1 | 会话列表 | 拉取会话（经 BFF 代理） | T4.2,T5.2 | L2 | 列表渲染 |
 | T6.2 | 新建会话 | `session.create` | T4.4 | L1 | 拿到 session_id |
 | T6.3 | 流式消息 | `prompt.submit` → `message.delta/complete` → transcript | T6.2 | L1 | 流式显示 |
-| T6.4 | 工具卡 | `tool.start/complete` 渲染 | T6.3 | L1 | 工具可见 |
-| T6.5 | 审批/澄清 | server→client request 回包 | T6.3 | L1 | 审批可点 |
-| T6.6 | 中断 | `session.interrupt` | T6.3 | L1 | 可停止 |
-| T6.7 | 状态条 | 上下文/用量/速率 | T6.3 | L1 | 显示统计 |
+| T6.4 | 工具卡 | `tool.start/generating/complete` 渲染 | T6.3 | L1 | 工具可见 |
+| T6.5 | 审批/澄清 | server request `approval`/`clarify` 回包 | T6.3 | L1 | 可点 |
+| T6.6 | 其它服务端请求 | `sudo`/`secret`/`mcp.setup` 回包 | T6.5 | L1 | 不卡 turn |
+| T6.7 | 中断 | `session.interrupt` | T6.3 | L1 | 可停止 |
+| T6.8 | 状态条 | 上下文/用量/速率（`thinking`/`done`/`error`） | T6.3 | L1 | 显示统计 |
+| T6.9 | 会话管理 | 重命名/删除/恢复（`session.title/delete/resume`） | T6.1 | L1 | 操作生效 |
+| T6.10 | 断线重放 | `session.events.since` 重建挂起状态 | T6.3 | L1 | 刷新可续 |
+| T6.11 | 附件 | 图片/文件/PDF 上传（`image/pdf/file.attach`） | T6.3 | L1 | 可发送 |
 
-## M5 技能 / 设置
+## M6 技能 / 工具 / 设置
 
 | ID | 任务 | 说明 | 依赖 | 接口 | 验收 |
 | --- | --- | --- | --- | --- | --- |
 | T7.1 | 技能列表 | 按类别分组 | T4.2 | L2 | 分组渲染 |
 | T7.2 | 技能启停 | toggle | T7.1 | L2 | 状态持久 |
+| T7.3 | 工具 / Toolsets | `/api/tools/toolsets`（查看/启停/config） | T4.2 | L2 | 可管理 |
+| T7.4 | MCP 管理 | `/api/mcp/*`（列表/增删/启停/目录） | T4.2 | L2 | 可管理 |
+| T7.5 | 插件 | `plugins.manage`（列表/启停） | T4.2 | L1/L2 | 可管理 |
 | T8.1 | Keys 管理 | `/api/env` 读写（不回显明文） | T4.2 | L2 | 可保存 |
-| T8.2 | 模型设置 | `/api/model/*` | T4.2 | L2 | 可切换 |
+| T8.2 | 模型设置 | `/api/model/*`（info/options/set/moa） | T4.2 | L2 | 可切换 |
 | T8.3 | 外观 | 主题/语言 | — | — | 生效 |
+| T8.4 | 配置中心 | `/api/config`（config.yaml 常用项） | T4.2 | L2 | 可改 |
 
-## M6 任务 / 用量 / 面板
+## M7 任务 / 用量 / 面板
 
 | ID | 任务 | 说明 | 依赖 | 接口 | 验收 |
 | --- | --- | --- | --- | --- | --- |
@@ -86,20 +107,45 @@
 | T11.1 | 文件面板 | 浏览/读取 | T4.2 | L2 | 可浏览 |
 | T11.2 | 日志面板 | 读取/过滤 | T4.2 | L2 | 可筛选 |
 | T11.3 | 预览面板 | 文件/HTML 预览 | T11.1 | — | 可预览 |
+| T11.4 | Git 面板 | `/api/git/*`（状态/差异） | T4.2 | L2 | 可查看 |
 
-## M7 体验
+## M8 Agent / Profile 管理（待决策）
 
 | ID | 任务 | 说明 | 依赖 | 接口 | 验收 |
 | --- | --- | --- | --- | --- | --- |
-| T12.1 | 命令面板 | ⌘K：导航/动作 | T5.2 | — | 可执行 |
-| T13.1 | 中文化 | 文案/i18n 收口 | — | — | 全中文 |
-| T13.2 | 移动端 | 响应式布局 | T5.2 | — | 小屏可用 |
-| T13.3 | 登录/用户管理页 | 登录页 + 用户管理页（admin 可见） | T2.4,T3.1 | BFF | 仅 admin 可见管理页 |
+| T16.1 | Agent 列表/详情 | `profiles.list` / `/api/profiles` | T4.2 | L1/L2 | 展示正确 |
+| T16.2 | 创建/克隆 | `profiles.create` | T16.1 | L1 | 可创建 |
+| T16.3 | 编辑 | SOUL/模型/skills（`profiles.configure`） | T16.1 | L1 | 可编辑 |
+| T16.4 | 删除 | `PATCH|DELETE /api/profiles/:name` | T16.1 | L2 | 可删除 |
+| T16.5 | 头像 | `profiles.set_asset/get_asset` | T16.1 | L1 | 可设头像 |
 
-## M8 future
+## M9 体验
+
+| ID | 任务 | 说明 | 依赖 | 接口 | 验收 |
+| --- | --- | --- | --- | --- | --- |
+| T12.1 | 命令面板 | ⌘K：导航/动作 | T5.1 | — | 可执行 |
+| T13.1 | 中文化 | 文案/i18n 收口 | — | — | 全中文 |
+| T13.2 | 移动端 | 响应式布局 | T5.1 | — | 小屏可用 |
+
+## M10 future（本期不做）
 
 | ID | 任务 | 说明 | 依赖 | 接口 | 验收 |
 | --- | --- | --- | --- | --- | --- |
 | T14.1 | AuthProvider 抽象 | 抽出接口，password 为实现之一 | T2.4 | — | 行为不变 |
 | T14.2 | OIDC 接入 | provider + JIT 映射到本地 user/角色 | T14.1 | — | 可 OIDC 登录 |
 | T15.1 | Skill UI 宿主 | iframe + postMessage RPC（见 24OS 协议） | T6.3 | — | 能挂 UI |
+| T17.1 | 群聊 / Bot | `groups.*` / `bot_relay.*` | T6.3 | L1 | 可群聊 |
+| T17.2 | 消息平台 Channels | `/api/messaging/*` | T4.2 | L2 | 可配置 |
+| T17.3 | 记忆 | `/api/memory*` | T4.2 | L2 | 可切换 |
+| T17.4 | Webhooks | `/api/webhooks*` | T4.2 | L2 | 可管理 |
+| T17.5 | 子代理观测 | `subagent.list/tail/interrupt/steer` | T6.3 | L1 | 可见/可控 |
+
+## 覆盖与缺口（审计）
+
+对照 `docs/INTERFACES.md`：
+
+- **已在范围**（BFF/认证/用户/代理/对话/技能/工具/MCP/插件/设置/任务/用量/面板/Git/前端骨架）。
+- **待决策（M8）**：Agent/Profile 管理（`profiles.*` / `/api/profiles*`）——产品是否要"用户能创建/编辑 agent"？
+- **future（M10）**：群聊/Bot、消息平台、记忆、Webhooks、子代理观测、IdP、Skill UI。
+- **明确不做**：本地模型（`/api/local-models`）、配对（`/api/pairing`）、门户（`/api/portal`）、运维 ops（`/api/ops`）、voice/wake、billing/free_tier/subscription、vault/connectors、session.foreign、llm.oneshot、cli.exec/shell.exec、browser.manage、image.generate、project.facts、verification.status、handoff、curator/learning。
+- **结构修正**：本版补齐了缺失的 **T5 前端骨架**（原 T12.1/T13.2 的悬空依赖 `T5.2` 已修复为 `T5.1`）。
