@@ -240,3 +240,28 @@ describe("ChatPage T6.7 中断", () => {
     expect(await screen.findByRole("button", { name: "发送" })).toBeInTheDocument();
   });
 });
+
+describe("ChatPage T6.8 状态条", () => {
+  it("renders context, tokens and rate from a thinking event", async () => {
+    const gateway = createFakeGateway((method) =>
+      method === "session.list" ? { sessions: [{ id: "s1", title: "会话一" }] } : {},
+    );
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+
+    act(() => {
+      gateway.emit("thinking", {
+        session_id: "s1",
+        context_percent: 18,
+        tokens: 62000,
+        tps: 62,
+      });
+    });
+
+    const bar = screen.getByRole("status");
+    expect(bar).toHaveTextContent("上下文 18%");
+    expect(bar).toHaveTextContent("62k tok");
+    expect(bar).toHaveTextContent("62 tok/s");
+  });
+});

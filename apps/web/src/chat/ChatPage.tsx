@@ -3,6 +3,7 @@ import { useGateway } from "./GatewayProvider";
 import SessionList from "./SessionList";
 import Transcript from "./Transcript";
 import Composer from "./Composer";
+import StatusBar from "./StatusBar";
 import ServerRequestCard from "./ServerRequestCard";
 import {
   appendDelta,
@@ -12,6 +13,7 @@ import {
   isSameSession,
   normalizeCreatedId,
   normalizeSessions,
+  parseStatus,
   toolDetail,
   toolId,
   toolName,
@@ -20,6 +22,7 @@ import {
   type PendingRequest,
   type RequestKind,
   type SessionSummary,
+  type StatusInfo,
   type TranscriptItem,
 } from "./types";
 
@@ -34,6 +37,7 @@ export default function ChatPage() {
   const [items, setItems] = useState<TranscriptItem[]>([]);
   const [pending, setPending] = useState<PendingRequest[]>([]);
   const [running, setRunning] = useState(false);
+  const [status, setStatus] = useState<StatusInfo | null>(null);
 
   const activeIdRef = useRef<string | null>(null);
   const respondersRef = useRef(new Map<string, (result: Record<string, unknown>) => void>());
@@ -115,17 +119,25 @@ export default function ChatPage() {
         }),
       );
     });
+    gateway.on("thinking", (payload) => {
+      if (!isSameSession(payload, activeIdRef.current)) {
+        return;
+      }
+      setStatus({ phase: "thinking", ...parseStatus(payload) });
+    });
     gateway.on("done", (payload) => {
       if (!isSameSession(payload, activeIdRef.current)) {
         return;
       }
       setRunning(false);
+      setStatus({ phase: "done" });
     });
     gateway.on("error", (payload) => {
       if (!isSameSession(payload, activeIdRef.current)) {
         return;
       }
       setRunning(false);
+      setStatus({ phase: "error", error: errorText(payload) });
       setItems((current) => [
         ...current,
         { kind: "notice", id: nextId(), level: "error", text: errorText(payload) },
@@ -178,6 +190,7 @@ export default function ChatPage() {
         { kind: "message", id: nextId(), role: "user", text },
       ]);
       setRunning(true);
+      setStatus({ phase: "thinking" });
       gateway.request("prompt.submit", { session_id: sessionId, text }).catch(() => {
         setRunning(false);
         setError("发送失败");
@@ -256,6 +269,7 @@ export default function ChatPage() {
               </div>
             ) : null}
             <Composer running={running} onSend={handleSend} onStop={handleStop} />
+            <StatusBar status={status} />
           </>
         ) : (
           <p className="empty chat-hint">选择或新建一个会话开始对话。</p>

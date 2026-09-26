@@ -605,6 +605,20 @@ button {
   color: var(--ds-label-secondary);
 }
 
+.status-bar {
+  font-size: var(--ds-font-size-xs);
+  color: var(--ds-label-tertiary);
+  min-height: 16px;
+}
+
+.status-bar[data-phase="thinking"] {
+  color: var(--ds-label-secondary);
+}
+
+.status-bar[data-phase="error"] {
+  color: var(--ds-danger);
+}
+
 /* ---------- 通用表单 / 页面 ---------- */
 
 .page {
