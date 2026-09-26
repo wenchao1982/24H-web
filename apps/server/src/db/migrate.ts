@@ -60,6 +60,13 @@ export const MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_user_profiles_user ON user_profiles(user_id);
     `,
   },
+  {
+    version: 2,
+    name: "002_avatar",
+    sql: `
+      ALTER TABLE users ADD COLUMN avatar TEXT;
+    `,
+  },
 ];
 
 export function migrate(db: Db): number {

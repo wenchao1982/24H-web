@@ -12,6 +12,7 @@ export interface UserRow {
   created_at: number;
   updated_at: number;
   last_login_at: number | null;
+  avatar: string | null;
 }
 
 export function countUsers(db: Db): number {

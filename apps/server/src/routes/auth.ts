@@ -4,7 +4,8 @@ import { ApiError } from "../http/errors";
 import { issueCsrfToken } from "../http/csrf";
 import { verifyPassword, hashPassword } from "../auth/password";
 import { clearLoginFailures, getLockedUntil, recordLoginFailure } from "../auth/rateLimit";
-import { findUserByUsername, listUserProfiles } from "../users/repo";
+import { findUserByUsername, findUserById, listUserProfiles } from "../users/repo";
+import { parseAvatarDataUrl } from "../users/avatar";
 import { SESSION_COOKIE, createSession, deleteSessionByToken } from "../session/repo";
 import { requireAuth } from "../session/middleware";
 
@@ -173,5 +174,36 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, opt
     }
 
     return { ok: true, username };
+  });
+
+  app.put("/api/auth/avatar", { preHandler: requireAuth }, async (request) => {
+    const user = request.user;
+    if (!user) {
+      throw new ApiError(401, "UNAUTHENTICATED", "未登录");
+    }
+
+    const data = readString(request.body, "data");
+    if (!data) {
+      throw new ApiError(400, "INVALID_INPUT", "缺少头像数据");
+    }
+
+    const avatar = parseAvatarDataUrl(data);
+    db.prepare("UPDATE users SET avatar = ?, updated_at = ? WHERE id = ?").run(
+      avatar.dataUrl,
+      Date.now(),
+      user.id,
+    );
+
+    return { ok: true };
+  });
+
+  app.get("/api/auth/avatar", { preHandler: requireAuth }, async (request) => {
+    const user = request.user;
+    if (!user) {
+      throw new ApiError(401, "UNAUTHENTICATED", "未登录");
+    }
+
+    const row = findUserById(db, user.id);
+    return { data: row?.avatar ?? null };
   });
 };
