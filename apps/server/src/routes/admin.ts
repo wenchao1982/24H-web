@@ -2,7 +2,7 @@ import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import type { Db } from "../db";
 import { ApiError } from "../http/errors";
 import { hashPassword } from "../auth/password";
-import { logAudit } from "../audit/repo";
+import { listAudit, logAudit } from "../audit/repo";
 import {
   countActiveSuperAdmins,
   createUser,
@@ -68,6 +68,14 @@ function readIdParam(request: FastifyRequest): number {
     throw new ApiError(400, "INVALID_INPUT", "无效的用户 ID");
   }
   return id;
+}
+
+function readPage(value: unknown, fallback: number, max: number): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    return fallback;
+  }
+  return Math.min(parsed, max);
 }
 
 export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, opts) => {
@@ -282,4 +290,11 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
       return { ok: true };
     },
   );
+
+  app.get("/api/admin/audit", { preHandler: requireSuperAdmin }, async (request) => {
+    const query = request.query as { limit?: string; offset?: string };
+    const limit = readPage(query.limit, 50, 200);
+    const offset = readPage(query.offset, 0, Number.MAX_SAFE_INTEGER);
+    return listAudit(db, { limit, offset });
+  });
 };

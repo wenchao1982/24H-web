@@ -538,3 +538,117 @@ describe("POST /api/admin/users/:id/password", () => {
   });
 });
 
+describe("GET /api/admin/audit", () => {
+  it("records admin writes and lists them newest first with the actor username", async () => {
+    ctx = await createTestContext();
+    const { session, csrf } = await loginAndGetCookies(ctx.app);
+    const cookies = { "24h_session": session, "24h_csrf": csrf };
+    const headers = { "x-csrf-token": csrf };
+
+    const created = await ctx.app.inject({
+      method: "POST",
+      url: "/api/admin/users",
+      cookies,
+      headers,
+      payload: { username: "bob", password: "bob-password-123", role: "admin" },
+    });
+    const bobId = (created.json() as { id: number }).id;
+
+    await ctx.app.inject({
+      method: "PATCH",
+      url: `/api/admin/users/${bobId}`,
+      cookies,
+      headers,
+      payload: { status: "disabled" },
+    });
+    await ctx.app.inject({
+      method: "PUT",
+      url: `/api/admin/users/${bobId}/profiles`,
+      cookies,
+      headers,
+      payload: { profiles: ["alpha"], defaultProfile: "alpha" },
+    });
+    await ctx.app.inject({
+      method: "POST",
+      url: `/api/admin/users/${bobId}/password`,
+      cookies,
+      headers,
+      payload: { password: "bob-new-password" },
+    });
+    await ctx.app.inject({
+      method: "DELETE",
+      url: `/api/admin/users/${bobId}`,
+      cookies,
+      headers,
+    });
+
+    const res = await ctx.app.inject({ method: "GET", url: "/api/admin/audit", cookies });
+
+    expect(res.statusCode).toBe(200);
+    const rows = res.json() as Record<string, unknown>[];
+    expect(rows).toHaveLength(5);
+    expect(new Set(rows.map((row) => row.action))).toEqual(
+      new Set([
+        "user.create",
+        "user.update",
+        "user.profiles.set",
+        "user.password.reset",
+        "user.delete",
+      ]),
+    );
+    expect(rows[0].action).toBe("user.delete");
+    for (const row of rows) {
+      expect(row).toMatchObject({ actor_username: "admin", target_type: "user" });
+      expect(typeof row.at).toBe("number");
+    }
+    expect(JSON.stringify(rows)).not.toContain("password_hash");
+  });
+
+  it("supports limit and offset", async () => {
+    ctx = await createTestContext();
+    const { session, csrf } = await loginAndGetCookies(ctx.app);
+    const cookies = { "24h_session": session, "24h_csrf": csrf };
+    const headers = { "x-csrf-token": csrf };
+
+    for (const username of ["user1", "user2", "user3"]) {
+      await ctx.app.inject({
+        method: "POST",
+        url: "/api/admin/users",
+        cookies,
+        headers,
+        payload: { username, password: `${username}-password-123`, role: "admin" },
+      });
+    }
+
+    const firstPage = await ctx.app.inject({
+      method: "GET",
+      url: "/api/admin/audit?limit=2",
+      cookies,
+    });
+    expect(firstPage.statusCode).toBe(200);
+    expect(firstPage.json()).toHaveLength(2);
+
+    const secondPage = await ctx.app.inject({
+      method: "GET",
+      url: "/api/admin/audit?limit=2&offset=2",
+      cookies,
+    });
+    expect(secondPage.json()).toHaveLength(1);
+    expect(secondPage.json()[0].action).toBe("user.create");
+  });
+
+  it("forbids a plain admin with 403", async () => {
+    ctx = await createTestContext();
+    await createUser(ctx.db, { username: "alice", password: "alice-password-123", role: "admin" });
+    const { session } = await loginAndGetCookies(ctx.app, "alice", "alice-password-123");
+
+    const res = await ctx.app.inject({
+      method: "GET",
+      url: "/api/admin/audit",
+      cookies: { "24h_session": session },
+    });
+
+    expect(res.statusCode).toBe(403);
+  });
+});
+
