@@ -344,3 +344,30 @@ describe("ChatPage T6.10 断线重放", () => {
     expect(gateway.paramsOf("session.events.since")).toEqual([{ session_id: "s1" }]);
   });
 });
+
+describe("ChatPage T6.11 附件", () => {
+  it("attaches a file chip and includes it in the prompt", async () => {
+    const gateway = createFakeGateway((method) =>
+      method === "session.list" ? { sessions: [{ id: "s1", title: "会话一" }] } : {},
+    );
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+
+    const file = new File(["hello"], "notes.txt", { type: "text/plain" });
+    await user.upload(screen.getByLabelText("添加附件"), file);
+
+    expect(await screen.findByText("notes.txt")).toBeInTheDocument();
+    expect(gateway.paramsOf("file.attach")).toEqual([
+      { session_id: "s1", name: "notes.txt", size: 5, type: "text/plain" },
+    ]);
+
+    await user.type(screen.getByLabelText("消息"), "带你一起");
+    await user.click(screen.getByRole("button", { name: "发送" }));
+
+    const submits = gateway.paramsOf("prompt.submit");
+    expect(submits).toHaveLength(1);
+    expect(submits[0]).toMatchObject({ session_id: "s1", text: "带你一起" });
+    expect((submits[0].attachments as string[])).toHaveLength(1);
+  });
+});

@@ -20,6 +20,7 @@ import {
   toolName,
   toolResult,
   upsertTool,
+  type Attachment,
   type PendingRequest,
   type RequestKind,
   type SessionSummary,
@@ -39,6 +40,7 @@ export default function ChatPage() {
   const [pending, setPending] = useState<PendingRequest[]>([]);
   const [running, setRunning] = useState(false);
   const [status, setStatus] = useState<StatusInfo | null>(null);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
 
   const activeIdRef = useRef<string | null>(null);
   const respondersRef = useRef(new Map<string, (result: Record<string, unknown>) => void>());
@@ -261,12 +263,17 @@ export default function ChatPage() {
       ]);
       setRunning(true);
       setStatus({ phase: "thinking" });
-      gateway.request("prompt.submit", { session_id: sessionId, text }).catch(() => {
+      const payload: Record<string, unknown> = { session_id: sessionId, text };
+      if (attachments.length > 0) {
+        payload.attachments = attachments.map((attachment) => attachment.id);
+      }
+      setAttachments([]);
+      gateway.request("prompt.submit", payload).catch(() => {
         setRunning(false);
         setError("发送失败");
       });
     },
-    [gateway, nextId],
+    [attachments, gateway, nextId],
   );
 
   const handleStop = useCallback(() => {
@@ -281,6 +288,40 @@ export default function ChatPage() {
       })
       .finally(() => setRunning(false));
   }, [gateway]);
+
+  const handleAttach = useCallback(
+    (files: File[]) => {
+      const sessionId = activeIdRef.current;
+      if (!sessionId) {
+        return;
+      }
+      for (const file of files) {
+        const method: Attachment["method"] = file.type.startsWith("image/")
+          ? "image.attach"
+          : file.type === "application/pdf"
+            ? "pdf.attach"
+            : "file.attach";
+        const id = nextId();
+        setAttachments((current) => [
+          ...current,
+          { id, name: file.name, size: file.size, type: file.type, method },
+        ]);
+        gateway
+          .request(method, {
+            session_id: sessionId,
+            name: file.name,
+            size: file.size,
+            type: file.type,
+          })
+          .catch(() => setError("附件上传失败"));
+      }
+    },
+    [gateway, nextId],
+  );
+
+  const removeAttachment = useCallback((id: string) => {
+    setAttachments((current) => current.filter((attachment) => attachment.id !== id));
+  }, []);
 
   const answerRequest = useCallback(
     (requestId: string, result: Record<string, unknown>) => {
@@ -341,7 +382,14 @@ export default function ChatPage() {
                 ))}
               </div>
             ) : null}
-            <Composer running={running} onSend={handleSend} onStop={handleStop} />
+            <Composer
+              running={running}
+              onSend={handleSend}
+              onStop={handleStop}
+              attachments={attachments}
+              onAttach={handleAttach}
+              onRemoveAttachment={removeAttachment}
+            />
             <StatusBar status={status} />
           </>
         ) : (

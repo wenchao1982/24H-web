@@ -581,10 +581,40 @@ button {
   display: flex;
   gap: var(--ds-space-2);
   align-items: flex-end;
+  flex-wrap: wrap;
   border: var(--ds-border-1) solid var(--ds-border-l2);
   border-radius: var(--ds-radius-md);
   padding: var(--ds-space-2);
   background: var(--ds-surface-l1);
+}
+
+.composer-file {
+  display: none;
+}
+
+.attachments {
+  flex-basis: 100%;
+  display: flex;
+  gap: var(--ds-space-2);
+  flex-wrap: wrap;
+}
+
+.attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ds-space-1);
+  padding: 2px var(--ds-space-2);
+  border-radius: var(--ds-radius-pill);
+  background: var(--ds-surface-l3);
+  color: var(--ds-label-secondary);
+  font-size: var(--ds-font-size-xs);
+}
+
+.attachment-remove {
+  border: none;
+  background: transparent;
+  color: var(--ds-label-tertiary);
+  padding: 0 2px;
 }
 
 .composer-input {
