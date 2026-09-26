@@ -8,6 +8,7 @@ import { registerCsrfGuard } from "./csrf";
 import { config } from "../config";
 import { authRoutes } from "../routes/auth";
 import { adminRoutes } from "../routes/admin";
+import { adminConnectionsRoutes } from "../routes/adminConnections";
 import { hermesRoutes } from "../routes/hermes";
 import { hermesWsRoutes } from "../hermes/proxy";
 import { registerSessionMiddleware } from "../session/middleware";
@@ -40,6 +41,7 @@ export function buildApp(db: Db, options: BuildAppOptions = {}): FastifyInstance
 
   app.register(authRoutes, { db });
   app.register(adminRoutes, { db });
+  app.register(adminConnectionsRoutes, { db });
   app.register(hermesRoutes, {
     db,
     defaultBaseUrl: options.hermesBaseUrl ?? config.hermesBaseUrl,

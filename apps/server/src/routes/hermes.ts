@@ -3,6 +3,7 @@ import type { Db } from "../db";
 import { ApiError } from "../http/errors";
 import { requireAuth } from "../session/middleware";
 import { getHermesToken, hermesUpstream } from "../hermes/client";
+import { resolveTarget } from "../hermes/connections";
 import { userCanAccessProfile } from "../users/repo";
 
 export interface HermesRoutesOptions {
@@ -44,6 +45,13 @@ function assertProfileAccess(db: Db, request: FastifyRequest): void {
   }
 }
 
+function resolveRequestTarget(db: Db, defaultBaseUrl: string, request: FastifyRequest) {
+  const connectionId = readStringField(request.query, "connection") || null;
+  const target = resolveTarget(db, defaultBaseUrl, connectionId);
+  const upstream = hermesUpstream({ hermesBaseUrl: defaultBaseUrl }, target.baseUrl);
+  return { upstream, token: target.token };
+}
+
 /**
  * Proxy `/api/hermes/*` to the Hermes REST API (`/api/*`), injecting the
  * loopback session token. The token never reaches the client.
@@ -51,10 +59,14 @@ function assertProfileAccess(db: Db, request: FastifyRequest): void {
 export const hermesRoutes: FastifyPluginAsync<HermesRoutesOptions> = async (app, opts) => {
   const defaultBaseUrl = opts.defaultBaseUrl;
 
-  app.get("/api/hermes/health", { preHandler: requireAuth }, async () => {
-    const upstream = hermesUpstream({ hermesBaseUrl: defaultBaseUrl });
+  app.get("/api/hermes/health", { preHandler: requireAuth }, async (request) => {
+    const { upstream, token: explicitToken } = resolveRequestTarget(
+      opts.db,
+      defaultBaseUrl,
+      request,
+    );
     try {
-      const token = await getHermesToken(upstream.baseUrl);
+      const token = explicitToken ?? (await getHermesToken(upstream.baseUrl));
       const response = await fetch(`${upstream.baseUrl}/api/status`, {
         headers: { "x-hermes-session-token": token },
         signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
@@ -73,13 +85,17 @@ export const hermesRoutes: FastifyPluginAsync<HermesRoutesOptions> = async (app,
   app.all("/api/hermes/*", { preHandler: requireAuth }, async (request, reply) => {
     assertProfileAccess(opts.db, request);
 
-    const upstream = hermesUpstream({ hermesBaseUrl: defaultBaseUrl });
+    const { upstream, token: explicitToken } = resolveRequestTarget(
+      opts.db,
+      defaultBaseUrl,
+      request,
+    );
     const rest = (request.params as { "*"?: string })["*"] ?? "";
     const queryIndex = request.url.indexOf("?");
     const query = queryIndex >= 0 ? request.url.slice(queryIndex) : "";
     const target = `${upstream.baseUrl}/api/${rest}${query}`;
 
-    const token = await getHermesToken(upstream.baseUrl);
+    const token = explicitToken ?? (await getHermesToken(upstream.baseUrl));
 
     const headers: Record<string, string> = { "x-hermes-session-token": token };
     const init: RequestInit = {

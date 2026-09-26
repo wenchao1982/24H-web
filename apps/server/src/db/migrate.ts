@@ -67,6 +67,21 @@ export const MIGRATIONS: Migration[] = [
       ALTER TABLE users ADD COLUMN avatar TEXT;
     `,
   },
+  {
+    version: 3,
+    name: "003_connections",
+    sql: `
+      CREATE TABLE IF NOT EXISTS connections (
+        id TEXT PRIMARY KEY,
+        label TEXT NOT NULL,
+        url TEXT NOT NULL,
+        token TEXT,
+        created_at INTEGER NOT NULL,
+        is_default INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE INDEX IF NOT EXISTS idx_connections_default ON connections(is_default);
+    `,
+  },
 ];
 
 export function migrate(db: Db): number {
