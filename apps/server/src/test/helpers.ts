@@ -45,7 +45,7 @@ export interface TestContext {
   close: () => Promise<void>;
 }
 
-export async function createTestContext(): Promise<TestContext> {
+export async function createTestContext(options: { hermesBaseUrl?: string } = {}): Promise<TestContext> {
   const dir = mkdtempSync(join(tmpdir(), "24h-test-"));
   const db = openDb(join(dir, "test.db"));
   migrate(db);
@@ -54,7 +54,10 @@ export async function createTestContext(): Promise<TestContext> {
   process.env.OS_ADMIN_PASSWORD = TEST_ADMIN_PASSWORD;
   await ensureFirstAdmin(db);
 
-  const app = buildApp(db, { logger: false });
+  const app = buildApp(db, {
+    logger: false,
+    ...(options.hermesBaseUrl ? { hermesBaseUrl: options.hermesBaseUrl } : {}),
+  });
 
   return {
     app,

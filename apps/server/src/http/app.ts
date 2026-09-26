@@ -4,12 +4,15 @@ import Fastify, { type FastifyInstance } from "fastify";
 import type { Db } from "../db";
 import { registerErrorHandler } from "./errors";
 import { registerCsrfGuard } from "./csrf";
+import { config } from "../config";
 import { authRoutes } from "../routes/auth";
 import { adminRoutes } from "../routes/admin";
+import { hermesRoutes } from "../routes/hermes";
 import { registerSessionMiddleware } from "../session/middleware";
 
 export interface BuildAppOptions {
   logger?: boolean;
+  hermesBaseUrl?: string;
 }
 
 export function buildApp(db: Db, options: BuildAppOptions = {}): FastifyInstance {
@@ -34,6 +37,10 @@ export function buildApp(db: Db, options: BuildAppOptions = {}): FastifyInstance
 
   app.register(authRoutes, { db });
   app.register(adminRoutes, { db });
+  app.register(hermesRoutes, {
+    db,
+    defaultBaseUrl: options.hermesBaseUrl ?? config.hermesBaseUrl,
+  });
 
   app.get("/health", async () => ({ ok: true }));
 
