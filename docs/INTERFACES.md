@@ -13,6 +13,8 @@
 | GET | `/api/auth/me` | 当前用户：`id/username/role/profiles/default_profile` |
 | POST | `/api/auth/logout` | 登出，清 cookie |
 | POST | `/api/auth/change-password` | 改密（首登强制） |
+| PATCH | `/api/auth/profile` | 自助改用户名/显示名 |
+| PUT | `/api/auth/avatar` | 自助头像 |
 
 ### 用户/角色管理（super_admin）
 | 方法 | 路径 | 说明 |
@@ -30,6 +32,13 @@
 | --- | --- | --- |
 | * | `/api/hermes/*` | 转发到 Hermes `/api/*`（注入内部凭证 + profile 守卫） |
 | WS | `/api/hermes/ws` | 认证后代理到 Hermes `/api/ws`（L1） |
+
+### 系统
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/system/version` | 核心 + web 版本 |
+| POST | `/api/system/update` | 检查/执行升级 |
+| GET/POST/PATCH/DELETE | `/api/admin/connections` | 连接管理（多个 Hermes 实例） |
 
 ## 2. Hermes L1（WS JSON-RPC）方法
 
@@ -62,9 +71,9 @@
 | 技能 | `GET /api/skills` `PUT /api/skills/toggle` `GET/PUT /api/skills/content` `POST /api/skills` + hub 路由 | |
 | 工具 | `GET /api/tools/toolsets` `.../:name/config|models|env|post-setup` `GET/PUT /api/tools/terminal/backend(s)` `GET /api/tools/computer-use/status` | |
 | 模型 | `GET /api/model/info|options|recommended-default|auxiliary` `GET/PUT /api/model/moa` `POST /api/model/set` `GET/DELETE/POST /api/providers/oauth/*` | |
-| 配置/环境 | `GET /api/config` `GET /api/config/defaults|schema` `GET/PUT /api/config/raw` `GET/POST/DELETE /api/env` `POST /api/env/reveal` | |
+| 配置/环境 | `GET /api/config` `GET /api/config/defaults|schema` `GET/PUT /api/config/raw` `GET/POST/DELETE /api/env` `POST /api/env/reveal` | （含 approvals.mode 审批策略） |
 | 档案 profile | `GET/POST /api/profiles` `GET/POST /api/profiles/active` `PATCH/DELETE /api/profiles/:name` `GET/PUT /api/profiles/:name/soul|description|model` `POST /api/profiles/import|export` | |
-| 会话 | `GET /api/sessions` `GET /api/sessions/:id/messages` `POST /api/sessions/import|prune|bulk-delete` `GET /api/chat/workspaces` `POST /api/chat/image-upload` | |
+| 会话 | `GET /api/sessions` `GET /api/sessions/:id/messages` `POST /api/sessions/import|prune|bulk-delete` `GET /api/chat/workspaces` `POST /api/chat/image-upload` `GET /api/sessions?q=`（全文搜索） | |
 | 定时 | `GET/POST /api/cron/jobs` `GET /api/cron/delivery-targets` `POST /api/cron/jobs/:id/pause|resume|trigger` | |
 | MCP | `/api/mcp/*` `POST /api/mcp/catalog/install` | |
 | 消息平台 | `GET/PUT /api/messaging/platforms` `POST /api/messaging/{telegram,whatsapp}/onboarding/*` | |
@@ -91,6 +100,9 @@
 | 用量 | L2 `/api/analytics/*` `/api/system/stats` | BFF→L2 |
 | 设置（Keys/模型） | L2 `/api/env` `/api/model/*` `/api/config` | BFF→L2 |
 | 面板（文件/日志/预览） | L2 `/api/files` `/api/logs` | BFF→L2 |
+| 系统升级 | BFF `/api/system/update` | BFF |
+| 连接管理 | BFF `/api/admin/connections` | BFF |
+| 账户（自助资料） | BFF `/api/auth/profile` `/api/auth/avatar` | BFF |
 
 ## 5. 约定
 

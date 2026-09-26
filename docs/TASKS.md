@@ -31,6 +31,8 @@
 | T2.9 | 改密 | `POST /api/auth/change-password`（首登强制） | T2.7 | BFF | 改密后可继续 |
 | T2.10 | 登录限流 | `login_attempts` 计数 + 锁定 | T2.4 | BFF | 多次失败锁定 |
 | T2.11 | CSRF 防护 | 同源 + CSRF token（cookie 会话必需） | T1.3,T2.7 | BFF | 跨站写被拒 |
+| T2.12 | 自助改用户名 | `PATCH /api/auth/profile`（改 username/显示名） | T2.7 | BFF | 可改 |
+| T2.13 | 自助头像 | `PUT /api/auth/avatar` | T2.7 | BFF | 可传 |
 
 ## M2 用户与角色管理（super_admin）
 
@@ -54,6 +56,7 @@
 | T4.4 | WS 代理 | `/api/ws`：先认证再代理到 Hermes | T4.1,T2.7 | BFF→L1 | 收发事件 |
 | T4.5 | 代理错误归一 | 上游错误 → 统一结构 | T4.2 | BFF | 错误一致 |
 | T4.6 | 上游健康探测 | BFF→Hermes `/api/status` 探活 + 降级提示 | T4.1 | BFF→L2 | 断开可提示 |
+| T4.7 | 连接管理 | 多个 Hermes 实例的增删/选择/探活（registry） | T4.1 | BFF | 可切换实例 |
 
 ## M4 前端骨架
 
@@ -81,6 +84,10 @@
 | T6.9 | 会话管理 | 重命名/删除/恢复（`session.title/delete/resume`） | T6.1 | L1 | 操作生效 |
 | T6.10 | 断线重放 | `session.events.since` 重建挂起状态 | T6.3 | L1 | 刷新可续 |
 | T6.11 | 附件 | 图片/文件/PDF 上传（`image/pdf/file.attach`） | T6.3 | L1 | 可发送 |
+| T6.12 | 会话搜索 | 全文搜索（标题+内容，防抖） | T6.1 | L2 | 可搜索 |
+| T6.13 | 会话导入/导出/分享 | import / export（+分享链接） | T6.1 | L2 | 可导入导出 |
+| T6.14 | 会话清理 | prune / 批量删除 | T6.1 | L2 | 可清理 |
+| T6.15 | 工作区/目录选择 | `session.workspace.move` / `/api/chat/workspaces` | T6.2 | L1/L2 | 可切换 cwd |
 
 ## M6 技能 / 工具 / 设置
 
@@ -95,6 +102,10 @@
 | T8.2 | 模型设置 | `/api/model/*`（info/options/set/moa）（落点：设置） | T4.2 | L2 | 可切换 |
 | T8.3 | 外观 | 主题/语言（落点：设置） | — | — | 生效 |
 | T8.4 | 配置中心 | `/api/config`（config.yaml 常用项）（落点：设置） | T4.2 | L2 | 可改 |
+| T7.6 | 技能安装（hub） | `POST /api/skills` + hub 搜索/安装/更新（落点：智能体页） | T7.1 | L2 | 可安装 |
+| T7.7 | 技能内容编辑 | `GET/PUT /api/skills/content`（落点：智能体页） | T7.1 | L2 | 可编辑 |
+| T8.5 | 审批策略 | `approvals.mode`（smart/manual/off）（落点：设置） | T8.4 | L2 | 可切换 |
+| T8.6 | 模型服务商 OAuth | `/api/providers/oauth/*` 登录/登出（落点：设置） | T8.1 | L2 | 可登录 |
 
 ## M7 任务 / 用量 / 面板
 
@@ -108,6 +119,7 @@
 | T11.2 | 日志面板 | 读取/过滤 | T4.2 | L2 | 可筛选 |
 | T11.3 | 预览面板 | 文件/HTML 预览 | T11.1 | — | 可预览 |
 | T11.4 | Git 面板 | `/api/git/*`（状态/差异） | T4.2 | L2 | 可查看 |
+| T10.3 | 监控 | `GET /api/system/stats`（CPU/内存/磁盘/进程）（落点：设置→监控） | T4.2 | L2 | 可查看 |
 
 ## M8 Agent / Profile 管理
 
@@ -155,6 +167,7 @@
 | T18.13 | 密钥库/连接器 | L1 `vault.*`、`connectors.*` | T4.4 | L1 | 可管理 |
 | T18.14 | 计费/套餐 | L1 `billing.state`、`subscription.*`；L2 `/api/portal` | T4.4 | L1/L2 | 可展示 |
 | T18.15 | 学习/策展 | L2 `/api/curator`、`/api/learning/*` | T4.2 | L2 | 可查看 |
+| T18.16 | 系统升级 | 核心 + web：版本 / 检查更新 / 执行升级（落点：侧栏品牌行核心灯） | T2.8 | BFF | 可升级 |
 
 ## M12 未来增强
 
