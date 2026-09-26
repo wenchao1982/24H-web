@@ -92,6 +92,24 @@ export function normalizeSessions(result: unknown): SessionSummary[] {
   });
 }
 
+/** `GET /api/hermes/chat/workspaces` 的容错解析。 */
+export function normalizeWorkspaces(result: unknown): string[] {
+  const raw =
+    Array.isArray(result) || !result || typeof result !== "object"
+      ? result
+      : ((result as Record<string, unknown>).workspaces ??
+        (result as Record<string, unknown>).paths ??
+        (result as Record<string, unknown>).items ??
+        []);
+  return arr(raw).flatMap((entry) => {
+    if (typeof entry === "string") {
+      return [entry];
+    }
+    const path = str(entry.path) ?? str(entry.cwd) ?? str(entry.dir);
+    return path ? [path] : [];
+  });
+}
+
 /** 提取 `session.create` 返回的会话 id。 */
 export function normalizeCreatedId(result: unknown): string | null {
   if (!result || typeof result !== "object") {

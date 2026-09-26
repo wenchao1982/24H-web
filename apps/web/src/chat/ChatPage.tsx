@@ -15,6 +15,7 @@ import {
   normalizeCreatedId,
   normalizeReplayed,
   normalizeSessions,
+  normalizeWorkspaces,
   parseStatus,
   toolDetail,
   toolId,
@@ -54,6 +55,8 @@ export default function ChatPage() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [searchResults, setSearchResults] = useState<SessionSummary[] | null>(null);
   const [shareLink, setShareLink] = useState<string | null>(null);
+  const [workspaces, setWorkspaces] = useState<string[]>([]);
+  const [workspace, setWorkspace] = useState("");
 
   const activeIdRef = useRef<string | null>(null);
   const respondersRef = useRef(new Map<string, (result: Record<string, unknown>) => void>());
@@ -405,6 +408,20 @@ export default function ChatPage() {
     setShareLink(link);
   }, []);
 
+  const handleWorkspaceChange = useCallback(
+    (value: string) => {
+      setWorkspace(value);
+      const sessionId = activeIdRef.current;
+      if (!sessionId || !value) {
+        return;
+      }
+      gateway
+        .request("session.workspace.move", { session_id: sessionId, workspace: value })
+        .catch(() => setError("切换工作区失败"));
+    },
+    [gateway],
+  );
+
   const answerRequest = useCallback(
     (requestId: string, result: Record<string, unknown>) => {
       const respond = respondersRef.current.get(requestId);
@@ -436,6 +453,23 @@ export default function ChatPage() {
     }, 250);
     return () => clearTimeout(handle);
   }, [filter, gateway]);
+
+  // 工作区列表：切换会话时刷新。
+  useEffect(() => {
+    let alive = true;
+    api<unknown>("/api/hermes/chat/workspaces")
+      .then((result) => {
+        if (alive) {
+          setWorkspaces(normalizeWorkspaces(result));
+        }
+      })
+      .catch(() => {
+        // 工作区不可用时保持空列表
+      });
+    return () => {
+      alive = false;
+    };
+  }, [activeId]);
 
   const visible = useMemo(() => {
     if (searchResults !== null) {
@@ -496,6 +530,19 @@ export default function ChatPage() {
               <button type="button" className="ghost" onClick={shareSession}>
                 分享
               </button>
+              <select
+                className="chat-workspace"
+                aria-label="工作区"
+                value={workspace}
+                onChange={(event) => handleWorkspaceChange(event.target.value)}
+              >
+                <option value="">选择工作区</option>
+                {workspaces.map((path) => (
+                  <option key={path} value={path}>
+                    {path}
+                  </option>
+                ))}
+              </select>
             </div>
             {shareLink ? <p className="muted chat-share">{shareLink}</p> : null}
             <Transcript items={items} />

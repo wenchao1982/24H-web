@@ -545,6 +545,17 @@ button {
   word-break: break-all;
 }
 
+.chat-workspace {
+  max-width: 200px;
+  padding: var(--ds-space-1) var(--ds-space-2);
+  border: var(--ds-border-1) solid var(--ds-border-l2);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-l1);
+  color: var(--ds-label-primary);
+  font: inherit;
+  font-size: var(--ds-font-size-sm);
+}
+
 .transcript {
   flex: 1;
   min-height: 0;

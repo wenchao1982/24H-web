@@ -481,3 +481,35 @@ describe("ChatPage T6.14 清理", () => {
     expect(JSON.parse(String((call?.[1] as RequestInit).body))).toEqual({ ids: ["s1"] });
   });
 });
+
+describe("ChatPage T6.15 工作区", () => {
+  it("lists workspaces and moves the session workspace", async () => {
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        ({
+          ok: true,
+          status: 200,
+          text: async () =>
+            JSON.stringify({ workspaces: [{ path: "/home/u/a" }, { path: "/home/u/b" }] }),
+        }) as Response,
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const gateway = createFakeGateway((method) =>
+      method === "session.list" ? { sessions: [{ id: "s1", title: "会话一" }] } : {},
+    );
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+
+    const select = await screen.findByLabelText("工作区");
+    expect(await screen.findByRole("option", { name: "/home/u/a" })).toBeInTheDocument();
+
+    await user.selectOptions(select, "/home/u/b");
+    await waitFor(() => {
+      expect(gateway.paramsOf("session.workspace.move")).toEqual([
+        { session_id: "s1", workspace: "/home/u/b" },
+      ]);
+    });
+  });
+});
