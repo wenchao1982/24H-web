@@ -8,8 +8,9 @@
     "dev:web": "npm -w @24h/web run dev",
     "dev:server": "npm -w @24h/server run dev",
     "build": "npm -w @24h/web run build && npm -w @24h/server run build",
-    "typecheck": "npm -w @24h/web run typecheck && npm -w @24h/server run typecheck",
-    "check": "npm run typecheck"
+    "typecheck": "npm -w @24h/web run typecheck && npm -w @24h/server run typecheck && npm -w @24h/shared run typecheck",
+    "test": "npm -w @24h/server run test",
+    "check": "npm run typecheck && npm run test"
   },
   "license": "BUSL-1.1",
   "engines": { "node": ">=20" }
