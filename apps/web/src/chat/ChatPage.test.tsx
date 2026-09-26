@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ChatPage from "./ChatPage";
 import { GatewayProvider } from "./GatewayProvider";
@@ -32,9 +32,15 @@ describe("ChatPage T6.1 会话列表", () => {
   });
 
   it("filters sessions by title", async () => {
-    const gateway = createFakeGateway((method) =>
-      method === "session.list" ? SESSIONS : {},
-    );
+    const gateway = createFakeGateway((method, params) => {
+      if (method !== "session.list") {
+        return {};
+      }
+      if (typeof params.q === "string") {
+        return { sessions: SESSIONS.sessions.filter((s) => s.title.includes(params.q as string)) };
+      }
+      return SESSIONS;
+    });
     renderChat(gateway);
     await screen.findByText("第一会话");
 
@@ -369,5 +375,30 @@ describe("ChatPage T6.11 附件", () => {
     expect(submits).toHaveLength(1);
     expect(submits[0]).toMatchObject({ session_id: "s1", text: "带你一起" });
     expect((submits[0].attachments as string[])).toHaveLength(1);
+  });
+});
+
+describe("ChatPage T6.12 会话搜索", () => {
+  it("debounces a server-side session search and shows results", async () => {
+    const gateway = createFakeGateway((method, params) => {
+      if (method !== "session.list") {
+        return {};
+      }
+      if (typeof params.q === "string") {
+        return { sessions: [{ id: "s9", title: "匹配结果" }] };
+      }
+      return { sessions: [{ id: "s1", title: "会话一" }] };
+    });
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await screen.findByText("会话一");
+
+    await user.type(screen.getByLabelText("会话搜索"), "匹配");
+
+    await waitFor(
+      () => expect(gateway.paramsOf("session.list")).toContainEqual({ q: "匹配" }),
+      { timeout: 1000 },
+    );
+    expect(await screen.findByText("匹配结果")).toBeInTheDocument();
   });
 });

@@ -41,6 +41,7 @@ export default function ChatPage() {
   const [running, setRunning] = useState(false);
   const [status, setStatus] = useState<StatusInfo | null>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [searchResults, setSearchResults] = useState<SessionSummary[] | null>(null);
 
   const activeIdRef = useRef<string | null>(null);
   const respondersRef = useRef(new Map<string, (result: Record<string, unknown>) => void>());
@@ -339,13 +340,32 @@ export default function ChatPage() {
     [],
   );
 
+  // 会话搜索：防抖后走 L1 `session.list {q}`（BFF→L1/L2）。
+  useEffect(() => {
+    const query = filter.trim();
+    if (query === "") {
+      setSearchResults(null);
+      return;
+    }
+    const handle = setTimeout(() => {
+      gateway
+        .request("session.list", { q: query })
+        .then((result) => setSearchResults(normalizeSessions(result)))
+        .catch(() => setSearchResults(null));
+    }, 250);
+    return () => clearTimeout(handle);
+  }, [filter, gateway]);
+
   const visible = useMemo(() => {
+    if (searchResults !== null) {
+      return searchResults;
+    }
     const query = filter.trim().toLowerCase();
     if (!query) {
       return sessions;
     }
     return sessions.filter((session) => session.title.toLowerCase().includes(query));
-  }, [sessions, filter]);
+  }, [searchResults, sessions, filter]);
 
   const active = sessions.find((session) => session.id === activeId) ?? null;
 
