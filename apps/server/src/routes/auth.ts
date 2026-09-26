@@ -3,7 +3,7 @@ import type { Db } from "../db";
 import { ApiError } from "../http/errors";
 import { verifyPassword } from "../auth/password";
 import { findUserByUsername, listUserProfiles } from "../users/repo";
-import { SESSION_COOKIE, createSession } from "../session/repo";
+import { SESSION_COOKIE, createSession, deleteSessionByToken } from "../session/repo";
 import { resolveSessionUser } from "../session/auth";
 
 export interface AuthRoutesOptions {
@@ -87,5 +87,14 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, opt
       default_profile: defaultProfile,
       must_change_password: user.must_change_password,
     };
+  });
+
+  app.post("/api/auth/logout", async (request, reply) => {
+    const token = request.cookies[SESSION_COOKIE];
+    if (token) {
+      deleteSessionByToken(db, token);
+    }
+    reply.clearCookie(SESSION_COOKIE, { path: "/" });
+    return { ok: true };
   });
 };
