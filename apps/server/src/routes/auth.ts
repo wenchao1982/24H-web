@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import type { Db } from "../db";
 import { ApiError } from "../http/errors";
-import { verifyPassword } from "../auth/password";
+import { verifyPassword, hashPassword } from "../auth/password";
 import { findUserByUsername, listUserProfiles } from "../users/repo";
 import { SESSION_COOKIE, createSession, deleteSessionByToken } from "../session/repo";
 import { requireAuth } from "../session/middleware";
@@ -94,6 +94,34 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, opt
       deleteSessionByToken(db, token);
     }
     reply.clearCookie(SESSION_COOKIE, { path: "/" });
+    return { ok: true };
+  });
+
+  app.post("/api/auth/change-password", { preHandler: requireAuth }, async (request) => {
+    const user = request.user;
+    if (!user) {
+      throw new ApiError(401, "UNAUTHENTICATED", "未登录");
+    }
+
+    const oldPassword = readString(request.body, "oldPassword");
+    const newPassword = readString(request.body, "newPassword");
+    if (!oldPassword || !newPassword) {
+      throw new ApiError(400, "INVALID_INPUT", "旧密码和新密码不能为空");
+    }
+    if (newPassword.length < 8) {
+      throw new ApiError(400, "WEAK_PASSWORD", "新密码至少 8 位");
+    }
+
+    const valid = await verifyPassword(oldPassword, user.password_hash);
+    if (!valid) {
+      throw new ApiError(400, "INVALID_OLD_PASSWORD", "旧密码错误");
+    }
+
+    const passwordHash = await hashPassword(newPassword);
+    db.prepare(
+      "UPDATE users SET password_hash = ?, must_change_password = 0, updated_at = ? WHERE id = ?",
+    ).run(passwordHash, Date.now(), user.id);
+
     return { ok: true };
   });
 };
