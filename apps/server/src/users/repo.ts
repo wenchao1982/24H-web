@@ -112,13 +112,18 @@ export function getUserSummary(db: Db, id: number): UserSummary | null {
 
 export async function createUser(
   db: Db,
-  input: { username: string; password: string; role: UserRow["role"] },
+  input: {
+    username: string;
+    password: string;
+    role: UserRow["role"];
+    mustChangePassword?: boolean;
+  },
 ): Promise<UserRow> {
   return insertUser(db, {
     username: input.username,
     password: input.password,
     role: input.role,
-    mustChangePassword: false,
+    mustChangePassword: input.mustChangePassword ?? false,
   });
 }
 
