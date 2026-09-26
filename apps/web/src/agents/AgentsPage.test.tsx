@@ -635,3 +635,61 @@ describe("AgentsPage T16.4 删除/导出导入", () => {
   });
 });
 
+describe("AgentsPage T16.5 头像", () => {
+  it("uploads an avatar via profiles.set_asset and reflects it on GET", async () => {
+    let stored: string | null = null;
+    const gateway = createFakeGateway((method, params) => {
+      if (method === "profiles.list") {
+        return { profiles: [{ name: "writer", display_name: "写作" }] };
+      }
+      if (method === "profiles.describe") {
+        return { name: "writer", display_name: "写作" };
+      }
+      if (method === "profiles.get_asset") {
+        return stored ? { found: true, data: stored } : { found: false };
+      }
+      if (method === "profiles.set_asset") {
+        stored = String(params.data);
+        return { ok: true };
+      }
+      return {};
+    });
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = (init?.method ?? "GET").toUpperCase();
+      const path = url.split("?")[0];
+      if (path.endsWith("/api/hermes/skills") && method === "GET") {
+        return jsonResponse({ path: "", status: 200, body: SKILLS });
+      }
+      if (path.endsWith("/api/hermes/profiles/writer/avatar") && method === "GET") {
+        if (stored) {
+          return jsonResponse({ path: "", status: 200, body: { avatar: stored } });
+        }
+        return { ok: false, status: 404, text: async () => "" } as Response;
+      }
+      return { ok: false, status: 404, text: async () => "" } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    renderAgents(gateway);
+    await user.click(await screen.findByRole("button", { name: /写作/ }));
+
+    expect(screen.queryByAltText("写作 头像")).toBeNull();
+
+    const bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const file = new File([bytes], "avatar.png", { type: "image/png" });
+    await user.upload(screen.getByLabelText("上传头像"), file);
+
+    await waitFor(() => {
+      const params = gateway.paramsOf("profiles.set_asset")[0];
+      expect(params).toMatchObject({ name: "writer", asset: "avatar" });
+      expect(String(params.data)).toContain("data:image/png;base64,");
+    });
+
+    const img = await screen.findByAltText("写作 头像");
+    expect(img.getAttribute("src")).toContain("data:image/png;base64,");
+  });
+});
+

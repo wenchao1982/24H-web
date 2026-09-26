@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   agentInitial,
+  MAX_AVATAR_BYTES,
   normalizeAgentDetail,
   normalizeAgentList,
+  normalizeAvatar,
+  validateAvatarDataUrl,
 } from "./agents";
 
 describe("normalizeAgentList", () => {
@@ -89,5 +92,37 @@ describe("agentInitial", () => {
   it("falls back to ? for blank names and upper-cases otherwise", () => {
     expect(agentInitial("writer")).toBe("W");
     expect(agentInitial("  ")).toBe("?");
+  });
+});
+
+describe("normalizeAvatar", () => {
+  it("reads a data URL from the REST/asset payload shapes", () => {
+    expect(normalizeAvatar({ avatar: "data:image/png;base64,iVBORw0KGgo=" })).toBe(
+      "data:image/png;base64,iVBORw0KGgo=",
+    );
+    expect(normalizeAvatar({ found: true, data: "data:image/jpeg;base64,abc" })).toBe(
+      "data:image/jpeg;base64,abc",
+    );
+    expect(normalizeAvatar("data:image/png;base64,xyz")).toBe("data:image/png;base64,xyz");
+  });
+
+  it("returns null when there is no data URL", () => {
+    expect(normalizeAvatar({ found: false })).toBeNull();
+    expect(normalizeAvatar(null)).toBeNull();
+    expect(normalizeAvatar("/tmp/avatar.png")).toBeNull();
+  });
+});
+
+describe("validateAvatarDataUrl", () => {
+  it("accepts small PNG/JPEG data URLs", () => {
+    expect(validateAvatarDataUrl("data:image/png;base64,iVBORw0KGgo=")).toBeNull();
+    expect(validateAvatarDataUrl("data:image/jpeg;base64,/9j/4A==")).toBeNull();
+  });
+
+  it("rejects non-PNG/JPEG and oversized payloads", () => {
+    expect(validateAvatarDataUrl("data:image/gif;base64,R0lGOD")).toBe("头像需为 PNG 或 JPEG");
+    expect(validateAvatarDataUrl("not-a-data-url")).toBe("头像需为 PNG 或 JPEG");
+    const big = "A".repeat(Math.ceil((MAX_AVATAR_BYTES + 4) / 3) * 4);
+    expect(validateAvatarDataUrl(`data:image/png;base64,${big}`)).toBe("头像不能超过 256KB");
   });
 });

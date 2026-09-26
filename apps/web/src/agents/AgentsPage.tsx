@@ -4,6 +4,8 @@ import { api } from "../api/client";
 import {
   normalizeAgentDetail,
   normalizeAgentList,
+  normalizeAvatar,
+  validateAvatarDataUrl,
   withProfile,
   type AgentDetail as AgentDetailData,
   type AgentSummary,
@@ -62,6 +64,9 @@ export default function AgentsPage() {
   const [importError, setImportError] = useState<string | null>(null);
   const [deleteArmed, setDeleteArmed] = useState(false);
   const [opMessage, setOpMessage] = useState<string | null>(null);
+
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
 
   const loadAgents = useCallback(async () => {
     setListLoading(true);
@@ -163,6 +168,70 @@ export default function AgentsPage() {
     },
     [gateway],
   );
+
+  const loadAvatar = useCallback(
+    async (name: string) => {
+      try {
+        const payload = await api<unknown>(
+          `/api/hermes/profiles/${encodeURIComponent(name)}/avatar`,
+        );
+        const url = normalizeAvatar(payload);
+        if (url) {
+          setAvatarUrl(url);
+          return;
+        }
+      } catch {
+        // REST 头像端点可能 404 → 回退 L1 `profiles.get_asset`。
+      }
+      try {
+        await gateway.connect().catch(() => undefined);
+        const result = await gateway.request<{ found?: boolean; data?: string }>(
+          "profiles.get_asset",
+          { name, asset: "avatar" },
+        );
+        setAvatarUrl(result?.found && typeof result.data === "string" ? result.data : null);
+      } catch {
+        setAvatarUrl(null);
+      }
+    },
+    [gateway],
+  );
+
+  const uploadAvatar = useCallback(
+    async (dataUrl: string) => {
+      if (!selected) {
+        return;
+      }
+      const invalid = validateAvatarDataUrl(dataUrl);
+      if (invalid) {
+        setAvatarError(invalid);
+        return;
+      }
+      setAvatarError(null);
+      try {
+        await gateway.connect().catch(() => undefined);
+        await gateway.request("profiles.set_asset", {
+          name: selected,
+          asset: "avatar",
+          data: dataUrl,
+        });
+        setAvatarUrl(dataUrl);
+        await loadAvatar(selected);
+      } catch {
+        setAvatarError("头像上传失败");
+      }
+    },
+    [gateway, loadAvatar, selected],
+  );
+
+  useEffect(() => {
+    setAvatarError(null);
+    if (!selected) {
+      setAvatarUrl(null);
+      return;
+    }
+    void loadAvatar(selected);
+  }, [loadAvatar, selected]);
 
   const submitConfigure = useCallback(
     async (params: ConfigureProfileParams) => {
@@ -298,6 +367,7 @@ export default function AgentsPage() {
               }}
               onCreate={() => openCreate("new")}
               onImport={openImport}
+              avatars={avatarUrl && selected ? { [selected]: avatarUrl } : undefined}
             />
           )}
         </aside>
@@ -337,6 +407,29 @@ export default function AgentsPage() {
               agent={detail}
               loading={detailLoading}
               error={detailError}
+              avatar={avatarUrl ?? undefined}
+              avatarExtra={
+                detail ? (
+                  <label className="agent-avatar-upload">
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      aria-label="上传头像"
+                      className="composer-file"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = () => void uploadAvatar(String(reader.result ?? ""));
+                          reader.readAsDataURL(file);
+                        }
+                        event.target.value = "";
+                      }}
+                    />
+                    上传头像
+                  </label>
+                ) : null
+              }
               actions={
                 detail ? (
                   <>
@@ -377,6 +470,11 @@ export default function AgentsPage() {
             />
           )}
 
+          {avatarError ? (
+            <p className="err" role="alert">
+              {avatarError}
+            </p>
+          ) : null}
           {opMessage ? <p className="muted agent-op-message">{opMessage}</p> : null}
 
           <form className="card learn-action" onSubmit={runLearn}>

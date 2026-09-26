@@ -1547,3 +1547,15 @@ button.danger {
 .agent-op-message {
   margin: 0 0 var(--ds-space-3);
 }
+
+.agent-avatar-upload {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--ds-space-1) var(--ds-space-2);
+  border: var(--ds-border-1) solid var(--ds-border-l2);
+  border-radius: var(--ds-radius-sm);
+  color: var(--ds-label-secondary);
+  font-size: var(--ds-font-size-xs);
+  cursor: pointer;
+}

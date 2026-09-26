@@ -88,6 +88,34 @@ export function withProfile(path: string, profile?: string | null): string {
   return `${path}${joiner}profile=${encodeURIComponent(profile)}`;
 }
 
+/** 头像大小上限（与需求一致：≤256KB）。 */
+export const MAX_AVATAR_BYTES = 256 * 1024;
+
+/** 从 `GET /api/profiles/:name/avatar` 或 `profiles.get_asset` 结果取 data URL。 */
+export function normalizeAvatar(payload: unknown): string | null {
+  if (typeof payload === "string") {
+    return payload.startsWith("data:") ? payload : null;
+  }
+  const source = asRecord(payload);
+  const value = readString(source, "avatar", "data", "data_url", "dataUrl");
+  return value.startsWith("data:") ? value : null;
+}
+
+/** 校验头像 data URL（PNG/JPEG 且 ≤256KB）；合法返回 null，否则返回错误文案。 */
+export function validateAvatarDataUrl(dataUrl: string): string | null {
+  const match = /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl.trim());
+  if (!match) {
+    return "头像需为 PNG 或 JPEG";
+  }
+  const base64 = match[2];
+  const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
+  const size = Math.floor((base64.length * 3) / 4) - padding;
+  if (size > MAX_AVATAR_BYTES) {
+    return "头像不能超过 256KB";
+  }
+  return null;
+}
+
 /** `profiles.list` → 列表。兼容 `{profiles:[...]}` / `[...]`。 */
 export function normalizeAgentList(payload: unknown): AgentSummary[] {
   const raw = asRecord(payload);
