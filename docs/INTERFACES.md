@@ -39,6 +39,7 @@
 | GET | `/api/system/version` | 核心 + web 版本 |
 | POST | `/api/system/update` | 检查/执行升级 |
 | GET/POST/PATCH/DELETE | `/api/admin/connections` | 连接管理（多个 Hermes 实例） |
+| GET/POST | `/api/integrations/github` | GitHub 集成：`gh` 登录/状态、仓库、PR |
 
 ## 2. Hermes L1（WS JSON-RPC）方法
 
@@ -53,9 +54,9 @@
 | 模型 | `model.options` `model.save_key` `model.disconnect` | |
 | 配置 | `config.get` `config.set` `reload.env` `setup.status` `setup.runtime_check` `diagnostics.share_nous` | |
 | 档案 profile | `profiles.list` `profiles.describe` `profiles.configure` `profiles.create` `profiles.set_asset` `profiles.get_asset` | M9 对齐用 |
-| 工具 | `tools.list` `toolsets.list` `tools.show` `command.dispatch` `slash.exec` `complete.slash` `complete.path` `commands.catalog` | skills 也经 commands.catalog 暴露 |
+| 工具 | `tools.list` `toolsets.list` `tools.show` `command.dispatch` `slash.exec` `complete.slash` `complete.path` `commands.catalog` | skills 也经 commands.catalog 暴露；slash.exec 也承载 /learn（经验→skill） |
 | MCP | `mcp.servers.*` `mcp.catalog` | |
-| 技能 | `skills.manage` | |
+| 技能 | `skills.manage` `skill_manage` | ；/learn 经 slash.exec 生成 SKILL.md |
 | 插件 | `plugins.manage` `plugins.compat_report` | |
 | 定时 | `cron.manage`（list/add/remove/pause/resume）；事件 `cron.changed` | |
 | 群聊 / Bot | `groups.*` `bot_relay.*` | future |
@@ -100,6 +101,8 @@
 | 用量 | L2 `/api/analytics/*` `/api/system/stats` | BFF→L2 |
 | 设置（Keys/模型） | L2 `/api/env` `/api/model/*` `/api/config` | BFF→L2 |
 | 面板（文件/日志/预览） | L2 `/api/files` `/api/logs` | BFF→L2 |
+| 经验→Skill（/learn） | L1 `slash.exec`（/learn） | BFF→L1 |
+| GitHub 集成 | BFF `/api/integrations/github` | BFF |
 | 系统升级 | BFF `/api/system/update` | BFF |
 | 连接管理 | BFF `/api/admin/connections` | BFF |
 | 账户（自助资料） | BFF `/api/auth/profile` `/api/auth/avatar` | BFF |

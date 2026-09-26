@@ -106,6 +106,8 @@
 | T7.7 | 技能内容编辑 | `GET/PUT /api/skills/content`（落点：智能体页） | T7.1 | L2 | 可编辑 |
 | T8.5 | 审批策略 | `approvals.mode`（smart/manual/off）（落点：设置） | T8.4 | L2 | 可切换 |
 | T8.6 | 模型服务商 OAuth | `/api/providers/oauth/*` 登录/登出（落点：设置） | T8.1 | L2 | 可登录 |
+| T7.8 | 经验→Skill（/learn） | 从来源/经验蒸馏生成 SKILL.md（`slash.exec` 的 `/learn`）（落点：智能体页 / 对话 slash） | T7.1 | L1 | 可生成 skill |
+| T8.7 | GitHub 集成 | `gh` 登录/状态、仓库、GitHub MCP、PR 相关（落点：设置→集成） | T4.1 | BFF/L2 | 可配置 |
 
 ## M7 任务 / 用量 / 面板
 
@@ -166,7 +168,7 @@
 | T18.12 | 外部会话导入 | L1 `session.foreign.*` | T4.4 | L1 | 可导入 |
 | T18.13 | 密钥库/连接器 | L1 `vault.*`、`connectors.*` | T4.4 | L1 | 可管理 |
 | T18.14 | 计费/套餐 | L1 `billing.state`、`subscription.*`；L2 `/api/portal` | T4.4 | L1/L2 | 可展示 |
-| T18.15 | 学习/策展 | L2 `/api/curator`、`/api/learning/*` | T4.2 | L2 | 可查看 |
+| T18.15 | 学习/策展/学习旅程 | `/api/curator`、`/api/learning/*`（含 /journey） | T4.2 | L2 | 可查看 |
 | T18.16 | 系统升级 | 核心 + web：版本 / 检查更新 / 执行升级（落点：侧栏品牌行核心灯） | T2.8 | BFF | 可升级 |
 
 ## M12 未来增强
