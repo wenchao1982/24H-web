@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from "fastify";
 import type { Db } from "../db";
 import { ApiError } from "../http/errors";
 import { verifyPassword, hashPassword } from "../auth/password";
+import { clearLoginFailures, getLockedUntil, recordLoginFailure } from "../auth/rateLimit";
 import { findUserByUsername, listUserProfiles } from "../users/repo";
 import { SESSION_COOKIE, createSession, deleteSessionByToken } from "../session/repo";
 import { requireAuth } from "../session/middleware";
@@ -30,15 +31,30 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, opt
       throw new ApiError(400, "INVALID_INPUT", "用户名和密码不能为空");
     }
 
+    const ip = request.ip;
+    if (getLockedUntil(db, ip, username)) {
+      throw new ApiError(429, "LOGIN_LOCKED", "尝试次数过多，请稍后再试");
+    }
+
     const user = findUserByUsername(db, username);
     if (!user || user.status !== "active") {
+      const { locked } = recordLoginFailure(db, ip, username);
+      if (locked) {
+        throw new ApiError(429, "LOGIN_LOCKED", "尝试次数过多，请稍后再试");
+      }
       throw new ApiError(401, "INVALID_CREDENTIALS", "用户名或密码错误");
     }
 
     const valid = await verifyPassword(password, user.password_hash);
     if (!valid) {
+      const { locked } = recordLoginFailure(db, ip, username);
+      if (locked) {
+        throw new ApiError(429, "LOGIN_LOCKED", "尝试次数过多，请稍后再试");
+      }
       throw new ApiError(401, "INVALID_CREDENTIALS", "用户名或密码错误");
     }
+
+    clearLoginFailures(db, ip, username);
 
     const { token, session } = createSession(db, {
       userId: user.id,
