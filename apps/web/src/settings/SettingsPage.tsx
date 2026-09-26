@@ -6,6 +6,7 @@ import ConfigPanel from "./ConfigPanel";
 import ApprovalPanel from "./ApprovalPanel";
 import OAuthPanel from "./OAuthPanel";
 import GithubPanel from "./GithubPanel";
+import MonitorPanel from "./MonitorPanel";
 
 interface SectionDef {
   id: string;
@@ -20,6 +21,7 @@ const SECTIONS: SectionDef[] = [
   { id: "approvals", label: "审批策略" },
   { id: "oauth", label: "服务商登录" },
   { id: "github", label: "GitHub 集成" },
+  { id: "monitor", label: "监控" },
 ];
 
 /** 设置页：分区导航 + 分区详情（M6）。 */
@@ -50,6 +52,7 @@ export default function SettingsPage() {
         {section === "approvals" ? <ApprovalPanel /> : null}
         {section === "oauth" ? <OAuthPanel /> : null}
         {section === "github" ? <GithubPanel /> : null}
+        {section === "monitor" ? <MonitorPanel /> : null}
       </div>
     </div>
   );

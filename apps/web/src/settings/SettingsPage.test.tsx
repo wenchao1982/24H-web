@@ -333,3 +333,37 @@ describe("SettingsPage T8.7 GitHub 集成", () => {
     expect(await screen.findByText(/octocat/)).toBeInTheDocument();
   });
 });
+
+describe("SettingsPage T10.3 监控", () => {
+  it("renders CPU/memory/disk/process and health", async () => {
+    vi.stubGlobal(
+      "fetch",
+      stubFetch([
+        { path: "/api/hermes/env", method: "GET", status: 200, body: { keys: [] } },
+        {
+          path: "/api/hermes/system/stats",
+          method: "GET",
+          status: 200,
+          body: { cpu: 12.4, memory: { percent: 55 }, disk: 71, processes: 42 },
+        },
+        {
+          path: "/api/hermes/status",
+          method: "GET",
+          status: 200,
+          body: { health: "ok", version: "v0.21.3" },
+        },
+      ]),
+    );
+    const user = userEvent.setup();
+
+    render(<SettingsPage />);
+    await user.click(screen.getByRole("button", { name: "监控" }));
+
+    expect(await screen.findByLabelText("CPU 使用率")).toHaveTextContent("12%");
+    expect(screen.getByLabelText("内存使用率")).toHaveTextContent("55%");
+    expect(screen.getByLabelText("磁盘使用率")).toHaveTextContent("71%");
+    expect(screen.getByLabelText("进程数")).toHaveTextContent("42");
+    expect(screen.getByLabelText("监控健康")).toHaveTextContent("ok");
+    expect(screen.getByLabelText("版本")).toHaveTextContent("v0.21.3");
+  });
+});
