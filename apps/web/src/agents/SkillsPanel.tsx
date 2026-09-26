@@ -7,6 +7,7 @@ export default function SkillsPanel() {
   const [skills, setSkills] = useState<SkillEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -24,6 +25,27 @@ export default function SkillsPanel() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const toggle = useCallback(async (skill: SkillEntry) => {
+    const enabled = !skill.enabled;
+    setBusy(skill.name);
+    try {
+      await api("/api/hermes/skills/toggle", {
+        method: "PUT",
+        body: JSON.stringify({ name: skill.name, enabled }),
+      });
+      setSkills((current) =>
+        current.map((entry) =>
+          entry.name === skill.name ? { ...entry, enabled } : entry,
+        ),
+      );
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "切换技能失败");
+    } finally {
+      setBusy(null);
+    }
+  }, []);
 
   if (loading) {
     return <p className="empty">加载技能中…</p>;
@@ -43,6 +65,15 @@ export default function SkillsPanel() {
           <ul className="skill-list">
             {group.skills.map((skill) => (
               <li className="skill-item" key={skill.name}>
+                <label className="skill-toggle">
+                  <input
+                    type="checkbox"
+                    aria-label={`启用 ${skill.name}`}
+                    checked={skill.enabled}
+                    disabled={busy === skill.name}
+                    onChange={() => void toggle(skill)}
+                  />
+                </label>
                 <span className="skill-name">{skill.name}</span>
                 {skill.description ? (
                   <span className="skill-desc muted">{skill.description}</span>

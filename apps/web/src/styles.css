@@ -803,6 +803,11 @@ button {
   background: var(--ds-surface-l1);
 }
 
+.skill-toggle {
+  display: inline-flex;
+  align-items: center;
+}
+
 .skill-name {
   font-family: var(--ds-font-mono);
   font-size: var(--ds-font-size-sm);

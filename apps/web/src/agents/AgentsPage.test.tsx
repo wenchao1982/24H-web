@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import AgentsPage from "./AgentsPage";
 
 interface StubRoute {
@@ -70,6 +71,36 @@ describe("AgentsPage T7.1 技能列表", () => {
     render(<AgentsPage />);
 
     expect(await screen.findByText("暂无技能。")).toBeInTheDocument();
+  });
+});
+
+describe("AgentsPage T7.2 技能启停", () => {
+  it("toggles a skill with the exact PUT body and updates the UI", async () => {
+    const fetchMock = stubFetch([
+      { path: "/api/hermes/skills", method: "GET", status: 200, body: SKILLS },
+      { path: "/api/hermes/skills/toggle", method: "PUT", status: 200, body: { ok: true } },
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<AgentsPage />);
+    const toggle = await screen.findByLabelText("启用 ppt");
+    expect((toggle as HTMLInputElement).checked).toBe(false);
+
+    await user.click(toggle);
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find((entry) =>
+        String(entry[0]).endsWith("/api/hermes/skills/toggle"),
+      );
+      expect(call).toBeTruthy();
+      expect((call?.[1] as RequestInit).method).toBe("PUT");
+      expect(JSON.parse(String((call?.[1] as RequestInit).body))).toEqual({
+        name: "ppt",
+        enabled: true,
+      });
+    });
+    expect((screen.getByLabelText("启用 ppt") as HTMLInputElement).checked).toBe(true);
   });
 });
 
