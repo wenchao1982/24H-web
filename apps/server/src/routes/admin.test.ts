@@ -176,3 +176,114 @@ describe("POST /api/admin/users", () => {
   });
 });
 
+describe("PATCH /api/admin/users/:id", () => {
+  async function seedAlice(): Promise<{ id: number; session: string; csrf: string }> {
+    const alice = await createUser(ctx!.db, {
+      username: "alice",
+      password: "alice-password-123",
+      role: "admin",
+    });
+    const { session, csrf } = await loginAndGetCookies(ctx!.app);
+    return { id: alice.id, session, csrf };
+  }
+
+  it("updates role and status and records an audit row", async () => {
+    ctx = await createTestContext();
+    const { id, session, csrf } = await seedAlice();
+
+    const res = await ctx.app.inject({
+      method: "PATCH",
+      url: `/api/admin/users/${id}`,
+      cookies: { "24h_session": session, "24h_csrf": csrf },
+      headers: { "x-csrf-token": csrf },
+      payload: { role: "super_admin", status: "disabled" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ role: "super_admin", status: "disabled" });
+
+    const login = await ctx.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: "alice", password: "alice-password-123" },
+    });
+    expect(login.statusCode).toBe(401);
+
+    const audit = ctx.db
+      .prepare("SELECT action, target_id FROM audit WHERE action = ?")
+      .get("user.update") as Record<string, unknown>;
+    expect(audit.target_id).toBe(String(id));
+  });
+
+  it("refuses to demote or disable the last active super_admin with 409", async () => {
+    ctx = await createTestContext();
+    const admin = ctx.db.prepare("SELECT id FROM users WHERE username = ?").get("admin") as {
+      id: number;
+    };
+    const { session, csrf } = await loginAndGetCookies(ctx.app);
+    const patch = (payload: Record<string, unknown>) =>
+      ctx!.app.inject({
+        method: "PATCH",
+        url: `/api/admin/users/${admin.id}`,
+        cookies: { "24h_session": session, "24h_csrf": csrf },
+        headers: { "x-csrf-token": csrf },
+        payload,
+      });
+
+    const demote = await patch({ role: "admin" });
+    expect(demote.statusCode).toBe(409);
+    expect(demote.json().error).toBe("LAST_SUPER_ADMIN");
+
+    const disable = await patch({ status: "disabled" });
+    expect(disable.statusCode).toBe(409);
+    expect(disable.json().error).toBe("LAST_SUPER_ADMIN");
+  });
+
+  it("allows demoting when another active super_admin exists", async () => {
+    ctx = await createTestContext();
+    await createUser(ctx.db, {
+      username: "root2",
+      password: "root2-password-123",
+      role: "super_admin",
+    });
+    const admin = ctx.db.prepare("SELECT id FROM users WHERE username = ?").get("admin") as {
+      id: number;
+    };
+    const { session, csrf } = await loginAndGetCookies(ctx.app);
+
+    const res = await ctx.app.inject({
+      method: "PATCH",
+      url: `/api/admin/users/${admin.id}`,
+      cookies: { "24h_session": session, "24h_csrf": csrf },
+      headers: { "x-csrf-token": csrf },
+      payload: { role: "admin" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().role).toBe("admin");
+  });
+
+  it("returns 404 for an unknown user and 400 when no fields are provided", async () => {
+    ctx = await createTestContext();
+    const { session, csrf } = await loginAndGetCookies(ctx.app);
+
+    const missing = await ctx.app.inject({
+      method: "PATCH",
+      url: "/api/admin/users/999999",
+      cookies: { "24h_session": session, "24h_csrf": csrf },
+      headers: { "x-csrf-token": csrf },
+      payload: { role: "admin" },
+    });
+    expect(missing.statusCode).toBe(404);
+
+    const empty = await ctx.app.inject({
+      method: "PATCH",
+      url: "/api/admin/users/1",
+      cookies: { "24h_session": session, "24h_csrf": csrf },
+      headers: { "x-csrf-token": csrf },
+      payload: {},
+    });
+    expect(empty.statusCode).toBe(400);
+  });
+});
+

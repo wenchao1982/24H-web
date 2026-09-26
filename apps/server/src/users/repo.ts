@@ -20,6 +20,23 @@ export function countUsers(db: Db): number {
   return row.n;
 }
 
+export function countActiveSuperAdmins(db: Db, excludeId?: number): number {
+  const row =
+    excludeId === undefined
+      ? (db
+          .prepare(
+            "SELECT COUNT(*) AS n FROM users WHERE role = 'super_admin' AND status = 'active'",
+          )
+          .get() as { n: number })
+      : (db
+          .prepare(
+            `SELECT COUNT(*) AS n FROM users
+             WHERE role = 'super_admin' AND status = 'active' AND id != ?`,
+          )
+          .get(excludeId) as { n: number });
+  return row.n;
+}
+
 export function findUserByUsername(db: Db, username: string): UserRow | null {
   const row = db
     .prepare("SELECT * FROM users WHERE username = ?")

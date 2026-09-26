@@ -3,7 +3,9 @@ import type { Db } from "../db";
 import { ApiError } from "../http/errors";
 import { logAudit } from "../audit/repo";
 import {
+  countActiveSuperAdmins,
   createUser,
+  findUserById,
   findUserByUsername,
   getUserSummary,
   listUsers,
@@ -17,6 +19,7 @@ export interface AdminRoutesOptions {
 
 const USERNAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{2,31}$/;
 const ROLES = new Set<UserRow["role"]>(["super_admin", "admin"]);
+const STATUSES = new Set<UserRow["status"]>(["active", "disabled"]);
 
 function readString(body: unknown, key: string): string {
   if (body && typeof body === "object") {
@@ -34,6 +37,15 @@ function currentUser(request: FastifyRequest): UserRow {
     throw new ApiError(401, "UNAUTHENTICATED", "未登录");
   }
   return user;
+}
+
+function readIdParam(request: FastifyRequest): number {
+  const raw = (request.params as { id?: string }).id;
+  const id = Number(raw);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new ApiError(400, "INVALID_INPUT", "无效的用户 ID");
+  }
+  return id;
 }
 
 export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, opts) => {
@@ -77,5 +89,54 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
 
     reply.status(201);
     return getUserSummary(db, user.id);
+  });
+
+  app.patch("/api/admin/users/:id", { preHandler: requireSuperAdmin }, async (request) => {
+    const actor = currentUser(request);
+    const id = readIdParam(request);
+
+    const roleRaw = readString(request.body, "role");
+    const statusRaw = readString(request.body, "status");
+    if (roleRaw && !ROLES.has(roleRaw as UserRow["role"])) {
+      throw new ApiError(400, "INVALID_INPUT", "角色不合法");
+    }
+    if (statusRaw && !STATUSES.has(statusRaw as UserRow["status"])) {
+      throw new ApiError(400, "INVALID_INPUT", "状态不合法");
+    }
+    if (!roleRaw && !statusRaw) {
+      throw new ApiError(400, "INVALID_INPUT", "没有需要更新的字段");
+    }
+
+    const target = findUserById(db, id);
+    if (!target) {
+      throw new ApiError(404, "USER_NOT_FOUND", "用户不存在");
+    }
+
+    const newRole = (roleRaw || target.role) as UserRow["role"];
+    const newStatus = (statusRaw || target.status) as UserRow["status"];
+
+    const wasActiveSuperAdmin = target.role === "super_admin" && target.status === "active";
+    const losesSuperAdmin = newRole !== "super_admin" || newStatus !== "active";
+    if (wasActiveSuperAdmin && losesSuperAdmin && countActiveSuperAdmins(db, target.id) === 0) {
+      throw new ApiError(409, "LAST_SUPER_ADMIN", "不能禁用或降级最后一个超级管理员");
+    }
+
+    db.prepare("UPDATE users SET role = ?, status = ?, updated_at = ? WHERE id = ?").run(
+      newRole,
+      newStatus,
+      Date.now(),
+      target.id,
+    );
+
+    logAudit(db, {
+      actorId: actor.id,
+      action: "user.update",
+      targetType: "user",
+      targetId: String(target.id),
+      ip: request.ip,
+      detail: JSON.stringify({ role: newRole, status: newStatus }),
+    });
+
+    return getUserSummary(db, target.id);
   });
 };
