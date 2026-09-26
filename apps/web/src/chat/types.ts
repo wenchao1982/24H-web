@@ -200,6 +200,44 @@ export function toolResult(payload: Record<string, unknown>): string | undefined
   return str(payload.result) ?? str(payload.output) ?? str(payload.content) ?? stringify(payload.result);
 }
 
+export interface RequestOption {
+  value: string;
+  label: string;
+}
+
+/** 服务端请求的可选项（`options` / `choices`），无则返回 null。 */
+export function requestOptions(params: Record<string, unknown>): RequestOption[] | null {
+  const raw = params.options ?? params.choices;
+  if (!Array.isArray(raw)) {
+    return null;
+  }
+  return raw.flatMap((entry) => {
+    if (typeof entry === "string") {
+      return [{ value: entry, label: entry }];
+    }
+    if (entry && typeof entry === "object") {
+      const record = entry as Record<string, unknown>;
+      const value = str(record.value) ?? str(record.id) ?? str(record.key);
+      if (!value) {
+        return [];
+      }
+      return [{ value, label: str(record.label) ?? str(record.title) ?? value }];
+    }
+    return [];
+  });
+}
+
+/** 服务端请求的提示语。 */
+export function requestPrompt(params: Record<string, unknown>): string | undefined {
+  return (
+    str(params.prompt) ??
+    str(params.question) ??
+    str(params.message) ??
+    str(params.description) ??
+    str(params.title)
+  );
+}
+
 function lastToolIndex(items: TranscriptItem[], id: string): number {
   for (let i = items.length - 1; i >= 0; i -= 1) {
     const item = items[i];

@@ -152,3 +152,48 @@ describe("ChatPage T6.4 工具卡", () => {
     expect(screen.getByText("3 条结果")).toBeInTheDocument();
   });
 });
+
+describe("ChatPage T6.5 审批/澄清", () => {
+  it("renders an approval card and replies with the chosen option", async () => {
+    const gateway = createFakeGateway((method) =>
+      method === "session.list" ? { sessions: [{ id: "s1", title: "会话一" }] } : {},
+    );
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+
+    let respond!: ReturnType<typeof gateway.emitServerRequest>;
+    act(() => {
+      respond = gateway.emitServerRequest("approval", {
+        prompt: "是否允许执行该命令？",
+        options: ["once", "deny"],
+      });
+    });
+
+    expect(screen.getByText("是否允许执行该命令？")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "允许一次" }));
+
+    expect(respond).toHaveBeenCalledWith({ choice: "once" });
+    expect(screen.getByText(/已回复/)).toBeInTheDocument();
+  });
+
+  it("renders a clarify card and replies with the chosen answer", async () => {
+    const gateway = createFakeGateway((method) =>
+      method === "session.list" ? { sessions: [{ id: "s1", title: "会话一" }] } : {},
+    );
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+
+    let respond!: ReturnType<typeof gateway.emitServerRequest>;
+    act(() => {
+      respond = gateway.emitServerRequest("clarify", {
+        question: "选择哪个环境？",
+        options: [{ value: "staging", label: "预发" }, "production"],
+      });
+    });
+
+    await user.click(screen.getByRole("button", { name: "预发" }));
+    expect(respond).toHaveBeenCalledWith({ answer: "staging" });
+  });
+});

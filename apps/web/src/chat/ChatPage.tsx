@@ -3,6 +3,7 @@ import { useGateway } from "./GatewayProvider";
 import SessionList from "./SessionList";
 import Transcript from "./Transcript";
 import Composer from "./Composer";
+import ServerRequestCard from "./ServerRequestCard";
 import {
   appendDelta,
   completeAssistant,
@@ -15,9 +16,13 @@ import {
   toolName,
   toolResult,
   upsertTool,
+  type PendingRequest,
+  type RequestKind,
   type SessionSummary,
   type TranscriptItem,
 } from "./types";
+
+const REQUEST_KINDS: RequestKind[] = ["approval", "clarify"];
 
 export default function ChatPage() {
   const gateway = useGateway();
@@ -26,8 +31,10 @@ export default function ChatPage() {
   const [filter, setFilter] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<TranscriptItem[]>([]);
+  const [pending, setPending] = useState<PendingRequest[]>([]);
 
   const activeIdRef = useRef<string | null>(null);
+  const respondersRef = useRef(new Map<string, (result: Record<string, unknown>) => void>());
   const seqRef = useRef(0);
   const nextId = useCallback(() => `i${seqRef.current++}`, []);
 
@@ -108,6 +115,16 @@ export default function ChatPage() {
     });
   }, [gateway, nextId]);
 
+  useEffect(() => {
+    for (const kind of REQUEST_KINDS) {
+      gateway.onServerRequest(kind, (params, respond) => {
+        const id = nextId();
+        respondersRef.current.set(id, respond);
+        setPending((current) => [...current, { id, kind, params }]);
+      });
+    }
+  }, [gateway, nextId]);
+
   const createSession = useCallback(async () => {
     try {
       const result = await gateway.request("session.create", {});
@@ -149,6 +166,22 @@ export default function ChatPage() {
     [gateway, nextId],
   );
 
+  const answerRequest = useCallback(
+    (requestId: string, result: Record<string, unknown>) => {
+      const respond = respondersRef.current.get(requestId);
+      respond?.(result);
+      respondersRef.current.delete(requestId);
+      const value = result.choice ?? result.answer ?? result.value;
+      const label = typeof value === "string" ? value : "已提交";
+      setPending((current) =>
+        current.map((entry) =>
+          entry.id === requestId ? { ...entry, answered: true, answer: label } : entry,
+        ),
+      );
+    },
+    [],
+  );
+
   const visible = useMemo(() => {
     const query = filter.trim().toLowerCase();
     if (!query) {
@@ -178,6 +211,17 @@ export default function ChatPage() {
         {active ? (
           <>
             <Transcript items={items} />
+            {pending.length > 0 ? (
+              <div className="pending-requests">
+                {pending.map((request) => (
+                  <ServerRequestCard
+                    key={request.id}
+                    request={request}
+                    onRespond={(result) => answerRequest(request.id, result)}
+                  />
+                ))}
+              </div>
+            ) : null}
             <Composer onSend={handleSend} />
           </>
         ) : (
