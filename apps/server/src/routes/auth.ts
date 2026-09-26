@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import type { Db } from "../db";
 import { ApiError } from "../http/errors";
+import { issueCsrfToken } from "../http/csrf";
 import { verifyPassword, hashPassword } from "../auth/password";
 import { clearLoginFailures, getLockedUntil, recordLoginFailure } from "../auth/rateLimit";
 import { findUserByUsername, listUserProfiles } from "../users/repo";
@@ -56,6 +57,8 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, opt
 
     clearLoginFailures(db, ip, username);
 
+    const secure = request.headers["x-forwarded-proto"] === "https";
+
     const { token, session } = createSession(db, {
       userId: user.id,
       ip: request.ip,
@@ -73,9 +76,11 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, opt
       path: "/",
       httpOnly: true,
       sameSite: "lax",
-      secure: request.headers["x-forwarded-proto"] === "https",
+      secure,
       maxAge: Math.max(0, Math.floor((session.expires_at - now) / 1000)),
     });
+
+    issueCsrfToken(reply, { secure });
 
     return {
       user: {

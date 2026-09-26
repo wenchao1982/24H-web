@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   createTestContext,
+  loginAndGetCookies,
   TEST_ADMIN_PASSWORD,
   TEST_ADMIN_USERNAME,
   type TestContext,
@@ -13,28 +14,16 @@ afterEach(async () => {
   ctx = undefined;
 });
 
-async function loginToken(
-  context: TestContext,
-  password = TEST_ADMIN_PASSWORD,
-): Promise<string> {
-  const res = await context.app.inject({
-    method: "POST",
-    url: "/api/auth/login",
-    payload: { username: TEST_ADMIN_USERNAME, password },
-  });
-  expect(res.statusCode).toBe(200);
-  return String(res.headers["set-cookie"]).split(";")[0].split("=")[1];
-}
-
 describe("POST /api/auth/change-password", () => {
   it("rejects a wrong old password with 400 and keeps the flag", async () => {
     ctx = await createTestContext();
-    const token = await loginToken(ctx);
+    const { session, csrf } = await loginAndGetCookies(ctx.app);
 
     const res = await ctx.app.inject({
       method: "POST",
       url: "/api/auth/change-password",
-      cookies: { "24h_session": token },
+      cookies: { "24h_session": session, "24h_csrf": csrf },
+      headers: { "x-csrf-token": csrf },
       payload: { oldPassword: "nope", newPassword: "brand-new-password" },
     });
 
@@ -44,12 +33,13 @@ describe("POST /api/auth/change-password", () => {
 
   it("changes the password and clears must_change_password", async () => {
     ctx = await createTestContext();
-    const token = await loginToken(ctx);
+    const { session, csrf } = await loginAndGetCookies(ctx.app);
 
     const res = await ctx.app.inject({
       method: "POST",
       url: "/api/auth/change-password",
-      cookies: { "24h_session": token },
+      cookies: { "24h_session": session, "24h_csrf": csrf },
+      headers: { "x-csrf-token": csrf },
       payload: { oldPassword: TEST_ADMIN_PASSWORD, newPassword: "brand-new-password" },
     });
 
@@ -59,7 +49,7 @@ describe("POST /api/auth/change-password", () => {
     const me = await ctx.app.inject({
       method: "GET",
       url: "/api/auth/me",
-      cookies: { "24h_session": token },
+      cookies: { "24h_session": session },
     });
     expect(me.json().must_change_password).toBe(0);
 
@@ -73,10 +63,13 @@ describe("POST /api/auth/change-password", () => {
 
   it("rejects an unauthenticated request with 401", async () => {
     ctx = await createTestContext();
+    const { csrf } = await loginAndGetCookies(ctx.app);
 
     const res = await ctx.app.inject({
       method: "POST",
       url: "/api/auth/change-password",
+      cookies: { "24h_csrf": csrf },
+      headers: { "x-csrf-token": csrf },
       payload: { oldPassword: TEST_ADMIN_PASSWORD, newPassword: "brand-new-password" },
     });
 

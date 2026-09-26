@@ -10,6 +10,34 @@ import { buildApp } from "../http/app";
 export const TEST_ADMIN_USERNAME = "admin";
 export const TEST_ADMIN_PASSWORD = "test-admin-password";
 
+export function parseCookies(
+  setCookie: string | string[] | undefined,
+): Record<string, string> {
+  const list = Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [];
+  const out: Record<string, string> = {};
+  for (const entry of list) {
+    const pair = entry.split(";")[0];
+    const index = pair.indexOf("=");
+    if (index > 0) {
+      out[pair.slice(0, index)] = pair.slice(index + 1);
+    }
+  }
+  return out;
+}
+
+export function loginAndGetCookies(
+  app: FastifyInstance,
+  username = TEST_ADMIN_USERNAME,
+  password = TEST_ADMIN_PASSWORD,
+): Promise<{ session: string; csrf: string }> {
+  return app
+    .inject({ method: "POST", url: "/api/auth/login", payload: { username, password } })
+    .then((res) => {
+      const cookies = parseCookies(res.headers["set-cookie"]);
+      return { session: cookies["24h_session"], csrf: cookies["24h_csrf"] };
+    });
+}
+
 export interface TestContext {
   app: FastifyInstance;
   db: Db;

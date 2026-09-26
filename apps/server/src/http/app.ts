@@ -3,6 +3,7 @@ import cookie from "@fastify/cookie";
 import Fastify, { type FastifyInstance } from "fastify";
 import type { Db } from "../db";
 import { registerErrorHandler } from "./errors";
+import { registerCsrfGuard } from "./csrf";
 import { authRoutes } from "../routes/auth";
 import { registerSessionMiddleware } from "../session/middleware";
 
@@ -27,6 +28,7 @@ export function buildApp(db: Db, options: BuildAppOptions = {}): FastifyInstance
 
   app.decorate("db", db);
   registerErrorHandler(app);
+  registerCsrfGuard(app);
   registerSessionMiddleware(app, db);
 
   app.register(authRoutes, { db });
