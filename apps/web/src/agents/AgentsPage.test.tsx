@@ -319,3 +319,30 @@ describe("AgentsPage T7.7 技能内容编辑", () => {
   });
 });
 
+describe("AgentsPage T7.8 经验→Skill（/learn）", () => {
+  it("submits /learn through the gateway slash.exec", async () => {
+    const gateway = createFakeGateway(() => ({}));
+    vi.stubGlobal(
+      "fetch",
+      stubFetch([{ path: "/api/hermes/skills", method: "GET", status: 200, body: SKILLS }]),
+    );
+    const user = userEvent.setup();
+
+    render(
+      <GatewayProvider gateway={gateway}>
+        <AgentsPage />
+      </GatewayProvider>,
+    );
+
+    await user.type(screen.getByLabelText("学习来源"), "从部署经验生成");
+    await user.click(screen.getByRole("button", { name: "生成技能" }));
+
+    await waitFor(() => {
+      expect(gateway.paramsOf("slash.exec")).toEqual([
+        { command: "/learn", args: "从部署经验生成" },
+      ]);
+    });
+    expect(await screen.findByText("已提交生成技能")).toBeInTheDocument();
+  });
+});
+
