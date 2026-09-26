@@ -238,3 +238,43 @@ describe("AgentsPage T7.5 插件", () => {
   });
 });
 
+describe("AgentsPage T7.6 技能安装（hub）", () => {
+  it("searches the hub and installs a skill", async () => {
+    const fetchMock = stubFetch([
+      { path: "/api/hermes/skills", method: "GET", status: 200, body: SKILLS },
+      {
+        path: "/api/hermes/skills/hub",
+        method: "GET",
+        status: 200,
+        body: { results: [{ name: "translate", description: "翻译" }] },
+      },
+      { path: "/api/hermes/skills", method: "POST", status: 201, body: { ok: true } },
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<AgentsPage />);
+    await screen.findByRole("heading", { name: "检索" });
+
+    await user.type(screen.getByLabelText("搜索技能市场"), "翻译");
+    await user.click(screen.getByRole("button", { name: "搜索" }));
+
+    expect(await screen.findByText("translate")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "安装" }));
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (entry) =>
+          String(entry[0]).endsWith("/api/hermes/skills") &&
+          (entry[1] as RequestInit | undefined)?.method === "POST",
+      );
+      expect(call).toBeTruthy();
+      expect(JSON.parse(String((call?.[1] as RequestInit).body))).toEqual({ name: "translate" });
+    });
+    const hubCall = fetchMock.mock.calls.find((entry) =>
+      String(entry[0]).includes("/api/hermes/skills/hub?q="),
+    );
+    expect(String(hubCall?.[0])).toContain("q=%E7%BF%BB%E8%AF%91");
+  });
+});
+

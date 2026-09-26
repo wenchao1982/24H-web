@@ -64,9 +64,7 @@ export function normalizeSkills(payload: unknown): SkillEntry[] {
 export interface SkillGroup {
   category: string;
   skills: SkillEntry[];
-}
-
-/** 按类别分组，保持首次出现顺序，未分类排最后。 */
+}/** 按类别分组，保持首次出现顺序，未分类排最后。 */
 export function groupByCategory(skills: SkillEntry[]): SkillGroup[] {
   const order: string[] = [];
   const buckets = new Map<string, SkillEntry[]>();
@@ -84,3 +82,31 @@ export function groupByCategory(skills: SkillEntry[]): SkillGroup[] {
   });
   return order.map((category) => ({ category, skills: buckets.get(category)! }));
 }
+
+export interface HubSkillEntry {
+  name: string;
+  description: string;
+}
+
+/** 解析 hub 搜索结果（`GET /api/skills/hub`）。 */
+export function normalizeHubSkills(payload: unknown): HubSkillEntry[] {
+  const raw = asRecord(payload);
+  const list = Array.isArray(payload)
+    ? payload
+    : Array.isArray(raw.results)
+      ? raw.results
+      : Array.isArray(raw.skills)
+        ? raw.skills
+        : [];
+  const out: HubSkillEntry[] = [];
+  for (const item of list) {
+    const source = asRecord(item);
+    const name = readString(source, "name", "id", "slug");
+    if (!name) {
+      continue;
+    }
+    out.push({ name, description: readString(source, "description", "summary", "desc") });
+  }
+  return out;
+}
+
