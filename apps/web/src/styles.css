@@ -762,6 +762,61 @@ button {
   color: var(--ds-danger);
 }
 
+/* ---------- 智能体页 / 设置页（M6） ---------- */
+
+.tabs {
+  display: flex;
+  gap: var(--ds-space-1);
+  border-bottom: var(--ds-hairline) solid var(--ds-border-l1);
+  margin-bottom: var(--ds-space-4);
+}
+
+.skills {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-4);
+}
+
+.skill-group-title {
+  margin: 0 0 var(--ds-space-2);
+  font-size: var(--ds-font-size-sm);
+  font-weight: 500;
+  color: var(--ds-label-tertiary);
+}
+
+.skill-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-1);
+}
+
+.skill-item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-2) var(--ds-space-3);
+  border: var(--ds-hairline) solid var(--ds-border-l1);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-l1);
+}
+
+.skill-name {
+  font-family: var(--ds-font-mono);
+  font-size: var(--ds-font-size-sm);
+}
+
+.skill-desc {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--ds-font-size-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ---------- 通用表单 / 页面 ---------- */
 
 .page {
