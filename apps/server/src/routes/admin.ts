@@ -139,4 +139,41 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
 
     return getUserSummary(db, target.id);
   });
+
+  app.delete("/api/admin/users/:id", { preHandler: requireSuperAdmin }, async (request) => {
+    const actor = currentUser(request);
+    const id = readIdParam(request);
+
+    const target = findUserById(db, id);
+    if (!target) {
+      throw new ApiError(404, "USER_NOT_FOUND", "用户不存在");
+    }
+    if (
+      target.role === "super_admin" &&
+      target.status === "active" &&
+      countActiveSuperAdmins(db, target.id) === 0
+    ) {
+      throw new ApiError(409, "LAST_SUPER_ADMIN", "不能删除最后一个超级管理员");
+    }
+    if (target.id === actor.id) {
+      throw new ApiError(400, "CANNOT_DELETE_SELF", "不能删除自己");
+    }
+
+    const remove = db.transaction(() => {
+      db.prepare("DELETE FROM sessions WHERE user_id = ?").run(target.id);
+      db.prepare("DELETE FROM user_profiles WHERE user_id = ?").run(target.id);
+      db.prepare("DELETE FROM users WHERE id = ?").run(target.id);
+    });
+    remove();
+
+    logAudit(db, {
+      actorId: actor.id,
+      action: "user.delete",
+      targetType: "user",
+      targetId: String(target.id),
+      ip: request.ip,
+    });
+
+    return { ok: true };
+  });
 };

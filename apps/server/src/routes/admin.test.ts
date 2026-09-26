@@ -287,3 +287,99 @@ describe("PATCH /api/admin/users/:id", () => {
   });
 });
 
+describe("DELETE /api/admin/users/:id", () => {
+  it("deletes a user, cascades sessions and profiles, and records an audit row", async () => {
+    ctx = await createTestContext();
+    const alice = await createUser(ctx.db, {
+      username: "alice",
+      password: "alice-password-123",
+      role: "admin",
+    });
+    ctx.db
+      .prepare(
+        "INSERT INTO user_profiles (user_id, profile_name, is_default, created_at) VALUES (?, ?, ?, ?)",
+      )
+      .run(alice.id, "alpha", 1, Date.now());
+    await loginAndGetCookies(ctx.app, "alice", "alice-password-123");
+
+    const { session, csrf } = await loginAndGetCookies(ctx.app);
+    const res = await ctx.app.inject({
+      method: "DELETE",
+      url: `/api/admin/users/${alice.id}`,
+      cookies: { "24h_session": session, "24h_csrf": csrf },
+      headers: { "x-csrf-token": csrf },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true });
+
+    expect(ctx.db.prepare("SELECT COUNT(*) AS n FROM users WHERE id = ?").get(alice.id)).toEqual({ n: 0 });
+    expect(
+      ctx.db.prepare("SELECT COUNT(*) AS n FROM sessions WHERE user_id = ?").get(alice.id),
+    ).toEqual({ n: 0 });
+    expect(
+      ctx.db.prepare("SELECT COUNT(*) AS n FROM user_profiles WHERE user_id = ?").get(alice.id),
+    ).toEqual({ n: 0 });
+
+    const audit = ctx.db
+      .prepare("SELECT action, target_id FROM audit WHERE action = ?")
+      .get("user.delete") as Record<string, unknown>;
+    expect(audit.target_id).toBe(String(alice.id));
+  });
+
+  it("refuses deleting yourself with 400 CANNOT_DELETE_SELF", async () => {
+    ctx = await createTestContext();
+    await createUser(ctx.db, {
+      username: "root2",
+      password: "root2-password-123",
+      role: "super_admin",
+    });
+    const admin = ctx.db.prepare("SELECT id FROM users WHERE username = ?").get("admin") as {
+      id: number;
+    };
+    const { session, csrf } = await loginAndGetCookies(ctx.app);
+
+    const res = await ctx.app.inject({
+      method: "DELETE",
+      url: `/api/admin/users/${admin.id}`,
+      cookies: { "24h_session": session, "24h_csrf": csrf },
+      headers: { "x-csrf-token": csrf },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe("CANNOT_DELETE_SELF");
+  });
+
+  it("refuses deleting the last active super_admin with 409", async () => {
+    ctx = await createTestContext();
+    const admin = ctx.db.prepare("SELECT id FROM users WHERE username = ?").get("admin") as {
+      id: number;
+    };
+    const { session, csrf } = await loginAndGetCookies(ctx.app);
+
+    const res = await ctx.app.inject({
+      method: "DELETE",
+      url: `/api/admin/users/${admin.id}`,
+      cookies: { "24h_session": session, "24h_csrf": csrf },
+      headers: { "x-csrf-token": csrf },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toBe("LAST_SUPER_ADMIN");
+  });
+
+  it("returns 404 for an unknown user", async () => {
+    ctx = await createTestContext();
+    const { session, csrf } = await loginAndGetCookies(ctx.app);
+
+    const res = await ctx.app.inject({
+      method: "DELETE",
+      url: "/api/admin/users/999999",
+      cookies: { "24h_session": session, "24h_csrf": csrf },
+      headers: { "x-csrf-token": csrf },
+    });
+
+    expect(res.statusCode).toBe(404);
+  });
+});
+
