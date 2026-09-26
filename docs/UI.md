@@ -130,3 +130,64 @@ Cron 列表 + 新增/暂停/恢复/删除/立即运行。任务：T9.1/T9.2。
 - 监控 = **独立设置分区**。
 - 升级面板 = **不分开**（核心 + web 应用同一面板）。
 - 去掉命令面板；外观 = 顶栏日/夜一键切换；右面板图形按钮收起。
+
+## 14. 视觉风格（借鉴 dsh 的超简风）
+
+> 参考 DeepSeek Harness（dsh）Web 客户端的 `--dsw-*` 设计系统：**单色基调、语义 token、发丝描边、平滑圆角、字号阶梯、elevation 分级**。
+> 目标：**克制、留白、无重边框**。
+
+### 14.1 基调
+
+- **单色（monochrome）为主**，品牌色近似"黑/白"；强调色**只用于主操作**。
+- 大量留白；**无重边框、无多余分割线**。
+
+### 14.2 设计 token（语义 alias）
+
+| token | 含义 |
+| --- | --- |
+| `--ds-bg-base` | 页面底色 |
+| `--ds-surface-l1` / `--ds-surface-l2` | 面板 / 浮层表面 |
+| `--ds-label-primary` / `--ds-label-secondary` / `--ds-label-tertiary` | 三级文字 |
+| `--ds-border-l1` / `--ds-border-l2` | 发丝描边（10% / 12%） |
+| `--ds-brand-primary` | 品牌 / 主操作 |
+
+### 14.3 参考色值（可直接采用）
+
+| 用途 | 亮色 | 暗色 |
+| --- | --- | --- |
+| 底色 | `#ffffff` | `#151517` |
+| 主文字 | `#0f1115` | `#f9fafb` |
+| 次文字 | `#61666b` | `#cfd3d6` |
+| 三级文字 | `#81858c` | `#adb2b8` |
+| 描边 | `rgb(0 0 0 / 10%)` | `rgb(255 255 255 / 12%)` |
+| 品牌 | `#0f1115` | `#f9fafb` |
+
+### 14.4 描边与阴影（elevation）
+
+- **0.5px 发丝描边**表示层级；高层级表面设 `border: 0` 改用描边，**不占布局**。
+- 阴影分级：`elevation-soft` / `elevation-panel` / `elevation-prominent`；输入框用更大模糊、更低透明度。
+
+### 14.5 圆角
+
+- **平滑圆角**：`@supports (corner-shape: superellipse(1.5))` 下用超椭圆；不支持的引擎保持普通圆弧。
+- 正圆 / 胶囊（头像、按钮）配 `corner-shape: round`。
+
+### 14.6 字号
+
+- 正文默认 **14px**，可在 **12–17px** 调整；标题 / 摘要 / 表格比正文**低一档**；小号文本与代码**固定**等宽。
+
+### 14.7 字体
+
+- 正文：`system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif`
+- 代码：`"SF Mono", "JetBrains Mono", "Fira Code", Consolas, Menlo, monospace`
+
+### 14.8 主题
+
+- `light` / `dark` / `system` 三种；**首帧前注入**所选配色，避免闪烁。
+- 顶栏 `☀/🌙` 一键切换。
+
+### 14.9 落地约定
+
+- 前端**不引 UI 库**，手写 CSS + 上述 `--ds-*` token（与 `AGENTS.md` 一致）。
+- 所有颜色 / 圆角 / 阴影**只引用 token，不写死值**。
+- 待确认：是否保留**一个强调色**（仅主操作），还是完全单色（同 dsh）。
