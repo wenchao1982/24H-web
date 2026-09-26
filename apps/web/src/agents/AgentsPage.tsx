@@ -1,12 +1,16 @@
 import { useState } from "react";
 import SkillsPanel from "./SkillsPanel";
+import ToolsetsPanel from "./ToolsetsPanel";
 
 interface TabDef {
   id: string;
   label: string;
 }
 
-const TABS: TabDef[] = [{ id: "skills", label: "技能" }];
+const TABS: TabDef[] = [
+  { id: "skills", label: "技能" },
+  { id: "toolsets", label: "工具" },
+];
 
 /** 智能体页：技能 / 工具 / MCP / 插件 等子面板（M6）。 */
 export default function AgentsPage() {
@@ -30,6 +34,7 @@ export default function AgentsPage() {
       </div>
       <div className="tab-panel">
         {tab === "skills" ? <SkillsPanel /> : null}
+        {tab === "toolsets" ? <ToolsetsPanel /> : null}
       </div>
     </div>
   );

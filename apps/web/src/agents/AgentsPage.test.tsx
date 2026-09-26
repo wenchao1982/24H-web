@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import AgentsPage from "./AgentsPage";
 
@@ -101,6 +101,61 @@ describe("AgentsPage T7.2 技能启停", () => {
       });
     });
     expect((screen.getByLabelText("启用 ppt") as HTMLInputElement).checked).toBe(true);
+  });
+});
+
+describe("AgentsPage T7.3 工具 / Toolsets", () => {
+  it("renders toolsets, toggles one and opens its config", async () => {
+    const fetchMock = stubFetch([
+      { path: "/api/hermes/skills", method: "GET", status: 200, body: SKILLS },
+      {
+        path: "/api/hermes/tools/toolsets",
+        method: "GET",
+        status: 200,
+        body: {
+          toolsets: [
+            { name: "web", description: "联网检索", enabled: true },
+            { name: "code", description: "代码执行", enabled: false },
+          ],
+        },
+      },
+      {
+        path: "/api/hermes/tools/toolsets/web",
+        method: "PUT",
+        status: 200,
+        body: { ok: true },
+      },
+      {
+        path: "/api/hermes/tools/toolsets/web/config",
+        method: "GET",
+        status: 200,
+        body: { provider: "duckduckgo" },
+      },
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<AgentsPage />);
+    await user.click(await screen.findByRole("tab", { name: "工具" }));
+
+    expect(await screen.findByText("web")).toBeInTheDocument();
+    expect(screen.getByText("code")).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText("启用工具集 web"));
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (entry) =>
+          String(entry[0]).endsWith("/api/hermes/tools/toolsets/web") &&
+          (entry[1] as RequestInit | undefined)?.method === "PUT",
+      );
+      expect(call).toBeTruthy();
+      expect(JSON.parse(String((call?.[1] as RequestInit).body))).toEqual({ enabled: false });
+    });
+    expect((screen.getByLabelText("启用工具集 web") as HTMLInputElement).checked).toBe(false);
+
+    const webRow = screen.getByText("web").closest("li") as HTMLLIElement;
+    await user.click(within(webRow).getByRole("button", { name: "配置" }));
+    expect(await screen.findByText(/"provider": "duckduckgo"/)).toBeInTheDocument();
   });
 });
 
