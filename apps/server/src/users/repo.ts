@@ -64,6 +64,13 @@ export function listUserProfiles(
   return { profiles, defaultProfile: fallback ? fallback.profile_name : null };
 }
 
+export function userCanAccessProfile(db: Db, userId: number, profile: string): boolean {
+  const row = db
+    .prepare("SELECT 1 AS ok FROM user_profiles WHERE user_id = ? AND profile_name = ?")
+    .get(userId, profile) as { ok: number } | undefined;
+  return row !== undefined;
+}
+
 export interface UserSummary {
   id: number;
   username: string;

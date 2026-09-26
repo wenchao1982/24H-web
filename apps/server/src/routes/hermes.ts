@@ -1,7 +1,9 @@
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import type { Db } from "../db";
+import { ApiError } from "../http/errors";
 import { requireAuth } from "../session/middleware";
 import { getHermesToken, hermesUpstream } from "../hermes/client";
+import { userCanAccessProfile } from "../users/repo";
 
 export interface HermesRoutesOptions {
   db: Db;
@@ -12,6 +14,34 @@ function hasRequestBody(method: string, body: unknown): boolean {
   return method !== "GET" && method !== "HEAD" && body !== undefined && body !== null;
 }
 
+function readStringField(value: unknown, key: string): string {
+  if (value && typeof value === "object") {
+    const field = (value as Record<string, unknown>)[key];
+    if (typeof field === "string" && field.trim() !== "") {
+      return field.trim();
+    }
+  }
+  return "";
+}
+
+function requestProfile(request: FastifyRequest): string {
+  return readStringField(request.query, "profile") || readStringField(request.body, "profile");
+}
+
+function assertProfileAccess(db: Db, request: FastifyRequest): void {
+  const user = request.user;
+  if (!user) {
+    throw new ApiError(401, "UNAUTHENTICATED", "未登录");
+  }
+  const profile = requestProfile(request);
+  if (!profile || user.role === "super_admin") {
+    return;
+  }
+  if (!userCanAccessProfile(db, user.id, profile)) {
+    throw new ApiError(403, "PROFILE_FORBIDDEN", "无权访问该 profile");
+  }
+}
+
 /**
  * Proxy `/api/hermes/*` to the Hermes REST API (`/api/*`), injecting the
  * loopback session token. The token never reaches the client.
@@ -20,6 +50,8 @@ export const hermesRoutes: FastifyPluginAsync<HermesRoutesOptions> = async (app,
   const defaultBaseUrl = opts.defaultBaseUrl;
 
   app.all("/api/hermes/*", { preHandler: requireAuth }, async (request, reply) => {
+    assertProfileAccess(opts.db, request);
+
     const upstream = hermesUpstream({ hermesBaseUrl: defaultBaseUrl });
     const rest = (request.params as { "*"?: string })["*"] ?? "";
     const queryIndex = request.url.indexOf("?");
