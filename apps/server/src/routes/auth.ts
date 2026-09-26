@@ -4,7 +4,7 @@ import { ApiError } from "../http/errors";
 import { verifyPassword } from "../auth/password";
 import { findUserByUsername, listUserProfiles } from "../users/repo";
 import { SESSION_COOKIE, createSession, deleteSessionByToken } from "../session/repo";
-import { resolveSessionUser } from "../session/auth";
+import { requireAuth } from "../session/middleware";
 
 export interface AuthRoutesOptions {
   db: Db;
@@ -71,9 +71,8 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, opt
     };
   });
 
-  app.get("/api/auth/me", async (request) => {
-    const token = request.cookies[SESSION_COOKIE];
-    const user = token ? resolveSessionUser(db, token) : null;
+  app.get("/api/auth/me", { preHandler: requireAuth }, async (request) => {
+    const user = request.user;
     if (!user) {
       throw new ApiError(401, "UNAUTHENTICATED", "未登录");
     }
