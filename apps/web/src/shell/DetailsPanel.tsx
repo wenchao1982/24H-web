@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import FilesPanel from "../details/FilesPanel";
+import LogsPanel from "../details/LogsPanel";
 
 export const DETAILS_TABS = [
   { id: "files", label: "文件" },
@@ -48,6 +49,8 @@ function renderTab(tab: DetailsTab): ReactNode {
   switch (tab) {
     case "files":
       return <FilesPanel />;
+    case "logs":
+      return <LogsPanel />;
     default:
       return <p className="empty">暂无内容</p>;
   }
