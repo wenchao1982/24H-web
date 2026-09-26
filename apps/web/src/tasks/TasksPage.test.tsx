@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import TasksPage from "./TasksPage";
 
 interface StubRoute {
@@ -93,5 +94,66 @@ describe("TasksPage T9.1 任务列表", () => {
     );
     render(<TasksPage />);
     expect(await screen.findByRole("alert")).toHaveTextContent("无法连接 Hermes 上游");
+  });
+});
+
+describe("TasksPage T9.2 任务操作", () => {
+  const JOBS = {
+    jobs: [
+      { id: "daily-report", schedule: "0 9 * * *", enabled: true },
+      { id: "cleanup", schedule: "*/30 * * * *", enabled: false },
+    ],
+  };
+
+  it("pauses a job via POST /cron/jobs/:id/pause", async () => {
+    const fetchMock = stubFetch([
+      { path: "/api/hermes/cron/jobs", method: "GET", status: 200, body: JOBS },
+      { path: "/api/hermes/cron/jobs/daily-report/pause", method: "POST", status: 200, body: { ok: true } },
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<TasksPage />);
+    await screen.findByText("daily-report");
+
+    await user.click(screen.getByRole("button", { name: "暂停" }));
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (entry) =>
+          String(entry[0]).endsWith("/api/hermes/cron/jobs/daily-report/pause") &&
+          (entry[1] as RequestInit | undefined)?.method === "POST",
+      );
+      expect(call).toBeTruthy();
+    });
+  });
+
+  it("creates a job with the exact POST body", async () => {
+    const fetchMock = stubFetch([
+      { path: "/api/hermes/cron/jobs", method: "GET", status: 200, body: JOBS },
+      { path: "/api/hermes/cron/jobs", method: "POST", status: 201, body: { ok: true } },
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<TasksPage />);
+    await screen.findByText("daily-report");
+
+    await user.type(screen.getByLabelText("任务名称"), "weekly");
+    await user.type(screen.getByLabelText("任务计划"), "0 0 * * 1");
+    await user.click(screen.getByRole("button", { name: "新增" }));
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (entry) =>
+          String(entry[0]).endsWith("/api/hermes/cron/jobs") &&
+          (entry[1] as RequestInit | undefined)?.method === "POST",
+      );
+      expect(call).toBeTruthy();
+      expect(JSON.parse(String((call?.[1] as RequestInit).body))).toEqual({
+        name: "weekly",
+        schedule: "0 0 * * 1",
+      });
+    });
   });
 });
