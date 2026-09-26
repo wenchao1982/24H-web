@@ -427,3 +427,69 @@ describe("AgentsPage T16.1 Agent 列表/详情", () => {
   });
 });
 
+describe("AgentsPage T16.2 创建/克隆", () => {
+  it("creates a profile via profiles.create with the exact params", async () => {
+    const gateway = createFakeGateway((method) => {
+      if (method === "profiles.list") {
+        return { profiles: [] };
+      }
+      if (method === "profiles.create") {
+        return { ok: true, name: "writer" };
+      }
+      if (method === "profiles.describe") {
+        return { name: "writer" };
+      }
+      return {};
+    });
+    vi.stubGlobal(
+      "fetch",
+      stubFetch([{ path: "/api/hermes/skills", method: "GET", status: 200, body: SKILLS }]),
+    );
+    const user = userEvent.setup();
+
+    renderAgents(gateway);
+    await user.click(await screen.findByRole("button", { name: "新建" }));
+    await user.type(screen.getByLabelText("智能体名称"), "writer");
+    await user.type(screen.getByLabelText("智能体描述"), "文案助手");
+    await user.click(screen.getByRole("button", { name: "创建" }));
+
+    await waitFor(() => {
+      expect(gateway.paramsOf("profiles.create")).toEqual([
+        { name: "writer", description: "文案助手" },
+      ]);
+    });
+  });
+
+  it("clones the selected profile with clone_from", async () => {
+    const gateway = createFakeGateway((method) => {
+      if (method === "profiles.list") {
+        return { profiles: [{ name: "writer", display_name: "写作" }] };
+      }
+      if (method === "profiles.describe") {
+        return { name: "writer" };
+      }
+      if (method === "profiles.create") {
+        return { ok: true, name: "writer-copy" };
+      }
+      return {};
+    });
+    vi.stubGlobal(
+      "fetch",
+      stubFetch([{ path: "/api/hermes/skills", method: "GET", status: 200, body: SKILLS }]),
+    );
+    const user = userEvent.setup();
+
+    renderAgents(gateway);
+    await user.click(await screen.findByRole("button", { name: /写作/ }));
+    await user.click(await screen.findByRole("button", { name: "克隆" }));
+    await user.type(screen.getByLabelText("智能体名称"), "writer-copy");
+    await user.click(screen.getByRole("button", { name: "创建" }));
+
+    await waitFor(() => {
+      expect(gateway.paramsOf("profiles.create")).toEqual([
+        { name: "writer-copy", clone_from: "writer" },
+      ]);
+    });
+  });
+});
+

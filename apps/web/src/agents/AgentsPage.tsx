@@ -8,6 +8,7 @@ import {
 } from "./agents";
 import AgentList from "./AgentList";
 import AgentDetail from "./AgentDetail";
+import AgentCreatePanel, { type CreateProfileParams } from "./AgentCreatePanel";
 import SkillsPanel from "./SkillsPanel";
 import ToolsetsPanel from "./ToolsetsPanel";
 import McpPanel from "./McpPanel";
@@ -41,6 +42,12 @@ export default function AgentsPage() {
   const [learnArgs, setLearnArgs] = useState("");
   const [learnBusy, setLearnBusy] = useState(false);
   const [learnMsg, setLearnMsg] = useState<string | null>(null);
+
+  const [create, setCreate] = useState<{ mode: "new" | "clone"; cloneFrom?: string } | null>(
+    null,
+  );
+  const [createBusy, setCreateBusy] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const loadAgents = useCallback(async () => {
     setListLoading(true);
@@ -104,6 +111,35 @@ export default function AgentsPage() {
     );
   }, [agents, filter]);
 
+  const openCreate = useCallback((mode: "new" | "clone", cloneFrom?: string) => {
+    setCreate({ mode, cloneFrom });
+    setCreateError(null);
+  }, []);
+
+  const closeCreate = useCallback(() => {
+    setCreate(null);
+    setCreateError(null);
+  }, []);
+
+  const submitCreate = useCallback(
+    async (params: CreateProfileParams) => {
+      setCreateBusy(true);
+      setCreateError(null);
+      try {
+        await gateway.connect().catch(() => undefined);
+        await gateway.request("profiles.create", params);
+        setCreate(null);
+        await loadAgents();
+        setSelected(params.name);
+      } catch (err) {
+        setCreateError(err instanceof Error ? err.message : "创建智能体失败");
+      } finally {
+        setCreateBusy(false);
+      }
+    },
+    [gateway, loadAgents],
+  );
+
   const runLearn = async (event: FormEvent) => {
     event.preventDefault();
     const args = learnArgs.trim();
@@ -141,12 +177,39 @@ export default function AgentsPage() {
               filter={filter}
               onFilterChange={setFilter}
               onSelect={setSelected}
+              onCreate={() => openCreate("new")}
             />
           )}
         </aside>
 
         <section className="agents-main">
-          <AgentDetail agent={detail} loading={detailLoading} error={detailError} />
+          {create ? (
+            <AgentCreatePanel
+              mode={create.mode}
+              agents={agents}
+              defaultCloneFrom={create.cloneFrom}
+              busy={createBusy}
+              error={createError}
+              onCancel={closeCreate}
+              onSubmit={(params) => void submitCreate(params)}
+            />
+          ) : null}
+
+          <AgentDetail
+            agent={detail}
+            loading={detailLoading}
+            error={detailError}
+            actions={
+              detail ? (
+                <button
+                  type="button"
+                  onClick={() => openCreate("clone", detail.name)}
+                >
+                  克隆
+                </button>
+              ) : null
+            }
+          />
 
           <form className="card learn-action" onSubmit={runLearn}>
             <div className="row">
