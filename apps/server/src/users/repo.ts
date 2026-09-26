@@ -26,6 +26,26 @@ export function findUserByUsername(db: Db, username: string): UserRow | null {
   return row ?? null;
 }
 
+export function findUserById(db: Db, id: number): UserRow | null {
+  const row = db.prepare("SELECT * FROM users WHERE id = ?").get(id) as UserRow | undefined;
+  return row ?? null;
+}
+
+export function listUserProfiles(
+  db: Db,
+  userId: number,
+): { profiles: string[]; defaultProfile: string | null } {
+  const rows = db
+    .prepare(
+      "SELECT profile_name, is_default FROM user_profiles WHERE user_id = ? ORDER BY profile_name",
+    )
+    .all(userId) as { profile_name: string; is_default: number }[];
+
+  const profiles = rows.map((row) => row.profile_name);
+  const fallback = rows.find((row) => row.is_default === 1);
+  return { profiles, defaultProfile: fallback ? fallback.profile_name : null };
+}
+
 export async function createUser(
   db: Db,
   input: { username: string; password: string; role: UserRow["role"] },

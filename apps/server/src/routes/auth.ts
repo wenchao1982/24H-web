@@ -2,8 +2,9 @@ import type { FastifyPluginAsync } from "fastify";
 import type { Db } from "../db";
 import { ApiError } from "../http/errors";
 import { verifyPassword } from "../auth/password";
-import { findUserByUsername } from "../users/repo";
+import { findUserByUsername, listUserProfiles } from "../users/repo";
 import { SESSION_COOKIE, createSession } from "../session/repo";
+import { resolveSessionUser } from "../session/auth";
 
 export interface AuthRoutesOptions {
   db: Db;
@@ -67,6 +68,24 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, opt
         role: user.role,
         must_change_password: user.must_change_password,
       },
+    };
+  });
+
+  app.get("/api/auth/me", async (request) => {
+    const token = request.cookies[SESSION_COOKIE];
+    const user = token ? resolveSessionUser(db, token) : null;
+    if (!user) {
+      throw new ApiError(401, "UNAUTHENTICATED", "未登录");
+    }
+
+    const { profiles, defaultProfile } = listUserProfiles(db, user.id);
+    return {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      profiles,
+      default_profile: defaultProfile,
+      must_change_password: user.must_change_password,
     };
   });
 };
