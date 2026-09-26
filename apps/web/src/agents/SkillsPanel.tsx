@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api } from "../api/client";
+import { withProfile } from "./agents";
 import {
   groupByCategory,
   normalizeHubSkills,
@@ -9,8 +10,13 @@ import {
   type SkillEntry,
 } from "./skills";
 
+export interface SkillsPanelProps {
+  /** 作用到该 profile（省略则为全局默认 profile）。 */
+  profile?: string;
+}
+
 /** 智能体页「技能」面板：按类别分组展示 + hub 安装。 */
-export default function SkillsPanel() {
+export default function SkillsPanel({ profile }: SkillsPanelProps) {
   const [skills, setSkills] = useState<SkillEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +32,7 @@ export default function SkillsPanel() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const payload = await api<unknown>("/api/hermes/skills");
+      const payload = await api<unknown>(withProfile("/api/hermes/skills", profile));
       setSkills(normalizeSkills(payload));
       setError(null);
     } catch (err) {
@@ -34,32 +40,35 @@ export default function SkillsPanel() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [profile]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const toggle = useCallback(async (skill: SkillEntry) => {
-    const enabled = !skill.enabled;
-    setBusy(skill.name);
-    try {
-      await api("/api/hermes/skills/toggle", {
-        method: "PUT",
-        body: JSON.stringify({ name: skill.name, enabled }),
-      });
-      setSkills((current) =>
-        current.map((entry) =>
-          entry.name === skill.name ? { ...entry, enabled } : entry,
-        ),
-      );
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "切换技能失败");
-    } finally {
-      setBusy(null);
-    }
-  }, []);
+  const toggle = useCallback(
+    async (skill: SkillEntry) => {
+      const enabled = !skill.enabled;
+      setBusy(skill.name);
+      try {
+        await api(withProfile("/api/hermes/skills/toggle", profile), {
+          method: "PUT",
+          body: JSON.stringify({ name: skill.name, enabled }),
+        });
+        setSkills((current) =>
+          current.map((entry) =>
+            entry.name === skill.name ? { ...entry, enabled } : entry,
+          ),
+        );
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "切换技能失败");
+      } finally {
+        setBusy(null);
+      }
+    },
+    [profile],
+  );
 
   const searchHub = useCallback(
     async (event: FormEvent) => {
@@ -71,7 +80,7 @@ export default function SkillsPanel() {
       }
       try {
         const payload = await api<unknown>(
-          `/api/hermes/skills/hub?q=${encodeURIComponent(query)}`,
+          withProfile(`/api/hermes/skills/hub?q=${encodeURIComponent(query)}`, profile),
         );
         setHubResults(normalizeHubSkills(payload));
         setError(null);
@@ -79,14 +88,14 @@ export default function SkillsPanel() {
         setError(err instanceof Error ? err.message : "搜索技能失败");
       }
     },
-    [hubQuery],
+    [hubQuery, profile],
   );
 
   const install = useCallback(
     async (entry: HubSkillEntry) => {
       setHubBusy(entry.name);
       try {
-        await api("/api/hermes/skills", {
+        await api(withProfile("/api/hermes/skills", profile), {
           method: "POST",
           body: JSON.stringify({ name: entry.name }),
         });
@@ -100,7 +109,7 @@ export default function SkillsPanel() {
         setHubBusy(null);
       }
     },
-    [load],
+    [load, profile],
   );
 
   const openEditor = useCallback(
@@ -112,7 +121,7 @@ export default function SkillsPanel() {
       setContentBusy(true);
       try {
         const payload = await api<unknown>(
-          `/api/hermes/skills/content?name=${encodeURIComponent(skill.name)}`,
+          withProfile(`/api/hermes/skills/content?name=${encodeURIComponent(skill.name)}`, profile),
         );
         setContent(normalizeSkillContent(payload));
         setEditing(skill.name);
@@ -123,7 +132,7 @@ export default function SkillsPanel() {
         setContentBusy(false);
       }
     },
-    [editing],
+    [editing, profile],
   );
 
   const saveContent = useCallback(async () => {
@@ -132,7 +141,7 @@ export default function SkillsPanel() {
     }
     setContentBusy(true);
     try {
-      await api("/api/hermes/skills/content", {
+      await api(withProfile("/api/hermes/skills/content", profile), {
         method: "PUT",
         body: JSON.stringify({ name: editing, content }),
       });
@@ -142,7 +151,7 @@ export default function SkillsPanel() {
     } finally {
       setContentBusy(false);
     }
-  }, [content, editing]);
+  }, [content, editing, profile]);
 
   return (
     <div className="skills">

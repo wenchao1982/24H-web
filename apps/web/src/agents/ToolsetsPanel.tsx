@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/client";
+import { withProfile } from "./agents";
 import { formatToolsetConfig, normalizeToolsets, type ToolsetEntry } from "./toolsets";
 
+export interface ToolsetsPanelProps {
+  /** 作用到该 profile（省略则为全局默认 profile）。 */
+  profile?: string;
+}
+
 /** 智能体页「工具」面板：查看/启停 toolset 并展开配置。 */
-export default function ToolsetsPanel() {
+export default function ToolsetsPanel({ profile }: ToolsetsPanelProps) {
   const [toolsets, setToolsets] = useState<ToolsetEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -14,7 +20,7 @@ export default function ToolsetsPanel() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const payload = await api<unknown>("/api/hermes/tools/toolsets");
+      const payload = await api<unknown>(withProfile("/api/hermes/tools/toolsets", profile));
       setToolsets(normalizeToolsets(payload));
       setError(null);
     } catch (err) {
@@ -22,52 +28,64 @@ export default function ToolsetsPanel() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [profile]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const toggle = useCallback(async (toolset: ToolsetEntry) => {
-    const enabled = !toolset.enabled;
-    setBusy(toolset.name);
-    try {
-      await api(`/api/hermes/tools/toolsets/${encodeURIComponent(toolset.name)}`, {
-        method: "PUT",
-        body: JSON.stringify({ enabled }),
-      });
-      setToolsets((current) =>
-        current.map((entry) =>
-          entry.name === toolset.name ? { ...entry, enabled } : entry,
-        ),
-      );
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "切换工具集失败");
-    } finally {
-      setBusy(null);
-    }
-  }, []);
+  const toggle = useCallback(
+    async (toolset: ToolsetEntry) => {
+      const enabled = !toolset.enabled;
+      setBusy(toolset.name);
+      try {
+        await api(
+          withProfile(`/api/hermes/tools/toolsets/${encodeURIComponent(toolset.name)}`, profile),
+          {
+            method: "PUT",
+            body: JSON.stringify({ enabled }),
+          },
+        );
+        setToolsets((current) =>
+          current.map((entry) =>
+            entry.name === toolset.name ? { ...entry, enabled } : entry,
+          ),
+        );
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "切换工具集失败");
+      } finally {
+        setBusy(null);
+      }
+    },
+    [profile],
+  );
 
-  const openConfig = useCallback(async (toolset: ToolsetEntry) => {
-    if (configName === toolset.name) {
-      setConfigName(null);
-      return;
-    }
-    setBusy(toolset.name);
-    try {
-      const payload = await api<unknown>(
-        `/api/hermes/tools/toolsets/${encodeURIComponent(toolset.name)}/config`,
-      );
-      setConfigText(formatToolsetConfig(payload));
-      setConfigName(toolset.name);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "加载配置失败");
-    } finally {
-      setBusy(null);
-    }
-  }, [configName]);
+  const openConfig = useCallback(
+    async (toolset: ToolsetEntry) => {
+      if (configName === toolset.name) {
+        setConfigName(null);
+        return;
+      }
+      setBusy(toolset.name);
+      try {
+        const payload = await api<unknown>(
+          withProfile(
+            `/api/hermes/tools/toolsets/${encodeURIComponent(toolset.name)}/config`,
+            profile,
+          ),
+        );
+        setConfigText(formatToolsetConfig(payload));
+        setConfigName(toolset.name);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "加载配置失败");
+      } finally {
+        setBusy(null);
+      }
+    },
+    [configName, profile],
+  );
 
   if (loading) {
     return <p className="empty">加载工具集中…</p>;

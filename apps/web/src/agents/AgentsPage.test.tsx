@@ -44,6 +44,19 @@ const SKILLS = {
   ],
 };
 
+/** 用假网关渲染 AgentsPage（默认返回空 agent 列表，避免真实 WebSocket）。 */
+function renderAgents(
+  gateway = createFakeGateway((method) =>
+    method === "profiles.list" ? { profiles: [] } : {},
+  ),
+) {
+  return render(
+    <GatewayProvider gateway={gateway}>
+      <AgentsPage />
+    </GatewayProvider>,
+  );
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -55,7 +68,7 @@ describe("AgentsPage T7.1 技能列表", () => {
       stubFetch([{ path: "/api/hermes/skills", method: "GET", status: 200, body: SKILLS }]),
     );
 
-    render(<AgentsPage />);
+    renderAgents();
 
     expect(await screen.findByRole("heading", { name: "检索" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "创作" })).toBeInTheDocument();
@@ -70,7 +83,7 @@ describe("AgentsPage T7.1 技能列表", () => {
       stubFetch([{ path: "/api/hermes/skills", method: "GET", status: 200, body: { skills: [] } }]),
     );
 
-    render(<AgentsPage />);
+    renderAgents();
 
     expect(await screen.findByText("暂无技能。")).toBeInTheDocument();
   });
@@ -85,7 +98,7 @@ describe("AgentsPage T7.2 技能启停", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
-    render(<AgentsPage />);
+    renderAgents();
     const toggle = await screen.findByLabelText("启用 ppt");
     expect((toggle as HTMLInputElement).checked).toBe(false);
 
@@ -137,7 +150,7 @@ describe("AgentsPage T7.3 工具 / Toolsets", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
-    render(<AgentsPage />);
+    renderAgents();
     await user.click(await screen.findByRole("tab", { name: "工具" }));
 
     expect(await screen.findByText("web")).toBeInTheDocument();
@@ -178,7 +191,7 @@ describe("AgentsPage T7.4 MCP 管理", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
-    render(<AgentsPage />);
+    renderAgents();
     await user.click(await screen.findByRole("tab", { name: "MCP" }));
 
     expect(await screen.findByText("filesystem")).toBeInTheDocument();
@@ -217,11 +230,7 @@ describe("AgentsPage T7.5 插件", () => {
     );
     const user = userEvent.setup();
 
-    render(
-      <GatewayProvider gateway={gateway}>
-        <AgentsPage />
-      </GatewayProvider>,
-    );
+    renderAgents(gateway);
     await user.click(await screen.findByRole("tab", { name: "插件" }));
 
     expect(await screen.findByText("hello")).toBeInTheDocument();
@@ -253,7 +262,7 @@ describe("AgentsPage T7.6 技能安装（hub）", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
-    render(<AgentsPage />);
+    renderAgents();
     await screen.findByRole("heading", { name: "检索" });
 
     await user.type(screen.getByLabelText("搜索技能市场"), "翻译");
@@ -293,7 +302,7 @@ describe("AgentsPage T7.7 技能内容编辑", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
-    render(<AgentsPage />);
+    renderAgents();
     await screen.findByRole("heading", { name: "检索" });
 
     await user.click(screen.getByLabelText("编辑 web_search"));
@@ -328,11 +337,7 @@ describe("AgentsPage T7.8 经验→Skill（/learn）", () => {
     );
     const user = userEvent.setup();
 
-    render(
-      <GatewayProvider gateway={gateway}>
-        <AgentsPage />
-      </GatewayProvider>,
-    );
+    renderAgents(gateway);
 
     await user.type(screen.getByLabelText("学习来源"), "从部署经验生成");
     await user.click(screen.getByRole("button", { name: "生成技能" }));
@@ -343,6 +348,82 @@ describe("AgentsPage T7.8 经验→Skill（/learn）", () => {
       ]);
     });
     expect(await screen.findByText("已提交生成技能")).toBeInTheDocument();
+  });
+});
+
+describe("AgentsPage T16.1 Agent 列表/详情", () => {
+  it("renders the agent list from profiles.list", async () => {
+    const gateway = createFakeGateway((method) => {
+      if (method === "profiles.list") {
+        return {
+          profiles: [
+            {
+              name: "writer",
+              display_name: "写作",
+              model: "gpt-4o",
+              skill_count: 2,
+              is_default: true,
+            },
+            { name: "coder", model: "claude-3", worker_session: { id: "s1" } },
+          ],
+        };
+      }
+      return {};
+    });
+    vi.stubGlobal(
+      "fetch",
+      stubFetch([{ path: "/api/hermes/skills", method: "GET", status: 200, body: SKILLS }]),
+    );
+
+    renderAgents(gateway);
+
+    expect(await screen.findByRole("button", { name: /写作/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /coder/ })).toBeInTheDocument();
+    expect(gateway.paramsOf("profiles.list")).toEqual([{ include_sessions: false }]);
+  });
+
+  it("selecting an agent calls profiles.describe, renders detail and scopes the skills panel", async () => {
+    const gateway = createFakeGateway((method) => {
+      if (method === "profiles.list") {
+        return { profiles: [{ name: "writer", display_name: "写作" }] };
+      }
+      if (method === "profiles.describe") {
+        return {
+          name: "writer",
+          description: "文案助手",
+          soul: "你是写作助手",
+          model: { provider: "openai", default: "gpt-4o" },
+          skills: [
+            { name: "web_search", enabled: true },
+            { name: "ppt", enabled: false },
+          ],
+          mcp_servers: [{ name: "filesystem", enabled: true, transport: "stdio" }],
+        };
+      }
+      return {};
+    });
+    const fetchMock = stubFetch([
+      { path: "/api/hermes/skills", method: "GET", status: 200, body: SKILLS },
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    renderAgents(gateway);
+    await user.click(await screen.findByRole("button", { name: /写作/ }));
+
+    await waitFor(() => {
+      expect(gateway.paramsOf("profiles.describe")).toEqual([{ name: "writer" }]);
+    });
+    expect(await screen.findByText("你是写作助手")).toBeInTheDocument();
+    expect(screen.getByText("文案助手")).toBeInTheDocument();
+    expect(screen.getByText("filesystem")).toBeInTheDocument();
+
+    await waitFor(() => {
+      const scoped = fetchMock.mock.calls.find((entry) =>
+        String(entry[0]).includes("/api/hermes/skills?profile=writer"),
+      );
+      expect(scoped).toBeTruthy();
+    });
   });
 });
 

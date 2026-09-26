@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api } from "../api/client";
+import { withProfile } from "./agents";
 import { normalizeMcpServers, type McpServerEntry } from "./mcp";
 
+export interface McpPanelProps {
+  /** 作用到该 profile（省略则为全局默认 profile）。 */
+  profile?: string;
+}
+
 /** 智能体页「MCP」面板：列表/增删/启停 + 目录安装。 */
-export default function McpPanel() {
+export default function McpPanel({ profile }: McpPanelProps) {
   const [servers, setServers] = useState<McpServerEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -16,7 +22,7 @@ export default function McpPanel() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const payload = await api<unknown>("/api/hermes/mcp/servers");
+      const payload = await api<unknown>(withProfile("/api/hermes/mcp/servers", profile));
       setServers(normalizeMcpServers(payload));
       setError(null);
     } catch (err) {
@@ -24,7 +30,7 @@ export default function McpPanel() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [profile]);
 
   useEffect(() => {
     void load();
@@ -48,7 +54,7 @@ export default function McpPanel() {
       return;
     }
     void run(async () => {
-      await api("/api/hermes/mcp/servers", {
+      await api(withProfile("/api/hermes/mcp/servers", profile), {
         method: "POST",
         body: JSON.stringify({ name: name.trim(), command: command.trim() }),
       });
@@ -63,7 +69,7 @@ export default function McpPanel() {
       return;
     }
     void run(async () => {
-      await api("/api/hermes/mcp/catalog/install", {
+      await api(withProfile("/api/hermes/mcp/catalog/install", profile), {
         method: "POST",
         body: JSON.stringify({ name: catalogName.trim() }),
       });
@@ -75,7 +81,7 @@ export default function McpPanel() {
     const enabled = !server.enabled;
     setBusy(server.name);
     void run(async () => {
-      await api(`/api/hermes/mcp/servers/${encodeURIComponent(server.name)}`, {
+      await api(withProfile(`/api/hermes/mcp/servers/${encodeURIComponent(server.name)}`, profile), {
         method: "PUT",
         body: JSON.stringify({ enabled }),
       });
@@ -85,7 +91,7 @@ export default function McpPanel() {
   const remove = (server: McpServerEntry) => {
     setBusy(server.name);
     void run(async () => {
-      await api(`/api/hermes/mcp/servers/${encodeURIComponent(server.name)}`, {
+      await api(withProfile(`/api/hermes/mcp/servers/${encodeURIComponent(server.name)}`, profile), {
         method: "DELETE",
       });
     }).finally(() => setBusy(null));
