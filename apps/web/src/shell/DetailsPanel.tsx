@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import FilesPanel from "../details/FilesPanel";
 
 export const DETAILS_TABS = [
   { id: "files", label: "文件" },
@@ -37,8 +38,17 @@ export default function DetailsPanel({ tab, onTabChange, onClose, children }: De
         </button>
       </div>
       <div className="details-body" role="tabpanel">
-        {children ?? <p className="empty">暂无内容</p>}
+        {children ?? renderTab(tab)}
       </div>
     </aside>
   );
+}
+
+function renderTab(tab: DetailsTab): ReactNode {
+  switch (tab) {
+    case "files":
+      return <FilesPanel />;
+    default:
+      return <p className="empty">暂无内容</p>;
+  }
 }
