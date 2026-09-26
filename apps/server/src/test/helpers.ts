@@ -27,7 +27,6 @@ export async function createTestContext(): Promise<TestContext> {
   await ensureFirstAdmin(db);
 
   const app = buildApp(db, { logger: false });
-  await app.ready();
 
   return {
     app,
