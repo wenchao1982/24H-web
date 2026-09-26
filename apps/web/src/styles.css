@@ -1095,6 +1095,31 @@ button.danger {
   color: var(--ds-danger);
 }
 
+/* ---------- 用量 / 监控指标 ---------- */
+
+.usage-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--ds-space-3);
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-1);
+}
+
+.metric-label {
+  color: var(--ds-label-tertiary);
+  font-size: var(--ds-font-size-xs);
+}
+
+.metric-value {
+  color: var(--ds-label-primary);
+  font-size: var(--ds-font-size-lg, 1.25rem);
+  font-weight: 600;
+}
+
 /* ---------- 登录页 ---------- */
 
 .login-page {

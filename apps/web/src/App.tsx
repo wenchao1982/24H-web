@@ -7,6 +7,7 @@ import LoginPage from "./pages/LoginPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import AgentsPage from "./agents/AgentsPage";
 import TasksPage from "./tasks/TasksPage";
+import UsagePage from "./usage/UsagePage";
 import SettingsPage from "./settings/SettingsPage";
 import AdminUsersPage from "./pages/AdminUsersPage";
 import { ToastProvider } from "./ui/Toast";
@@ -25,7 +26,7 @@ export function AppRoutes() {
           <Route path="/agents" element={<AgentsPage />} />
           <Route path="/groups" element={<PlaceholderPage title="群聊" />} />
           <Route path="/tasks" element={<TasksPage />} />
-          <Route path="/usage" element={<PlaceholderPage title="用量" />} />
+          <Route path="/usage" element={<UsagePage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route element={<RequireSuperAdmin />}>
             <Route path="/admin/users" element={<AdminUsersPage />} />
