@@ -1,0 +1,29 @@
+import type { TranscriptItem } from "./types";
+
+export default function Transcript({ items }: { items: TranscriptItem[] }) {
+  if (items.length === 0) {
+    return <p className="empty transcript-empty">还没有消息。</p>;
+  }
+
+  return (
+    <div className="transcript" role="log" aria-label="对话记录">
+      {items.map((item) => {
+        if (item.kind === "message") {
+          return (
+            <div key={item.id} className="bubble" data-role={item.role} data-streaming={item.streaming}>
+              {item.text}
+            </div>
+          );
+        }
+        if (item.kind === "tool") {
+          return null;
+        }
+        return (
+          <p key={item.id} className="notice" data-level={item.level}>
+            {item.text}
+          </p>
+        );
+      })}
+    </div>
+  );
+}

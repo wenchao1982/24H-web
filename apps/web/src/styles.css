@@ -443,6 +443,69 @@ button {
   font-weight: 600;
 }
 
+.transcript {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+}
+
+.bubble {
+  max-width: 78%;
+  padding: var(--ds-space-2) var(--ds-space-3);
+  border-radius: var(--ds-radius-md);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.bubble[data-role="user"] {
+  align-self: flex-end;
+  background: var(--ds-accent-weak);
+  color: var(--ds-label-primary);
+}
+
+.bubble[data-role="assistant"] {
+  align-self: flex-start;
+  background: var(--ds-surface-l2);
+  border: var(--ds-hairline) solid var(--ds-border-l1);
+}
+
+.notice {
+  margin: 0;
+  font-size: var(--ds-font-size-sm);
+  color: var(--ds-label-tertiary);
+}
+
+.notice[data-level="error"] {
+  color: var(--ds-danger);
+}
+
+.composer {
+  display: flex;
+  gap: var(--ds-space-2);
+  align-items: flex-end;
+  border: var(--ds-border-1) solid var(--ds-border-l2);
+  border-radius: var(--ds-radius-md);
+  padding: var(--ds-space-2);
+  background: var(--ds-surface-l1);
+}
+
+.composer-input {
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  border: none;
+  background: transparent;
+  color: var(--ds-label-primary);
+  font: inherit;
+}
+
+.composer-input:focus {
+  outline: none;
+}
+
 /* ---------- 通用表单 / 页面 ---------- */
 
 .page {

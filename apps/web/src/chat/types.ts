@@ -111,6 +111,35 @@ export function isSameSession(payload: Record<string, unknown>, activeId: string
   return !id || id === activeId;
 }
 
+/** 追加增量文本：续写末尾的流式助手气泡，否则新建一个。 */
+export function appendDelta(
+  items: TranscriptItem[],
+  text: string,
+  id: string,
+): TranscriptItem[] {
+  const last = items[items.length - 1];
+  if (last && last.kind === "message" && last.role === "assistant" && last.streaming) {
+    return [...items.slice(0, -1), { ...last, text: last.text + text }];
+  }
+  return [...items, { kind: "message", id, role: "assistant", text, streaming: true }];
+}
+
+/** 收尾流式助手气泡；补齐最终文本。 */
+export function completeAssistant(
+  items: TranscriptItem[],
+  text: string,
+  id: string,
+): TranscriptItem[] {
+  const last = items[items.length - 1];
+  if (last && last.kind === "message" && last.role === "assistant" && last.streaming) {
+    return [...items.slice(0, -1), { ...last, text: text || last.text, streaming: false }];
+  }
+  if (text) {
+    return [...items, { kind: "message", id, role: "assistant", text, streaming: false }];
+  }
+  return items;
+}
+
 /** `tool.*` 事件的工具名。 */
 export function toolName(payload: Record<string, unknown>): string {
   return str(payload.name) ?? str(payload.tool) ?? str(payload.tool_name) ?? "工具";

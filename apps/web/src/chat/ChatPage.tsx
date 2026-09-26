@@ -1,7 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGateway } from "./GatewayProvider";
 import SessionList from "./SessionList";
-import { normalizeCreatedId, normalizeSessions, type SessionSummary } from "./types";
+import Transcript from "./Transcript";
+import Composer from "./Composer";
+import {
+  appendDelta,
+  completeAssistant,
+  deltaText,
+  isSameSession,
+  normalizeCreatedId,
+  normalizeSessions,
+  type SessionSummary,
+  type TranscriptItem,
+} from "./types";
 
 export default function ChatPage() {
   const gateway = useGateway();
@@ -9,6 +20,15 @@ export default function ChatPage() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [items, setItems] = useState<TranscriptItem[]>([]);
+
+  const activeIdRef = useRef<string | null>(null);
+  const seqRef = useRef(0);
+  const nextId = useCallback(() => `i${seqRef.current++}`, []);
+
+  useEffect(() => {
+    activeIdRef.current = activeId;
+  }, [activeId]);
 
   useEffect(() => {
     let alive = true;
@@ -35,6 +55,24 @@ export default function ChatPage() {
     };
   }, [gateway]);
 
+  useEffect(() => {
+    gateway.on("message.delta", (payload) => {
+      if (!isSameSession(payload, activeIdRef.current)) {
+        return;
+      }
+      const text = deltaText(payload);
+      if (text) {
+        setItems((current) => appendDelta(current, text, nextId()));
+      }
+    });
+    gateway.on("message.complete", (payload) => {
+      if (!isSameSession(payload, activeIdRef.current)) {
+        return;
+      }
+      setItems((current) => completeAssistant(current, deltaText(payload), nextId()));
+    });
+  }, [gateway, nextId]);
+
   const createSession = useCallback(async () => {
     try {
       const result = await gateway.request("session.create", {});
@@ -48,10 +86,33 @@ export default function ChatPage() {
           : [{ id, title: "新会话" }, ...current],
       );
       setActiveId(id);
+      setItems([]);
     } catch {
       setError("无法新建会话");
     }
   }, [gateway]);
+
+  const selectSession = useCallback((id: string) => {
+    setActiveId(id);
+    setItems([]);
+  }, []);
+
+  const handleSend = useCallback(
+    (text: string) => {
+      const sessionId = activeIdRef.current;
+      if (!sessionId) {
+        return;
+      }
+      setItems((current) => [
+        ...current,
+        { kind: "message", id: nextId(), role: "user", text },
+      ]);
+      gateway.request("prompt.submit", { session_id: sessionId, text }).catch(() => {
+        setError("发送失败");
+      });
+    },
+    [gateway, nextId],
+  );
 
   const visible = useMemo(() => {
     const query = filter.trim().toLowerCase();
@@ -71,7 +132,7 @@ export default function ChatPage() {
           activeId={activeId}
           filter={filter}
           onFilterChange={setFilter}
-          onSelect={setActiveId}
+          onSelect={selectSession}
           onCreate={createSession}
         />
       </aside>
@@ -79,7 +140,14 @@ export default function ChatPage() {
       <section className="chat-main">
         {error ? <p className="err chat-error">{error}</p> : null}
         <h2 className="chat-title">{active ? active.title : "对话"}</h2>
-        {active ? null : <p className="empty chat-hint">选择或新建一个会话开始对话。</p>}
+        {active ? (
+          <>
+            <Transcript items={items} />
+            <Composer onSend={handleSend} />
+          </>
+        ) : (
+          <p className="empty chat-hint">选择或新建一个会话开始对话。</p>
+        )}
       </section>
     </div>
   );

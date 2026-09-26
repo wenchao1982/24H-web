@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ChatPage from "./ChatPage";
 import { GatewayProvider } from "./GatewayProvider";
@@ -83,5 +83,33 @@ describe("ChatPage T6.2 新建会话", () => {
     expect(gateway.paramsOf("session.create")).toHaveLength(1);
     expect(await screen.findByRole("heading", { name: "新会话" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "新会话" })).toHaveAttribute("data-active", "true");
+  });
+});
+
+describe("ChatPage T6.3 流式消息", () => {
+  it("sends a prompt optimistically and accumulates assistant deltas", async () => {
+    const gateway = createFakeGateway((method) =>
+      method === "session.list" ? { sessions: [{ id: "s1", title: "会话一" }] } : {},
+    );
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+
+    await user.type(screen.getByLabelText("消息"), "你好");
+    await user.click(screen.getByRole("button", { name: "发送" }));
+
+    expect(screen.getByText("你好")).toBeInTheDocument();
+    expect(gateway.paramsOf("prompt.submit")).toEqual([{ session_id: "s1", text: "你好" }]);
+
+    act(() => {
+      gateway.emit("message.delta", { session_id: "s1", text: "收到" });
+      gateway.emit("message.delta", { session_id: "s1", text: "了" });
+    });
+    expect(screen.getByText("收到了")).toBeInTheDocument();
+
+    act(() => {
+      gateway.emit("message.complete", { session_id: "s1", text: "收到了，请稍等。" });
+    });
+    expect(screen.getByText("收到了，请稍等。")).toBeInTheDocument();
   });
 });
