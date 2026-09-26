@@ -3,6 +3,7 @@ import cookie from "@fastify/cookie";
 import Fastify, { type FastifyInstance } from "fastify";
 import type { Db } from "../db";
 import { registerErrorHandler } from "./errors";
+import { authRoutes } from "../routes/auth";
 
 export interface BuildAppOptions {
   logger?: boolean;
@@ -25,6 +26,8 @@ export function buildApp(db: Db, options: BuildAppOptions = {}): FastifyInstance
 
   app.decorate("db", db);
   registerErrorHandler(app);
+
+  app.register(authRoutes, { db });
 
   app.get("/health", async () => ({ ok: true }));
 
