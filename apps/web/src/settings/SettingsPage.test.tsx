@@ -90,3 +90,51 @@ describe("SettingsPage T8.1 Keys 管理", () => {
     });
   });
 });
+
+describe("SettingsPage T8.2 模型设置", () => {
+  it("shows the current model, switches it and toggles MoA", async () => {
+    const fetchMock = stubFetch([
+      { path: "/api/hermes/env", method: "GET", status: 200, body: { keys: [] } },
+      { path: "/api/hermes/model/info", method: "GET", status: 200, body: { model: "gpt-4o" } },
+      {
+        path: "/api/hermes/model/options",
+        method: "GET",
+        status: 200,
+        body: { models: ["gpt-4o", "claude-3"] },
+      },
+      { path: "/api/hermes/model/moa", method: "GET", status: 200, body: { enabled: false } },
+      { path: "/api/hermes/model/set", method: "POST", status: 200, body: { ok: true } },
+      { path: "/api/hermes/model/moa", method: "PUT", status: 200, body: { ok: true } },
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<SettingsPage />);
+    await user.click(screen.getByRole("button", { name: "模型设置" }));
+
+    expect(await screen.findByLabelText("当前模型")).toHaveTextContent("gpt-4o");
+
+    await user.selectOptions(screen.getByLabelText("选择模型"), "claude-3");
+    await user.click(screen.getByRole("button", { name: "切换" }));
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (entry) =>
+          String(entry[0]).endsWith("/api/hermes/model/set") &&
+          (entry[1] as RequestInit | undefined)?.method === "POST",
+      );
+      expect(call).toBeTruthy();
+      expect(JSON.parse(String((call?.[1] as RequestInit).body))).toEqual({ model: "claude-3" });
+    });
+
+    await user.click(screen.getByLabelText("启用 MoA"));
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (entry) =>
+          String(entry[0]).endsWith("/api/hermes/model/moa") &&
+          (entry[1] as RequestInit | undefined)?.method === "PUT",
+      );
+      expect(call).toBeTruthy();
+      expect(JSON.parse(String((call?.[1] as RequestInit).body))).toEqual({ enabled: true });
+    });
+  });
+});

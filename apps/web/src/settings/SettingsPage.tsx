@@ -1,12 +1,16 @@
 import { useState } from "react";
 import KeysPanel from "./KeysPanel";
+import ModelPanel from "./ModelPanel";
 
 interface SectionDef {
   id: string;
   label: string;
 }
 
-const SECTIONS: SectionDef[] = [{ id: "keys", label: "模型与密钥" }];
+const SECTIONS: SectionDef[] = [
+  { id: "keys", label: "模型与密钥" },
+  { id: "model", label: "模型设置" },
+];
 
 /** 设置页：分区导航 + 分区详情（M6）。 */
 export default function SettingsPage() {
@@ -30,6 +34,7 @@ export default function SettingsPage() {
       </nav>
       <div className="settings-content">
         {section === "keys" ? <KeysPanel /> : null}
+        {section === "model" ? <ModelPanel /> : null}
       </div>
     </div>
   );
