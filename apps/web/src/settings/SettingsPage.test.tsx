@@ -160,3 +160,48 @@ describe("SettingsPage T8.3 外观", () => {
     expect(document.documentElement.dataset.theme).toBe("light");
   });
 });
+
+describe("SettingsPage T8.4 配置中心", () => {
+  it("loads common config fields and saves the changed patch", async () => {
+    const fetchMock = stubFetch([
+      { path: "/api/hermes/env", method: "GET", status: 200, body: { keys: [] } },
+      {
+        path: "/api/hermes/config",
+        method: "GET",
+        status: 200,
+        body: {
+          config: {
+            api_server: { enabled: false },
+            tool_search: { enabled: true },
+          },
+        },
+      },
+      { path: "/api/hermes/config", method: "PUT", status: 200, body: { ok: true } },
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<SettingsPage />);
+    await user.click(screen.getByRole("button", { name: "配置中心" }));
+
+    const apiServer = await screen.findByLabelText("API Server");
+    expect(apiServer).not.toBeChecked();
+    expect(screen.getByLabelText("工具搜索")).toBeChecked();
+
+    await user.click(apiServer);
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (entry) =>
+          String(entry[0]).endsWith("/api/hermes/config") &&
+          (entry[1] as RequestInit | undefined)?.method === "PUT",
+      );
+      expect(call).toBeTruthy();
+      expect(JSON.parse(String((call?.[1] as RequestInit).body))).toEqual({
+        api_server: { enabled: true },
+      });
+    });
+    expect(await screen.findByText("已保存")).toBeInTheDocument();
+  });
+});

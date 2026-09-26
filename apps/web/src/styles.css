@@ -836,6 +836,15 @@ button {
   color: var(--ds-accent);
 }
 
+.config-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-2) 0;
+  font-size: var(--ds-font-size-sm);
+  color: var(--ds-label-secondary);
+}
+
 .skills {
   display: flex;
   flex-direction: column;
