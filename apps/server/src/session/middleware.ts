@@ -24,3 +24,10 @@ export async function requireAuth(request: FastifyRequest): Promise<void> {
     throw new ApiError(401, "UNAUTHENTICATED", "未登录");
   }
 }
+
+export async function requireSuperAdmin(request: FastifyRequest): Promise<void> {
+  await requireAuth(request);
+  if (request.user?.role !== "super_admin") {
+    throw new ApiError(403, "FORBIDDEN", "需要超级管理员权限");
+  }
+}
