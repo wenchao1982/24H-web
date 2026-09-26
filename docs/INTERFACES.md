@@ -40,6 +40,7 @@
 | POST | `/api/system/update` | 检查/执行升级 |
 | GET/POST/PATCH/DELETE | `/api/admin/connections` | 连接管理（多个 Hermes 实例） |
 | GET/POST | `/api/integrations/github` | GitHub 集成：`gh` 登录/状态、仓库、PR |
+| GET/PATCH | `/api/notifications` | 通知中心：未读/挂起聚合 + 偏好 |
 
 ## 2. Hermes L1（WS JSON-RPC）方法
 
@@ -55,12 +56,13 @@
 | 配置 | `config.get` `config.set` `reload.env` `setup.status` `setup.runtime_check` `diagnostics.share_nous` | |
 | 档案 profile | `profiles.list` `profiles.describe` `profiles.configure` `profiles.create` `profiles.set_asset` `profiles.get_asset` | M9 对齐用 |
 | 工具 | `tools.list` `toolsets.list` `tools.show` `command.dispatch` `slash.exec` `complete.slash` `complete.path` `commands.catalog` | skills 也经 commands.catalog 暴露；slash.exec 也承载 /learn（经验→skill） |
+| 会话命令 | `slash.exec` 承载 /goal /subgoal /loop /heartbeat /plan /review /branch /undo /retry /rollback /snapshot /bg /btw /queue /steer /busy /compress /skills /memory /bundles /suggestions /blueprint /reload* /init /fast /reasoning /egress /worktree | 统一经 `commands.catalog`+`complete.slash` |
 | MCP | `mcp.servers.*` `mcp.catalog` | |
 | 技能 | `skills.manage` `skill_manage` | ；/learn 经 slash.exec 生成 SKILL.md |
 | 插件 | `plugins.manage` `plugins.compat_report` | |
 | 定时 | `cron.manage`（list/add/remove/pause/resume）；事件 `cron.changed` | |
 | 群聊 / Bot | `groups.*` `bot_relay.*` | future |
-| 子代理 | `subagent.list` `subagent.tail` `subagent.interrupt` `subagent.steer` `delegation.status` `delegation.pause` `spawn_tree.save|list|load` | |
+| 子代理 | `subagent.list` `subagent.tail` `subagent.interrupt` `subagent.steer` `delegation.status` `delegation.pause` `spawn_tree.save|list|load` | ；/review 派独立评审 |
 | 其它 | `vault.*` `connectors.*` `free_tier.*` `billing.state` `subscription.*` `voice.*` `wake.*` `image.generate` `llm.oneshot` `gateway.capabilities` `ping` `cli.exec` `shell.exec` `browser.manage` `handoff.*` `project.facts` `verification.status` `session.foreign.*` | 按需 |
 
 ## 3. Hermes L2（REST `/api/*`）端点
@@ -75,6 +77,7 @@
 | 配置/环境 | `GET /api/config` `GET /api/config/defaults|schema` `GET/PUT /api/config/raw` `GET/POST/DELETE /api/env` `POST /api/env/reveal` | （含 approvals.mode 审批策略） |
 | 档案 profile | `GET/POST /api/profiles` `GET/POST /api/profiles/active` `PATCH/DELETE /api/profiles/:name` `GET/PUT /api/profiles/:name/soul|description|model` `POST /api/profiles/import|export` | |
 | 会话 | `GET /api/sessions` `GET /api/sessions/:id/messages` `POST /api/sessions/import|prune|bulk-delete` `GET /api/chat/workspaces` `POST /api/chat/image-upload` `GET /api/sessions?q=`（全文搜索） | |
+| 项目 | `GET/POST /api/projects*`、项目树 | 具名多文件夹工作区 |
 | 定时 | `GET/POST /api/cron/jobs` `GET /api/cron/delivery-targets` `POST /api/cron/jobs/:id/pause|resume|trigger` | |
 | MCP | `/api/mcp/*` `POST /api/mcp/catalog/install` | |
 | 消息平台 | `GET/PUT /api/messaging/platforms` `POST /api/messaging/{telegram,whatsapp}/onboarding/*` | |
