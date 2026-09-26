@@ -1,37 +1,59 @@
 # 24H Web
 
-面向中文用户的 Hermes **web 端**（route 3）：自有 SPA，由官方 `hermes dashboard` 托管，直连官方后端 L1/L2。
+面向企业的**多用户 Hermes web 工作台**：自有 SPA + 自有 BFF + 官方 Hermes 后端。
 
-- **L1**：`/api/ws`（tui_gateway JSON-RPC）— 对话、会话、事件
-- **L2**：`/api/*`（REST）— 配置、Keys、模型、技能
+## 架构
 
-## 开发
+```
+浏览器 SPA  →  BFF（认证/用户/租户/代理）  →  hermes serve  →  ~/.hermes
+```
+
+- 管理员在界面里管理用户与权限；普通用户只看到被授权的 agent 与会话。
+- Hermes 的 token 只在 BFF 内使用，浏览器永不持有。
+
+## 目录
+
+```
+24h-web/
+├── apps/web/          # React SPA (Vite)
+├── apps/server/       # BFF (Fastify)：认证 / 用户 / 代理 / 审计
+├── packages/shared/   # 共享类型
+├── docs/              # ARCHITECTURE.md / TASKS.md
+└── .github/workflows/ # CI
+```
+
+## 快速开始
 
 ```bash
 npm install
-# 另开一个终端跑官方 dashboard（默认 9119），Vite 会把 /api 代理过去
-hermes dashboard --host 127.0.0.1 --port 9119
-npm run dev
+
+# 1) 官方后端（loopback；已安装 Hermes）
+hermes serve --host 127.0.0.1 --port 9119
+
+# 2) BFF
+HERMES_BASE_URL=http://127.0.0.1:9119 npm run dev:server
+
+# 3) SPA
+npm run dev:web
 ```
 
-## 构建 / 部署（由官方 dashboard 托管，无需自研后端）
+首次启动：BFF 在无用户时引导创建 `super_admin` 并强制改密（见 `docs/TASKS.md` E2）。
 
-```bash
-npm run build   # → dist/
-HERMES_WEB_DIST=$(pwd)/dist hermes dashboard --skip-build --host 0.0.0.0 --port 9119
+## 部署（A2：loopback + 反代）
+
 ```
+浏览器 ──https://域名──> [Caddy] ──> [BFF :8931]
+                                        └──代理──> [hermes serve 127.0.0.1:9119]
+```
+- Hermes 只绑 loopback；公网只暴露 BFF（经反代 + TLS）。
+- BFF 负责登录认证；`~/.hermes/.env` 权限收紧。
 
-> 注意：必须用 `hermes dashboard`（`hermes serve` 是 headless，不挂 SPA）。
-> 非回环绑定会强制 auth gate，需先配置 basic / OAuth / OIDC。
+## 任务 / 路线
 
-## 现状
-
-最小闭环：设置填 Key → 对话流式。后续：技能/任务/用量整合、命令面板、移动端。
-Skill UI 宿主协议**暂不实现**（规格见 `24OS/docs/SKILL_UI_PROTOCOL.md`）。
+功能拆解与最小实现顺序见 [`docs/TASKS.md`](./docs/TASKS.md)。
 
 ## License
 
 Licensed under the **Business Source License 1.1** (BUSL-1.1) — see [LICENSE](./LICENSE).
-
-- You may use, copy, modify, and redistribute this software for **non-production** purposes.
-- Commercial / production use requires a commercial license from the Licensor until the **Change Date (2030-09-27)**, after which the license converts to **Apache License 2.0**.
+- 非生产用途可自由使用/修改/分发。
+- 生产/商用需向 Licensor 获取商业许可；至 **Change Date (2030-09-27)** 自动转为 **Apache License 2.0**。
