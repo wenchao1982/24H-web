@@ -392,6 +392,53 @@ button {
   font: inherit;
 }
 
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--ds-font-size-sm);
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: var(--ds-space-2);
+  border-bottom: var(--ds-hairline) solid var(--ds-border-l1);
+}
+
+.table th {
+  color: var(--ds-label-tertiary);
+  font-weight: 500;
+}
+
+.table select {
+  padding: var(--ds-space-1) var(--ds-space-2);
+  border: var(--ds-border-1) solid var(--ds-border-l2);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-l1);
+  color: var(--ds-label-primary);
+  font: inherit;
+}
+
+.row-actions {
+  display: flex;
+  gap: var(--ds-space-1);
+  flex-wrap: wrap;
+}
+
+.row-actions button {
+  border: var(--ds-border-1) solid var(--ds-border-l2);
+  border-radius: var(--ds-radius-sm);
+  background: transparent;
+  color: var(--ds-label-secondary);
+  font-size: var(--ds-font-size-xs);
+  padding: var(--ds-space-1) var(--ds-space-2);
+}
+
+.row-actions button.danger {
+  border-color: transparent;
+  color: var(--ds-danger);
+}
+
 button.primary {
   border: none;
   border-radius: var(--ds-radius-sm);

@@ -1,9 +1,11 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { SessionProvider } from "./auth/SessionProvider";
 import RequireAuth from "./auth/RequireAuth";
+import RequireSuperAdmin from "./auth/RequireSuperAdmin";
 import ShellLayout from "./shell/ShellLayout";
 import LoginPage from "./pages/LoginPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
+import AdminUsersPage from "./pages/AdminUsersPage";
 import { ToastProvider } from "./ui/Toast";
 
 /** 路由表（可注入 MemoryRouter 单测）。 */
@@ -20,7 +22,9 @@ export function AppRoutes() {
           <Route path="/tasks" element={<PlaceholderPage title="任务" />} />
           <Route path="/usage" element={<PlaceholderPage title="用量" />} />
           <Route path="/settings" element={<PlaceholderPage title="设置" />} />
-          <Route path="/admin/users" element={<PlaceholderPage title="用户与角色" />} />
+          <Route element={<RequireSuperAdmin />}>
+            <Route path="/admin/users" element={<AdminUsersPage />} />
+          </Route>
           <Route path="/account" element={<PlaceholderPage title="账户" />} />
           <Route path="/notifications" element={<PlaceholderPage title="通知" />} />
           <Route path="*" element={<Navigate to="/chat" replace />} />
