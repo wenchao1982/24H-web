@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import cookie from "@fastify/cookie";
 import Fastify, { type FastifyInstance } from "fastify";
 import type { Db } from "../db";
 import { registerErrorHandler } from "./errors";
@@ -19,6 +20,8 @@ export function buildApp(db: Db, options: BuildAppOptions = {}): FastifyInstance
   app.addHook("onSend", async (request, reply) => {
     reply.header("x-request-id", request.id);
   });
+
+  app.register(cookie);
 
   app.decorate("db", db);
   registerErrorHandler(app);
