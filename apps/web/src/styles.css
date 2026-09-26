@@ -352,6 +352,97 @@ button {
   padding: var(--ds-space-3);
 }
 
+/* ---------- 对话区（M5） ---------- */
+
+.chat {
+  display: flex;
+  gap: var(--ds-space-4);
+  height: 100%;
+  min-height: 0;
+}
+
+.chat-list {
+  flex: 0 0 220px;
+  min-height: 0;
+  display: flex;
+}
+
+.session-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+  width: 100%;
+  min-height: 0;
+}
+
+.session-list-head {
+  display: flex;
+  gap: var(--ds-space-2);
+}
+
+.session-search {
+  flex: 1;
+  min-width: 0;
+  padding: var(--ds-space-1) var(--ds-space-2);
+  border: var(--ds-border-1) solid var(--ds-border-l2);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-l1);
+  color: var(--ds-label-primary);
+  font: inherit;
+  font-size: var(--ds-font-size-sm);
+}
+
+.session-new {
+  flex: 0 0 auto;
+}
+
+.session-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  min-height: 0;
+}
+
+.session-item {
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-radius: var(--ds-radius-sm);
+  background: transparent;
+  color: var(--ds-label-secondary);
+  font-size: var(--ds-font-size-sm);
+  padding: var(--ds-space-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-item:hover {
+  background: var(--ds-surface-l3);
+  color: var(--ds-label-primary);
+}
+
+.session-item[data-active="true"] {
+  background: var(--ds-accent-weak);
+  color: var(--ds-accent);
+}
+
+.chat-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-3);
+}
+
+.chat-title {
+  margin: 0;
+  font-size: var(--ds-font-size);
+  font-weight: 600;
+}
+
 /* ---------- 通用表单 / 页面 ---------- */
 
 .page {

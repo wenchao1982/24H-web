@@ -7,6 +7,8 @@ import LoginPage from "./pages/LoginPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import AdminUsersPage from "./pages/AdminUsersPage";
 import { ToastProvider } from "./ui/Toast";
+import ChatPage from "./chat/ChatPage";
+import { GatewayProvider } from "./chat/GatewayProvider";
 
 /** 路由表（可注入 MemoryRouter 单测）。 */
 export function AppRoutes() {
@@ -16,7 +18,7 @@ export function AppRoutes() {
       <Route element={<RequireAuth />}>
         <Route element={<ShellLayout />}>
           <Route index element={<Navigate to="/chat" replace />} />
-          <Route path="/chat" element={<PlaceholderPage title="对话" />} />
+          <Route path="/chat" element={<ChatPage />} />
           <Route path="/agents" element={<PlaceholderPage title="智能体" />} />
           <Route path="/groups" element={<PlaceholderPage title="群聊" />} />
           <Route path="/tasks" element={<PlaceholderPage title="任务" />} />
@@ -39,7 +41,9 @@ export default function App() {
     <BrowserRouter>
       <ToastProvider>
         <SessionProvider>
-          <AppRoutes />
+          <GatewayProvider>
+            <AppRoutes />
+          </GatewayProvider>
         </SessionProvider>
       </ToastProvider>
     </BrowserRouter>
