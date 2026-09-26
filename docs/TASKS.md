@@ -2,7 +2,7 @@
 
 > 目标：一个任务 = 一次最小提交。依赖列 = 前置 ID。接口列 = BFF / L1(网关 WS) / L2(REST)。
 > 契约以官方为准（`gateway-contract.generated.ts` / `web_routers/*.py`）。
-> **全部功能均建任务**（无范围外项）。里程碑：M0 基线 · M1 BFF+认证 · M2 用户管理 · M3 代理 · M4 前端骨架 · M5 对话 · M6 技能/工具/设置 · M7 任务/用量/面板 · M8 Agent/Profile · M9 体验 · M10 协作与集成 · M11 运维与高级 · M12 未来增强 · M13 项目 · M14 通知中心 · M15 会话命令。
+> **全部功能均建任务**（无范围外项）。里程碑：M0 基线 · M1 BFF+认证 · M2 用户管理 · M3 代理 · M4 前端骨架 · M5 对话 · M6 技能/工具/设置 · M7 任务/用量/面板 · M8 Agent/Profile · M9 体验 · M10 协作与集成 · M11 运维与高级 · M12 未来增强 · M13 项目 · M14 通知中心 · M15 会话命令 · M16 上下文/路由/集成。
 
 ## M0 工程基线
 
@@ -223,3 +223,26 @@
 | T20.18 | 运行档 | `/fast` · `/reasoning`（快速/推理档） | T8.2 | L1 | 可切换 |
 | T20.19 | Egress 状态 | `/egress`（代理状态） | T4.2 | L1 | 可查看 |
 | T20.20 | Git worktree | `/worktree`（new/list） | T11.4 | L1 | 可管理 |
+
+## M16 上下文 / 路由 / 集成扩展
+
+| ID | 任务 | 说明 | 依赖 | 接口 | 验收 |
+| --- | --- | --- | --- | --- | --- |
+| T23.1 | 上下文文件 | 展示项目上下文文件（.hermes.md/AGENTS.md/CLAUDE.md/SOUL.md/.cursorrules）的来源与加载状态（落点：智能体页 / 对话侧） | T5.1 | L1 | 可查看 |
+| T23.2 | 上下文引用（@） | 输入框 `@` 引用文件/目录/git diff/URL 并内联注入（落点：对话输入框） | T6.3 | L1 | 可注入 |
+| T23.3 | Provider 路由 | 排序/白名单/黑名单/参数要求（`provider_routing`）（落点：设置→模型） | T8.2 | L2 | 可配置 |
+| T23.4 | 回退 Provider | 主备降级 + 辅助任务独立降级（`fallback`）（落点：设置→模型） | T8.2 | L2 | 可配置 |
+| T23.5 | 凭证池 | 同 provider 多 key 轮换（`credential_pools`）（落点：设置→模型/密钥） | T8.1 | L2 | 可配置 |
+| T23.6 | API Server | OpenAI 兼容端点开关（`api_server`）（落点：设置→高级） | T8.4 | L2 | 可开关 |
+| T23.7 | Event Hooks | gateway / plugin hooks 管理（落点：设置→高级） | T8.4 | L2 | 可管理 |
+| T23.8 | 搜索/抽取配置 | Web Search / X Search provider + Document Extraction 开关（落点：设置→高级 / 智能体） | T7.3 | L2 | 可配置 |
+| T23.9 | Tool Gateway | Nous Portal 工具网关（web/image/TTS/browser 一键）（落点：设置→高级） | T8.4 | L2 | 可配置 |
+| T23.10 | Tool Search | 工具延迟加载（`tool_search`）（落点：设置→高级） | T7.3 | L2 | 可开关 |
+| T23.11 | LSP | 语言服务器配置（落点：设置→高级） | T8.4 | L2 | 可配置 |
+| T23.12 | Computer Use | 状态 + 权限授予（落点：设置→高级） | T7.3 | L2 | 可管理 |
+| T23.13 | Deliverable Mode | 产物作为附件投递（落点：设置→渠道） | T17.2 | L2 | 可开关 |
+| T23.14 | Personality 预设 | `/personality` 预设切换（落点：对话 slash） | T16.3 | L1 | 可切换 |
+| T23.15 | Plugin Catalog | 插件目录/发现/安装（落点：设置→集成） | T7.5 | L1/L2 | 可浏览安装 |
+| T23.16 | Codex Runtime | `/codex-runtime` 开关（落点：设置→高级） | T8.2 | L1 | 可切换 |
+| T23.17 | Subscription Proxy | 订阅代理配置（落点：设置→高级） | T18.14 | L2 | 可配置 |
+| T23.18 | Bot Screen | bot 屏幕相关能力（落点：群聊/智能体；边缘，可后置） | T17.1 | L1/L2 | 可查看 |
