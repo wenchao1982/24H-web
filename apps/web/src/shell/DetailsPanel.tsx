@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import FilesPanel from "../details/FilesPanel";
 import PreviewPanel from "../details/PreviewPanel";
 import LogsPanel from "../details/LogsPanel";
+import GitPanel from "../details/GitPanel";
 
 export const DETAILS_TABS = [
   { id: "files", label: "文件" },
@@ -30,6 +31,8 @@ export default function DetailsPanel({ tab, onTabChange, onClose, children }: De
         return <PreviewPanel path={previewPath} />;
       case "logs":
         return <LogsPanel />;
+      case "git":
+        return <GitPanel />;
       default:
         return <p className="empty">暂无内容</p>;
     }
