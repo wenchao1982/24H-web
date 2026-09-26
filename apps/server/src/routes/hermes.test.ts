@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { createTestContext, loginAndGetCookies, type TestContext } from "../test/helpers";
 import { startMockHermes, type MockHermes } from "../test/mockHermes";
-import { clearHermesTokenCache } from "../hermes/client";
+import { clearHermesTokenCache, getHermesToken } from "../hermes/client";
 import { createUser } from "../users/repo";
 
 let ctx: TestContext | undefined;
@@ -180,5 +180,78 @@ describe("profile guard", () => {
     });
 
     expect(res.statusCode).toBe(200);
+  });
+});
+
+describe("proxy error normalisation", () => {
+  it("returns 502 HERMES_UNREACHABLE when the upstream is down", async () => {
+    upstream = await startMockHermes({ token: "down-token" });
+    const baseUrl = upstream.baseUrl;
+    ctx = await createTestContext({ hermesBaseUrl: baseUrl });
+    const { session } = await loginAndGetCookies(ctx.app);
+
+    await getHermesToken(baseUrl);
+    await upstream.close();
+    upstream = undefined;
+
+    const res = await ctx.app.inject({
+      method: "GET",
+      url: "/api/hermes/status",
+      cookies: { "24h_session": session },
+    });
+
+    expect(res.statusCode).toBe(502);
+    expect(res.json()).toEqual({
+      error: "HERMES_UNREACHABLE",
+      message: expect.any(String),
+    });
+    expect(res.body).not.toContain("down-token");
+  });
+
+  it("wraps a non-JSON upstream response while preserving the status", async () => {
+    upstream = await startMockHermes();
+    upstream.setHandler(({ res, request }) => {
+      if (request.path === "/api/raw") {
+        res.statusCode = 418;
+        res.setHeader("content-type", "text/plain");
+        res.end("boom");
+        return true;
+      }
+      return false;
+    });
+    ctx = await createTestContext({ hermesBaseUrl: upstream.baseUrl });
+    const { session } = await loginAndGetCookies(ctx.app);
+
+    const res = await ctx.app.inject({
+      method: "GET",
+      url: "/api/hermes/raw",
+      cookies: { "24h_session": session },
+    });
+
+    expect(res.statusCode).toBe(418);
+    expect(res.json()).toEqual({ error: "UPSTREAM_ERROR", message: "boom" });
+  });
+
+  it("wraps malformed JSON upstream responses", async () => {
+    upstream = await startMockHermes();
+    upstream.setHandler(({ res, request }) => {
+      if (request.path === "/api/broken") {
+        res.setHeader("content-type", "application/json");
+        res.end("{not-json");
+        return true;
+      }
+      return false;
+    });
+    ctx = await createTestContext({ hermesBaseUrl: upstream.baseUrl });
+    const { session } = await loginAndGetCookies(ctx.app);
+
+    const res = await ctx.app.inject({
+      method: "GET",
+      url: "/api/hermes/broken",
+      cookies: { "24h_session": session },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ error: "UPSTREAM_ERROR", message: "{not-json" });
   });
 });

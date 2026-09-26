@@ -10,6 +10,8 @@ export interface HermesRoutesOptions {
   defaultBaseUrl: string;
 }
 
+const UPSTREAM_TIMEOUT_MS = 15_000;
+
 function hasRequestBody(method: string, body: unknown): boolean {
   return method !== "GET" && method !== "HEAD" && body !== undefined && body !== null;
 }
@@ -61,20 +63,40 @@ export const hermesRoutes: FastifyPluginAsync<HermesRoutesOptions> = async (app,
     const token = await getHermesToken(upstream.baseUrl);
 
     const headers: Record<string, string> = { "x-hermes-session-token": token };
-    const init: RequestInit = { method: request.method, headers };
+    const init: RequestInit = {
+      method: request.method,
+      headers,
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+    };
     if (hasRequestBody(request.method, request.body)) {
       headers["content-type"] = "application/json";
       init.body = JSON.stringify(request.body);
     }
 
-    const response = await fetch(target, init);
+    let response: Response;
+    try {
+      response = await fetch(target, init);
+    } catch {
+      throw new ApiError(502, "HERMES_UNREACHABLE", "无法连接 Hermes 上游");
+    }
+
     reply.status(response.status);
 
     const contentType = response.headers.get("content-type") ?? "";
     const text = await response.text();
-    if (contentType.includes("application/json")) {
-      return reply.send(text.length > 0 ? JSON.parse(text) : null);
+
+    if (text.length === 0) {
+      return reply.send(null);
     }
-    return reply.type(contentType || "text/plain").send(text);
+
+    if (contentType.includes("application/json")) {
+      try {
+        return reply.send(JSON.parse(text));
+      } catch {
+        return reply.send({ error: "UPSTREAM_ERROR", message: text });
+      }
+    }
+
+    return reply.send({ error: "UPSTREAM_ERROR", message: text });
   });
 };
