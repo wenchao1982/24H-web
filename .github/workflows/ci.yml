@@ -14,7 +14,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      # 首次提交尚无 package-lock.json，用 npm install；锁定后改回 npm ci。
+      # 在 monorepo 根安装（npm workspaces 会链接 apps/* 与 packages/*）。
       - run: npm install --no-audit --no-fund
       - run: npm run check
       - run: npm run build

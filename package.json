@@ -2,24 +2,15 @@
   "name": "24h-web",
   "private": true,
   "version": "0.1.0",
-  "license": "BUSL-1.1",
   "type": "module",
+  "workspaces": ["apps/*", "packages/*"],
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
+    "dev:web": "npm -w @24h/web run dev",
+    "dev:server": "npm -w @24h/server run dev",
+    "build": "npm -w @24h/web run build && npm -w @24h/server run build",
+    "typecheck": "npm -w @24h/web run typecheck && npm -w @24h/server run typecheck",
     "check": "npm run typecheck"
   },
-  "dependencies": {
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
-  },
-  "devDependencies": {
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "@vitejs/plugin-react": "^4.3.4",
-    "typescript": "^5.7.3",
-    "vite": "^6.0.7"
-  }
+  "license": "BUSL-1.1",
+  "engines": { "node": ">=20" }
 }
