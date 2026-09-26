@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import cookie from "@fastify/cookie";
+import websocket from "@fastify/websocket";
 import Fastify, { type FastifyInstance } from "fastify";
 import type { Db } from "../db";
 import { registerErrorHandler } from "./errors";
@@ -8,6 +9,7 @@ import { config } from "../config";
 import { authRoutes } from "../routes/auth";
 import { adminRoutes } from "../routes/admin";
 import { hermesRoutes } from "../routes/hermes";
+import { hermesWsRoutes } from "../hermes/proxy";
 import { registerSessionMiddleware } from "../session/middleware";
 
 export interface BuildAppOptions {
@@ -29,6 +31,7 @@ export function buildApp(db: Db, options: BuildAppOptions = {}): FastifyInstance
   });
 
   app.register(cookie);
+  app.register(websocket);
 
   app.decorate("db", db);
   registerErrorHandler(app);
@@ -38,6 +41,10 @@ export function buildApp(db: Db, options: BuildAppOptions = {}): FastifyInstance
   app.register(authRoutes, { db });
   app.register(adminRoutes, { db });
   app.register(hermesRoutes, {
+    db,
+    defaultBaseUrl: options.hermesBaseUrl ?? config.hermesBaseUrl,
+  });
+  app.register(hermesWsRoutes, {
     db,
     defaultBaseUrl: options.hermesBaseUrl ?? config.hermesBaseUrl,
   });
