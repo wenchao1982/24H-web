@@ -5,6 +5,7 @@ import type { Db } from "../db";
 import { registerErrorHandler } from "./errors";
 import { registerCsrfGuard } from "./csrf";
 import { authRoutes } from "../routes/auth";
+import { adminRoutes } from "../routes/admin";
 import { registerSessionMiddleware } from "../session/middleware";
 
 export interface BuildAppOptions {
@@ -32,6 +33,7 @@ export function buildApp(db: Db, options: BuildAppOptions = {}): FastifyInstance
   registerSessionMiddleware(app, db);
 
   app.register(authRoutes, { db });
+  app.register(adminRoutes, { db });
 
   app.get("/health", async () => ({ ok: true }));
 
