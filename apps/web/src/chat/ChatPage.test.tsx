@@ -197,3 +197,25 @@ describe("ChatPage T6.5 审批/澄清", () => {
     expect(respond).toHaveBeenCalledWith({ answer: "staging" });
   });
 });
+
+describe("ChatPage T6.6 其它服务端请求", () => {
+  it("answers a secret request with the provided value", async () => {
+    const gateway = createFakeGateway((method) =>
+      method === "session.list" ? { sessions: [{ id: "s1", title: "会话一" }] } : {},
+    );
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+
+    let respond!: ReturnType<typeof gateway.emitServerRequest>;
+    act(() => {
+      respond = gateway.emitServerRequest("secret", { prompt: "请输入 API Token" });
+    });
+
+    expect(screen.getByText("需要密钥")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("需要密钥输入"), "sk-123");
+    await user.click(screen.getByRole("button", { name: "提交" }));
+
+    expect(respond).toHaveBeenCalledWith({ value: "sk-123" });
+  });
+});

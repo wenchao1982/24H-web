@@ -22,7 +22,7 @@ import {
   type TranscriptItem,
 } from "./types";
 
-const REQUEST_KINDS: RequestKind[] = ["approval", "clarify"];
+const REQUEST_KINDS: RequestKind[] = ["approval", "clarify", "sudo", "secret", "mcp.setup"];
 
 export default function ChatPage() {
   const gateway = useGateway();
