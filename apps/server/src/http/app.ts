@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import Fastify, { type FastifyInstance } from "fastify";
 import type { Db } from "../db";
 import { registerErrorHandler } from "./errors";
@@ -7,7 +8,17 @@ export interface BuildAppOptions {
 }
 
 export function buildApp(db: Db, options: BuildAppOptions = {}): FastifyInstance {
-  const app = Fastify({ logger: options.logger ?? true });
+  const app = Fastify({
+    logger: options.logger ?? true,
+    genReqId: (req) => {
+      const header = req.headers["x-request-id"];
+      return typeof header === "string" && header.length > 0 ? header : randomUUID();
+    },
+  });
+
+  app.addHook("onSend", async (request, reply) => {
+    reply.header("x-request-id", request.id);
+  });
 
   app.decorate("db", db);
   registerErrorHandler(app);
