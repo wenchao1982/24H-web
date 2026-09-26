@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGateway } from "./GatewayProvider";
+import { api } from "../api/client";
 import SessionList from "./SessionList";
 import Transcript from "./Transcript";
 import Composer from "./Composer";
@@ -30,6 +31,16 @@ import {
 
 const REQUEST_KINDS: RequestKind[] = ["approval", "clarify", "sudo", "secret", "mcp.setup"];
 
+/** 读取本地文件文本（用于导入会话）。 */
+function readFileText(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error ?? new Error("读取失败"));
+    reader.readAsText(file);
+  });
+}
+
 export default function ChatPage() {
   const gateway = useGateway();
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
@@ -42,6 +53,7 @@ export default function ChatPage() {
   const [status, setStatus] = useState<StatusInfo | null>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [searchResults, setSearchResults] = useState<SessionSummary[] | null>(null);
+  const [shareLink, setShareLink] = useState<string | null>(null);
 
   const activeIdRef = useRef<string | null>(null);
   const respondersRef = useRef(new Map<string, (result: Record<string, unknown>) => void>());
@@ -324,6 +336,49 @@ export default function ChatPage() {
     setAttachments((current) => current.filter((attachment) => attachment.id !== id));
   }, []);
 
+  const exportSession = useCallback(async () => {
+    const sessionId = activeIdRef.current;
+    if (!sessionId) {
+      return;
+    }
+    try {
+      await api("/api/hermes/sessions/export", {
+        method: "POST",
+        body: JSON.stringify({ session_id: sessionId }),
+      });
+    } catch {
+      setError("导出失败");
+    }
+  }, []);
+
+  const importSession = useCallback(
+    async (file: File) => {
+      try {
+        const text = await readFileText(file);
+        await api("/api/hermes/sessions/import", { method: "POST", body: text });
+        const result = await gateway.request("session.list", {});
+        setSessions(normalizeSessions(result));
+      } catch {
+        setError("导入失败");
+      }
+    },
+    [gateway],
+  );
+
+  const shareSession = useCallback(async () => {
+    const sessionId = activeIdRef.current;
+    if (!sessionId) {
+      return;
+    }
+    const link = `${location.origin}${location.pathname}?session=${encodeURIComponent(sessionId)}`;
+    try {
+      await navigator.clipboard?.writeText(link);
+    } catch {
+      // 剪贴板不可用时仅展示链接
+    }
+    setShareLink(link);
+  }, []);
+
   const answerRequest = useCallback(
     (requestId: string, result: Record<string, unknown>) => {
       const respond = respondersRef.current.get(requestId);
@@ -390,6 +445,31 @@ export default function ChatPage() {
         <h2 className="chat-title">{active ? active.title : "对话"}</h2>
         {active ? (
           <>
+            <div className="chat-toolbar">
+              <label className="session-menu-btn chat-import">
+                <input
+                  type="file"
+                  className="composer-file"
+                  aria-label="导入会话"
+                  accept=".json,application/json"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) {
+                      void importSession(file);
+                    }
+                    event.target.value = "";
+                  }}
+                />
+                导入
+              </label>
+              <button type="button" className="ghost" onClick={exportSession}>
+                导出
+              </button>
+              <button type="button" className="ghost" onClick={shareSession}>
+                分享
+              </button>
+            </div>
+            {shareLink ? <p className="muted chat-share">{shareLink}</p> : null}
             <Transcript items={items} />
             {pending.length > 0 ? (
               <div className="pending-requests">

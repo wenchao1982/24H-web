@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ChatPage from "./ChatPage";
@@ -400,5 +400,45 @@ describe("ChatPage T6.12 会话搜索", () => {
       { timeout: 1000 },
     );
     expect(await screen.findByText("匹配结果")).toBeInTheDocument();
+  });
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe("ChatPage T6.13 导入/导出/分享", () => {
+  it("exports and imports sessions via the L2 proxy", async () => {
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        ({ ok: true, status: 200, text: async () => JSON.stringify({ ok: true }) }) as Response,
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const gateway = createFakeGateway((method) =>
+      method === "session.list" ? { sessions: [{ id: "s1", title: "会话一" }] } : {},
+    );
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+
+    await user.click(screen.getByRole("button", { name: "导出" }));
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some((call) => String(call[0]).endsWith("/api/hermes/sessions/export")),
+      ).toBe(true);
+    });
+    const exportCall = fetchMock.mock.calls.find((call) =>
+      String(call[0]).endsWith("/api/hermes/sessions/export"),
+    );
+    expect((exportCall?.[1] as RequestInit).method).toBe("POST");
+
+    const file = new File(['{"id":"s1"}'], "s1.json", { type: "application/json" });
+    await user.upload(screen.getByLabelText("导入会话"), file);
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some((call) => String(call[0]).endsWith("/api/hermes/sessions/import")),
+      ).toBe(true);
+    });
   });
 });

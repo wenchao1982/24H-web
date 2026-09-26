@@ -494,6 +494,32 @@ button {
   font-weight: 600;
 }
 
+.chat-toolbar {
+  display: flex;
+  gap: var(--ds-space-2);
+  align-items: center;
+}
+
+.chat-import {
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  height: auto;
+  min-height: var(--ds-row-h);
+  padding: 0 var(--ds-space-3);
+  border: var(--ds-border-1) solid var(--ds-border-l2);
+  border-radius: var(--ds-radius-sm);
+  color: var(--ds-label-secondary);
+  font-size: var(--ds-font-size-sm);
+  cursor: pointer;
+}
+
+.chat-share {
+  margin: 0;
+  font-size: var(--ds-font-size-xs);
+  word-break: break-all;
+}
+
 .transcript {
   flex: 1;
   min-height: 0;
