@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import AgentsPage from "./AgentsPage";
+import { GatewayProvider } from "../chat/GatewayProvider";
+import { createFakeGateway } from "../test/fakeGateway";
 
 interface StubRoute {
   path: string;
@@ -198,6 +200,41 @@ describe("AgentsPage T7.4 MCP 管理", () => {
         command: "npx mcp-github",
       });
     });
+  });
+});
+
+describe("AgentsPage T7.5 插件", () => {
+  it("lists plugins via plugins.manage and enables one", async () => {
+    const gateway = createFakeGateway((method, params) => {
+      if (method === "plugins.manage" && params.action === "list") {
+        return { plugins: [{ name: "hello", version: "1.0.0", enabled: false }] };
+      }
+      return {};
+    });
+    vi.stubGlobal(
+      "fetch",
+      stubFetch([{ path: "/api/hermes/skills", method: "GET", status: 200, body: SKILLS }]),
+    );
+    const user = userEvent.setup();
+
+    render(
+      <GatewayProvider gateway={gateway}>
+        <AgentsPage />
+      </GatewayProvider>,
+    );
+    await user.click(await screen.findByRole("tab", { name: "插件" }));
+
+    expect(await screen.findByText("hello")).toBeInTheDocument();
+    expect(screen.getByLabelText("启用插件 hello")).not.toBeChecked();
+
+    await user.click(screen.getByLabelText("启用插件 hello"));
+    await waitFor(() => {
+      expect(gateway.paramsOf("plugins.manage")).toContainEqual({
+        action: "enable",
+        name: "hello",
+      });
+    });
+    expect(screen.getByLabelText("启用插件 hello")).toBeChecked();
   });
 });
 
