@@ -705,6 +705,31 @@ export const zh = {
   "toolSearch.title": "Tool Search",
   "toolSearch.hint": "工具延迟加载（tool_search）。",
   "toolSearch.enabled": "启用工具搜索",
+
+  "advanced.tab.lsp": "LSP",
+  "lsp.title": "LSP",
+  "lsp.hint": "语言服务器配置（lsp）：以 JSON 编辑 servers。",
+
+  "advanced.tab.subscriptionProxy": "订阅代理",
+  "subscriptionProxy.title": "Subscription Proxy",
+  "subscriptionProxy.hint": "订阅代理配置（subscription_proxy）：以 JSON 读写。",
+
+  "advanced.tab.codexRuntime": "Codex 运行时",
+  "codexRuntime.title": "Codex Runtime",
+  "codexRuntime.hint": "经 `/codex-runtime` 切换 Codex 运行时。",
+  "codexRuntime.enable": "启用 Codex 运行时",
+  "codexRuntime.disable": "停用 Codex 运行时",
+  "codexRuntime.status": "查看状态",
+  "codexRuntime.loading": "执行中…",
+  "codexRuntime.error": "Codex 运行时操作失败",
+
+  "advanced.tab.botScreen": "Bot 屏幕",
+  "botScreen.title": "Bot Screen",
+  "botScreen.hint": "Bot 屏幕相关能力（边缘功能）。",
+  "botScreen.loading": "查询 Bot 屏幕…",
+  "botScreen.unsupported": "当前内核未开放 Bot 屏幕能力。",
+  "botScreen.empty": "未发现可用的 Bot 屏幕。",
+  "botScreen.error.load": "查询 Bot 屏幕失败",
 } as const;
 
 export type TranslationKey = keyof typeof zh;
