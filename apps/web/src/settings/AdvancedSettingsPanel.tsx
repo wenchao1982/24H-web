@@ -1,5 +1,6 @@
 import { useState } from "react";
 import LocalModelsPanel from "./LocalModelsPanel";
+import PairingPanel from "./PairingPanel";
 import { t, type TranslationKey } from "../i18n";
 
 interface TabDef {
@@ -9,6 +10,7 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   { id: "local-models", labelKey: "advanced.tab.localModels" },
+  { id: "pairing", labelKey: "advanced.tab.pairing" },
 ];
 
 /** 设置 → 高级：本地模型 / 配对 / 运维 / 网关工具等子分区。 */
@@ -32,6 +34,7 @@ export default function AdvancedSettingsPanel() {
         ))}
       </nav>
       {tab === "local-models" ? <LocalModelsPanel /> : null}
+      {tab === "pairing" ? <PairingPanel /> : null}
     </div>
   );
 }
