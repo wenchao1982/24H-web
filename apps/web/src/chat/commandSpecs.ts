@@ -333,6 +333,25 @@ export const SLASH_COMMAND_SPECS: SlashCommandSpec[] = [
     titleKey: "init.title",
     actions: [{ id: "run", labelKey: "init.action.run", args: "run", kind: "primary" }],
   },
+  {
+    command: "fast",
+    titleKey: "fast.title",
+    actions: [
+      { id: "enable", labelKey: "fast.action.enable", args: "on", kind: "primary" },
+      { id: "disable", labelKey: "fast.action.disable", args: "off" },
+      { id: "status", labelKey: "fast.action.status", args: "status" },
+    ],
+  },
+  {
+    command: "reasoning",
+    titleKey: "reasoning.title",
+    actions: [
+      { id: "low", labelKey: "reasoning.action.low", args: "low" },
+      { id: "medium", labelKey: "reasoning.action.medium", args: "medium" },
+      { id: "high", labelKey: "reasoning.action.high", args: "high" },
+      { id: "status", labelKey: "reasoning.action.status", args: "status" },
+    ],
+  },
 ];
 
 export function specForCommand(command: string): SlashCommandSpec | undefined {

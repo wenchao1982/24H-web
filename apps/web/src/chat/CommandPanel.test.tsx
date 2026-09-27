@@ -325,3 +325,20 @@ describe("CommandPanel T20.17 生成 AGENTS.md", () => {
     expect(await screen.findByLabelText("执行结果")).toHaveTextContent("已生成 AGENTS.md");
   });
 });
+
+describe("CommandPanel T20.18 运行档", () => {
+  it("toggles fast mode and sets reasoning level", async () => {
+    const gateway = renderPanel();
+    const user = userEvent.setup();
+
+    await user.selectOptions(screen.getByLabelText("选择命令"), "fast");
+    await user.click(screen.getByRole("button", { name: "开启快速档" }));
+    await user.selectOptions(screen.getByLabelText("选择命令"), "reasoning");
+    await user.click(screen.getByRole("button", { name: "高" }));
+
+    expect(gateway.paramsOf("slash.exec")).toEqual([
+      { command: "/fast", args: "on" },
+      { command: "/reasoning", args: "high" },
+    ]);
+  });
+});

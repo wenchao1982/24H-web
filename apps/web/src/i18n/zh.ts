@@ -593,6 +593,17 @@ export const zh = {
 
   "init.title": "生成 AGENTS.md",
   "init.action.run": "生成 AGENTS.md",
+
+  "fast.title": "快速档",
+  "fast.input": "快速档模型（可选）",
+  "fast.action.enable": "开启快速档",
+  "fast.action.disable": "关闭快速档",
+  "fast.action.status": "查看状态",
+  "reasoning.title": "推理档",
+  "reasoning.action.low": "低",
+  "reasoning.action.medium": "中",
+  "reasoning.action.high": "高",
+  "reasoning.action.status": "查看状态",
 } as const;
 
 export type TranslationKey = keyof typeof zh;
