@@ -13,6 +13,7 @@ import ForeignSessionPanel from "./ForeignSessionPanel";
 import VaultPanel from "./VaultPanel";
 import BillingPanel from "./BillingPanel";
 import LearningPanel from "./LearningPanel";
+import ApiServerPanel from "./ApiServerPanel";
 import { t, type TranslationKey } from "../i18n";
 
 interface TabDef {
@@ -35,6 +36,7 @@ const TABS: TabDef[] = [
   { id: "vault", labelKey: "advanced.tab.vault" },
   { id: "billing", labelKey: "advanced.tab.billing" },
   { id: "learning", labelKey: "advanced.tab.learning" },
+  { id: "api-server", labelKey: "advanced.tab.apiServer" },
 ];
 
 /** 设置 → 高级：本地模型 / 配对 / 运维 / 网关工具等子分区。 */
@@ -71,6 +73,7 @@ export default function AdvancedSettingsPanel() {
       {tab === "vault" ? <VaultPanel /> : null}
       {tab === "billing" ? <BillingPanel /> : null}
       {tab === "learning" ? <LearningPanel /> : null}
+      {tab === "api-server" ? <ApiServerPanel /> : null}
     </div>
   );
 }

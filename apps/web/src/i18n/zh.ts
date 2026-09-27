@@ -661,6 +661,13 @@ export const zh = {
   "credentialPools.error.load": "加载凭证池失败",
   "credentialPools.error.save": "保存凭证池失败",
   "credentialPools.error.input": "请填写 provider 与密钥值",
+
+  "advanced.tab.apiServer": "API Server",
+  "apiServer.title": "API Server",
+  "apiServer.hint": "OpenAI 兼容端点的启用与端口（api_server）。",
+  "apiServer.enabled": "启用 API Server",
+  "apiServer.port": "端口",
+  "apiServer.portPlaceholder": "如 8000",
 } as const;
 
 export type TranslationKey = keyof typeof zh;
