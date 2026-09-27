@@ -11,6 +11,7 @@
     "dev:web": "npm -w @24h/web run dev",
     "dev:server": "npm -w @24h/server run dev",
     "build": "npm -w @24h/web run build && npm -w @24h/server run build",
+    "start": "npm -w @24h/server run start",
     "typecheck": "npm -w @24h/web run typecheck && npm -w @24h/server run typecheck && npm -w @24h/shared run typecheck",
     "test": "npm -w @24h/server run test && npm -w @24h/web run test",
     "test:e2e": "playwright test",
