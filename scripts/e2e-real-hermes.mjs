@@ -17,9 +17,12 @@
  * 用法：
  *   node scripts/e2e-real-hermes.mjs --base http://127.0.0.1:8931 \
  *     --user admin --pass <password> [--prompt '仅回复两个字：pong'] [--timeout 60000]
+ *   node scripts/e2e-real-hermes.mjs --base http://127.0.0.1:8931 \
+ *     --user admin --pass <password> --probe-groups   # 只读探测群聊能力，不建会话/不花模型调用
  *
  * 环境变量：E2E_BASE / E2E_USER / E2E_PASS / E2E_PROMPT / E2E_TIMEOUT_MS / E2E_RAW=1
  *           E2E_WAIT_READY=1（恢复旧的就绪屏障，等 `gateway.ready` 再发首个请求）
+ *           E2E_PROBE_GROUPS=1（等价 --probe-groups）
  * 默认（no-wait）：WS `open` 后**立即**发 `session.create`，不等待转发的 `gateway.ready`
  *   —— 这是对 BFF「上游未建立前先缓存客户端帧」冷启动修复的端到端验证；失败即回归。
  * 退出码：0 = 到达最终答复（含模型调用失败时的 WARN）；1 = 未取得任何助手文本 / 连接失败。
@@ -46,6 +49,7 @@ function parseArgs(argv) {
     raw: process.env.E2E_RAW === "1",
     // 默认不等待 gateway.ready（回归 BFF 冷启动缓存修复）。
     noWait: process.env.E2E_WAIT_READY !== "1",
+    probeGroups: process.env.E2E_PROBE_GROUPS === "1",
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -61,6 +65,7 @@ function parseArgs(argv) {
     else if (arg === "--raw") opts.raw = true;
     else if (arg === "--no-wait") opts.noWait = true;
     else if (arg === "--wait-ready") opts.noWait = false;
+    else if (arg === "--probe-groups") opts.probeGroups = true;
   }
   return opts;
 }
@@ -560,6 +565,22 @@ async function main() {
         becameReady ? "已就绪" : "5s 内未收到，仍继续尝试"
       }`,
     );
+  }
+
+  // 只读群聊能力探测：不创建会话、不发起模型调用，仅发 groups.* RPC 并打印原始结果。
+  if (opts.probeGroups) {
+    console.log("");
+    console.log("=== groups probe (read-only) ===");
+    for (const method of ["groups.capabilities", "groups.list"]) {
+      try {
+        const result = await withTimeout(gateway.request(method, {}), requestTimeout, method);
+        console.log(`[${PASS}] ${method} → ${JSON.stringify(result)}`);
+      } catch (error) {
+        console.log(`[${WARN}] ${method} → ${error.message}`);
+      }
+    }
+    socket.close();
+    return 0;
   }
 
   // 3. session.create
