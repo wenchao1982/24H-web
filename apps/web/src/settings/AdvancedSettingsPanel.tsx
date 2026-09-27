@@ -11,6 +11,7 @@ import ProjectFactsPanel from "./ProjectFactsPanel";
 import HandoffPanel from "./HandoffPanel";
 import ForeignSessionPanel from "./ForeignSessionPanel";
 import VaultPanel from "./VaultPanel";
+import BillingPanel from "./BillingPanel";
 import { t, type TranslationKey } from "../i18n";
 
 interface TabDef {
@@ -31,6 +32,7 @@ const TABS: TabDef[] = [
   { id: "handoff", labelKey: "advanced.tab.handoff" },
   { id: "foreign", labelKey: "advanced.tab.foreign" },
   { id: "vault", labelKey: "advanced.tab.vault" },
+  { id: "billing", labelKey: "advanced.tab.billing" },
 ];
 
 /** 设置 → 高级：本地模型 / 配对 / 运维 / 网关工具等子分区。 */
@@ -65,6 +67,7 @@ export default function AdvancedSettingsPanel() {
       {tab === "handoff" ? <HandoffPanel /> : null}
       {tab === "foreign" ? <ForeignSessionPanel /> : null}
       {tab === "vault" ? <VaultPanel /> : null}
+      {tab === "billing" ? <BillingPanel /> : null}
     </div>
   );
 }
