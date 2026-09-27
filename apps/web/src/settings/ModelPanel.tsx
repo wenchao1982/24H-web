@@ -1,9 +1,22 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/client";
+import { t, type TranslationKey } from "../i18n";
 import { normalizeMoa, normalizeModelInfo, normalizeModelOptions, type MoaState } from "./model";
+import ProviderRoutingPanel from "./ProviderRoutingPanel";
 
-/** 设置 → 模型：当前模型 / 可选模型切换 / MoA。 */
+interface SubTab {
+  id: string;
+  labelKey: TranslationKey;
+}
+
+const SUB_TABS: SubTab[] = [
+  { id: "current", labelKey: "model.subtab.current" },
+  { id: "routing", labelKey: "model.subtab.routing" },
+];
+
+/** 设置 → 模型：当前模型 / 可选模型切换 / MoA / Provider 路由。 */
 export default function ModelPanel() {
+  const [tab, setTab] = useState<string>("current");
   const [current, setCurrent] = useState("");
   const [options, setOptions] = useState<string[]>([]);
   const [selected, setSelected] = useState("");
@@ -75,45 +88,71 @@ export default function ModelPanel() {
 
   return (
     <div className="settings-section">
-      {error ? <p className="err">{error}</p> : null}
-
-      <div className="card">
-        <h3>当前模型</h3>
-        <p className="muted" aria-label="当前模型">
-          {current || "未设置"}
-        </p>
-        <div className="row">
-          <select
-            aria-label="选择模型"
-            value={selected}
-            onChange={(event) => setSelected(event.target.value)}
+      <nav className="segmented" aria-label={t("model.subtabsAria")}>
+        {SUB_TABS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className="segmented-btn"
+            data-active={tab === item.id}
+            aria-current={tab === item.id ? "page" : undefined}
+            onClick={() => setTab(item.id)}
           >
-            {options.length === 0 ? <option value="">（无可用模型）</option> : null}
-            {options.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-          <button className="primary" type="button" disabled={busy || !selected} onClick={applyModel}>
-            切换
+            {t(item.labelKey)}
           </button>
-        </div>
-      </div>
+        ))}
+      </nav>
 
-      <div className="card">
-        <h3>混合代理（MoA）</h3>
-        <label className="skill-toggle">
-          <input
-            type="checkbox"
-            aria-label="启用 MoA"
-            checked={moa.enabled}
-            disabled={busy}
-            onChange={(event) => void toggleMoa(event.target.checked)}
-          />
-          <span className="muted">启用混合代理</span>
-        </label>
-      </div>
+      {tab === "routing" ? <ProviderRoutingPanel /> : null}
+
+      {tab === "current" ? (
+        <>
+          {error ? <p className="err">{error}</p> : null}
+
+          <div className="card">
+            <h3>当前模型</h3>
+            <p className="muted" aria-label="当前模型">
+              {current || "未设置"}
+            </p>
+            <div className="row">
+              <select
+                aria-label="选择模型"
+                value={selected}
+                onChange={(event) => setSelected(event.target.value)}
+              >
+                {options.length === 0 ? <option value="">（无可用模型）</option> : null}
+                {options.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="primary"
+                type="button"
+                disabled={busy || !selected}
+                onClick={applyModel}
+              >
+                切换
+              </button>
+            </div>
+          </div>
+
+          <div className="card">
+            <h3>混合代理（MoA）</h3>
+            <label className="skill-toggle">
+              <input
+                type="checkbox"
+                aria-label="启用 MoA"
+                checked={moa.enabled}
+                disabled={busy}
+                onChange={(event) => void toggleMoa(event.target.checked)}
+              />
+              <span className="muted">启用混合代理</span>
+            </label>
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }

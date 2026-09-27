@@ -629,6 +629,21 @@ export const zh = {
   "reference.empty": "无匹配的文件或目录",
   "reference.hint": "输入 @ 引用文件/目录",
   "reference.remove": "移除引用 {{path}}",
+
+  "configForm.loading": "加载配置中…",
+  "configForm.save": "保存",
+  "configForm.saved": "已保存",
+  "configForm.error.load": "加载配置失败",
+  "configForm.error.save": "保存配置失败",
+  "configForm.error.json": "JSON 格式无效，请检查后再保存",
+
+  "model.subtabsAria": "模型子分区",
+  "model.subtab.current": "当前模型",
+  "model.subtab.routing": "Provider 路由",
+  "model.subtab.fallback": "回退 Provider",
+  "model.subtab.pools": "凭证池",
+  "providerRouting.title": "Provider 路由",
+  "providerRouting.hint": "配置 provider_routing：排序 / 白名单 / 黑名单 / 参数要求。",
 } as const;
 
 export type TranslationKey = keyof typeof zh;
