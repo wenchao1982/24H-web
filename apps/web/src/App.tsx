@@ -6,6 +6,7 @@ import ShellLayout from "./shell/ShellLayout";
 import LoginPage from "./pages/LoginPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import AgentsPage from "./agents/AgentsPage";
+import GroupChatPage from "./groups/GroupChatPage";
 import TasksPage from "./tasks/TasksPage";
 import UsagePage from "./usage/UsagePage";
 import SettingsPage from "./settings/SettingsPage";
@@ -26,7 +27,8 @@ export function AppRoutes() {
           <Route index element={<Navigate to="/chat" replace />} />
           <Route path="/chat" element={<ChatPage />} />
           <Route path="/agents" element={<AgentsPage />} />
-          <Route path="/groups" element={<PlaceholderPage title={t("page.groups")} />} />
+          <Route path="/group-chat" element={<GroupChatPage />} />
+          <Route path="/groups" element={<Navigate to="/group-chat" replace />} />
           <Route path="/tasks" element={<TasksPage />} />
           <Route path="/usage" element={<UsagePage />} />
           <Route path="/settings" element={<SettingsPage />} />

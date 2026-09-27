@@ -7,7 +7,7 @@ import { t, type TranslationKey } from "../i18n";
 const ROUTES: Record<string, string> = {
   chat: "/chat",
   agents: "/agents",
-  groups: "/groups",
+  groups: "/group-chat",
   tasks: "/tasks",
   usage: "/usage",
   settings: "/settings",
