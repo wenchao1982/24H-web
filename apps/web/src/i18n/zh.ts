@@ -772,6 +772,8 @@ export const zh = {
   "personality.set": "应用",
   "personality.setOf": "应用人格 {{name}}",
   "personality.empty": "暂无人格预设。",
+  "personality.close": "收起人格面板",
+  "personality.current": "当前人格：{{name}}",
   "personality.error.list": "加载人格预设失败",
   "personality.error.set": "应用人格失败",
 } as const;
