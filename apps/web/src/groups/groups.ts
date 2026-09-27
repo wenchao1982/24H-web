@@ -1,8 +1,15 @@
 /**
- * 群聊（L1 `groups.*`）响应规范化。
+ * 群聊（L1 `groups.*`）响应规范化与请求构造。
  *
- * 官方 `groups.*` schema 尚未冻结，这里做宽松解析：兼容数组 / `{rooms}` / `{groups}`，
- * 以及 snake_case / camelCase 字段，避免因字段差异崩溃。
+ * 对齐官方契约（`gateway-contract.generated.ts` / `tui_gateway/methods_groups.py`）：
+ *   - `groups.capabilities` → `{driver, methods[], ...}`（`driver:false` 表示不可用）
+ *   - `groups.create {room_id, name, members:[{member_id, profile, handle, display_name?}]}`
+ *   - `groups.state {room_id}` → `{room, driver_status?}`
+ *   - `groups.log {room_id, since_seq?}` → `{events:[{event_id, kind, actor, payload}], ...}`
+ *   - `groups.send {room_id, event_id, payload:{text, thread_id}}`
+ *   - `groups.rename {room_id, event_id, name}` / `groups.disband {room_id}`
+ *
+ * 官方 schema 仍在演进，解析保持宽松：兼容数组 / `{rooms}` / `{groups}` / snake_case / camelCase。
  */
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -26,6 +33,10 @@ function readString(source: Record<string, unknown>, ...keys: string[]): string 
 export interface GroupMember {
   id: string;
   name: string;
+  /** 群内 @handle（`groups.create` 的 `handle`；`RoomMember.handle`）。 */
+  handle?: string;
+  /** 成员对应的 profile（本地 roster 与 members 的 `profile`）。 */
+  profile?: string;
 }
 
 export interface GroupMessage {
@@ -42,13 +53,44 @@ export interface GroupRoom {
   messages: GroupMessage[];
 }
 
+export interface GroupCapabilities {
+  driver: boolean;
+  methods: string[];
+}
+
+/** 官方 roster 约束：`hosted_room_discussion.validate_roster`（2–6 名本地 profile）。 */
+export const MIN_GROUP_MEMBERS = 2;
+export const MAX_GROUP_MEMBERS = 6;
+
+/** `groups.create` 的成员入参（`RoomMemberInput`）。 */
+export interface GroupMemberInput {
+  member_id: string;
+  profile: string;
+  handle: string;
+  display_name?: string;
+}
+
 /** `groups.capabilities` 响应是否表明群聊可用。 */
 export function isGroupsSupported(payload: unknown): boolean {
   if (payload == null) {
     return true;
   }
   const source = asRecord(payload);
-  return source.supported !== false && source.available !== false && source.enabled !== false;
+  return (
+    source.supported !== false &&
+    source.available !== false &&
+    source.enabled !== false &&
+    source.driver !== false
+  );
+}
+
+/** 宽松解析 `groups.capabilities`。 */
+export function normalizeCapabilities(payload: unknown): GroupCapabilities {
+  const source = asRecord(payload);
+  const methods = asArray(source.methods).filter(
+    (method): method is string => typeof method === "string" && method.trim() !== "",
+  );
+  return { driver: source.driver !== false, methods };
 }
 
 export function normalizeMembers(value: unknown): GroupMember[] {
@@ -59,10 +101,30 @@ export function normalizeMembers(value: unknown): GroupMember[] {
       continue;
     }
     const source = asRecord(item);
-    const name = readString(source, "name", "display_name", "displayName", "id", "agent");
-    if (name) {
-      out.push({ id: readString(source, "id", "agent", "name") || name, name });
+    const name = readString(
+      source,
+      "display_name",
+      "displayName",
+      "name",
+      "member_id",
+      "memberId",
+      "handle",
+      "id",
+      "agent",
+      "profile",
+    );
+    if (!name) {
+      continue;
     }
+    const id = readString(source, "member_id", "memberId", "id", "agent", "name") || name;
+    const handle = readString(source, "handle");
+    const profile = readString(source, "profile");
+    out.push({
+      id,
+      name,
+      ...(handle ? { handle } : {}),
+      ...(profile ? { profile } : {}),
+    });
   }
   return out;
 }
@@ -82,6 +144,39 @@ export function normalizeMessages(value: unknown): GroupMessage[] {
     out.push({
       id: readString(source, "id", "message_id", "messageId") || `m${out.length}`,
       sender: readString(source, "sender", "author", "from", "role", "name") || "?",
+      text,
+    });
+  }
+  return out;
+}
+
+/**
+ * 解析 `groups.log` 事件流为 transcript（speaker + text）。
+ * 只保留带 `payload.text` 的 `message.*` 事件；`turn.*` / `room.*` 等控制事件无文本，忽略。
+ */
+export function normalizeLogEvents(payload: unknown): GroupMessage[] {
+  const source = asRecord(payload);
+  const list = Array.isArray(payload)
+    ? payload
+    : asArray(source.events ?? source.messages ?? source.transcript);
+  const out: GroupMessage[] = [];
+  for (const item of list) {
+    const event = asRecord(item);
+    const body = asRecord(event.payload ?? event.data);
+    const text = readString(body, "text", "content", "message", "body") || readString(event, "text");
+    if (!text) {
+      continue;
+    }
+    const actor = asRecord(event.actor);
+    const kind = readString(actor, "kind");
+    const memberId = readString(body, "member_id", "memberId");
+    const sender =
+      kind === "user"
+        ? "我"
+        : readString(actor, "display_name", "displayName", "name", "id") || memberId || "?";
+    out.push({
+      id: readString(event, "event_id", "eventId", "id", "seq") || `m${out.length}`,
+      sender,
       text,
     });
   }
@@ -120,4 +215,44 @@ export function normalizeRooms(payload: unknown): GroupRoom[] {
     }
   }
   return out;
+}
+
+/** `groups.state` 响应 → 单个房间（`{room}` 或直接房间对象）。 */
+export function normalizeRoomState(payload: unknown): GroupRoom | null {
+  const source = asRecord(payload);
+  return normalizeRoom(source.room ?? payload);
+}
+
+/**
+ * profile 名称 → `groups.create` 成员入参。
+ * `member_id`/`profile`/`handle` 均取 profile 名（唯一）；handle 不能占用 `@all`/`@everyone`。
+ */
+export function buildMemberInputs(
+  profiles: { name: string; displayName?: string }[],
+): GroupMemberInput[] {
+  const seen = new Set<string>();
+  const out: GroupMemberInput[] = [];
+  for (const profile of profiles) {
+    const name = profile.name.trim();
+    if (!name || seen.has(name)) {
+      continue;
+    }
+    seen.add(name);
+    const reserved = name.toLowerCase() === "all" || name.toLowerCase() === "everyone";
+    const handle = reserved ? `${name}-member` : name;
+    const displayName = (profile.displayName ?? "").trim();
+    out.push({
+      member_id: name,
+      profile: name,
+      handle,
+      ...(displayName && displayName !== name ? { display_name: displayName } : {}),
+    });
+  }
+  return out;
+}
+
+/** 生成官方 `_IDENTIFIER_RE`（`^[A-Za-z0-9][A-Za-z0-9._:-]*$`）安全的 id。 */
+export function newIdentifier(prefix: string): string {
+  const noise = Math.random().toString(36).slice(2, 10);
+  return `${prefix}-${Date.now().toString(36)}-${noise}`;
 }

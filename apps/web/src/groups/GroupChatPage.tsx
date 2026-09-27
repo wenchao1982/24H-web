@@ -1,9 +1,15 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useGateway } from "../chat/GatewayProvider";
 import { t } from "../i18n";
+import { normalizeAgentList, type AgentSummary } from "../agents/agents";
 import {
+  buildMemberInputs,
   isGroupsSupported,
-  normalizeMessages,
+  MAX_GROUP_MEMBERS,
+  MIN_GROUP_MEMBERS,
+  newIdentifier,
+  normalizeLogEvents,
+  normalizeRoomState,
   normalizeRooms,
   type GroupMember,
   type GroupMessage,
@@ -11,18 +17,26 @@ import {
 } from "./groups";
 
 /**
- * 群聊页（T17.1）：房间列表 + 新建房间 + 房间多 agent 转录。
- * 经 L1 `groups.*`；`groups.capabilities` 探测不支持时展示说明性空态（不崩溃）。
+ * 群聊页（T17.1）：房间列表 + 新建房间（选成员）+ 房间多 agent 转录。
+ *
+ * 经 L1 `groups.*`（官方 hosted rooms）：`capabilities` / `list` / `create` / `state` /
+ * `log` / `send` / `rename` / `disband`。成员 roster 在创建时冻结（2–6 名本地 profile，
+ * `validate_roster`）；官方无「增删成员」RPC，故成员仅能在创建时选择，「编辑」仅支持
+ * 改名（`groups.rename`）。`groups.capabilities` 缺失或 `driver:false` 时展示说明性空态。
  */
 export default function GroupChatPage() {
   const gateway = useGateway();
   const [supported, setSupported] = useState<boolean | null>(null);
+  const [profiles, setProfiles] = useState<AgentSummary[]>([]);
   const [rooms, setRooms] = useState<GroupRoom[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<GroupMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [name, setName] = useState("");
+  const [selected, setSelected] = useState<string[]>([]);
+  const [renameDraft, setRenameDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const threadRef = useRef<string>("");
 
   const load = useCallback(async () => {
     try {
@@ -37,12 +51,20 @@ export default function GroupChatPage() {
         setRooms([]);
         return;
       }
-      const result = await gateway.request("groups.list", {});
-      setRooms(normalizeRooms(result));
+      const roomList = await gateway.request("groups.list", {});
+      setRooms(normalizeRooms(roomList));
       setSupported(true);
       setError(null);
     } catch {
       setSupported(false);
+      return;
+    }
+    try {
+      const profileList = await gateway.request("profiles.list", { include_sessions: false });
+      setProfiles(normalizeAgentList(profileList));
+    } catch {
+      // 无法取成员时不影响浏览已有房间
+      setProfiles([]);
     }
   }, [gateway]);
 
@@ -50,29 +72,74 @@ export default function GroupChatPage() {
     void load();
   }, [load]);
 
-  const openRoom = useCallback(
-    async (room: GroupRoom) => {
-      setActiveId(room.id);
-      setMessages(room.messages);
+  const refreshLog = useCallback(
+    async (roomId: string) => {
       try {
-        const result = await gateway.request("groups.messages", { room_id: room.id });
-        setMessages(normalizeMessages(result));
+        const log = await gateway.request("groups.log", { room_id: roomId, since_seq: 0 });
+        setMessages(normalizeLogEvents(log));
       } catch {
-        // 转录拉取失败时保留列表内嵌消息
+        // 转录拉取失败时保留已有消息
       }
     },
     [gateway],
   );
 
+  const openRoom = useCallback(
+    async (room: GroupRoom) => {
+      setActiveId(room.id);
+      setMessages(room.messages);
+      setRenameDraft(room.name);
+      threadRef.current = newIdentifier("thread");
+      try {
+        const state = await gateway.request("groups.state", { room_id: room.id });
+        const normalized = normalizeRoomState(state);
+        if (normalized) {
+          setRooms((current) =>
+            current.map((item) =>
+              item.id === room.id
+                ? { ...item, name: normalized.name, members: normalized.members }
+                : item,
+            ),
+          );
+        }
+      } catch {
+        // state 拉取失败时沿用 list 内嵌成员
+      }
+      await refreshLog(room.id);
+    },
+    [gateway, refreshLog],
+  );
+
+  const toggleMember = (profileName: string) => {
+    setSelected((current) =>
+      current.includes(profileName)
+        ? current.filter((item) => item !== profileName)
+        : [...current, profileName],
+    );
+  };
+
   const createRoom = async (event: FormEvent) => {
     event.preventDefault();
-    const roomName = name.trim();
-    if (!roomName) {
+    if (selected.length < MIN_GROUP_MEMBERS) {
+      setError(t("groups.error.members"));
       return;
     }
+    if (selected.length > MAX_GROUP_MEMBERS) {
+      setError(t("groups.error.members"));
+      return;
+    }
+    const members = buildMemberInputs(
+      profiles.filter((profile) => selected.includes(profile.name)),
+    );
+    const roomName = name.trim() || t("groups.defaultName");
     try {
-      await gateway.request("groups.create", { name: roomName });
+      await gateway.request("groups.create", {
+        room_id: newIdentifier("room"),
+        name: roomName,
+        members,
+      });
       setName("");
+      setSelected([]);
       setError(null);
       await load();
     } catch {
@@ -85,17 +152,62 @@ export default function GroupChatPage() {
     if (!text || !activeId) {
       return;
     }
+    if (!threadRef.current) {
+      threadRef.current = newIdentifier("thread");
+    }
+    const threadId = threadRef.current;
     setMessages((current) => [...current, { id: `local-${current.length}`, sender: "我", text }]);
     setDraft("");
     try {
-      await gateway.request("groups.send", { room_id: activeId, text });
+      await gateway.request("groups.send", {
+        room_id: activeId,
+        event_id: newIdentifier("event"),
+        payload: { text, thread_id: threadId },
+      });
+      setError(null);
+      await refreshLog(activeId);
     } catch {
       setError(t("groups.error.send"));
     }
   };
 
+  const rename = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!activeId) {
+      return;
+    }
+    const next = renameDraft.trim();
+    if (!next) {
+      return;
+    }
+    try {
+      await gateway.request("groups.rename", {
+        room_id: activeId,
+        event_id: newIdentifier("event"),
+        name: next,
+      });
+      setError(null);
+      await load();
+    } catch {
+      setError(t("groups.error.rename"));
+    }
+  };
+
+  const disband = async (room: GroupRoom) => {
+    try {
+      await gateway.request("groups.disband", { room_id: room.id });
+      if (activeId === room.id) {
+        setActiveId(null);
+        setMessages([]);
+      }
+      await load();
+    } catch {
+      setError(t("groups.error.disband"));
+    }
+  };
+
   const mention = (member: GroupMember) => {
-    setDraft((current) => `${current}@${member.name} `);
+    setDraft((current) => `${current}@${member.handle || member.name} `);
   };
 
   if (supported === null) {
@@ -123,6 +235,27 @@ export default function GroupChatPage() {
               value={name}
               onChange={(event) => setName(event.target.value)}
             />
+            <fieldset className="groups-members">
+              <legend>{t("groups.pickMembers")}</legend>
+              {profiles.length === 0 ? (
+                <p className="empty">{t("groups.noMembers")}</p>
+              ) : (
+                profiles.map((profile) => (
+                  <label key={profile.name} className="groups-member-option">
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(profile.name)}
+                      onChange={() => toggleMember(profile.name)}
+                      aria-label={t("groups.pickMember", { name: profile.name })}
+                    />
+                    {profile.displayName || profile.name}
+                  </label>
+                ))
+              )}
+            </fieldset>
+            <p className="groups-hint">
+              {t("groups.selectedCount", { count: selected.length })}
+            </p>
             <button className="primary" type="submit">
               {t("groups.create")}
             </button>
@@ -161,6 +294,25 @@ export default function GroupChatPage() {
         {active ? (
           <>
             <h2 className="chat-title">{active.name}</h2>
+            <form className="chat-toolbar groups-rename" onSubmit={rename}>
+              <input
+                aria-label={t("groups.renameLabel")}
+                placeholder={t("groups.renameLabel")}
+                value={renameDraft}
+                onChange={(event) => setRenameDraft(event.target.value)}
+              />
+              <button className="ghost" type="submit">
+                {t("groups.saveName")}
+              </button>
+              <button
+                className="ghost"
+                type="button"
+                aria-label={t("groups.disbandRoom", { name: active.name })}
+                onClick={() => void disband(active)}
+              >
+                {t("groups.disband")}
+              </button>
+            </form>
             {active.members.length > 0 ? (
               <div className="chat-toolbar" aria-label={t("groups.members")}>
                 {active.members.map((member) => (
@@ -168,14 +320,15 @@ export default function GroupChatPage() {
                     key={member.id}
                     type="button"
                     className="ghost"
-                    aria-label={t("groups.mention", { name: member.name })}
+                    aria-label={t("groups.mention", { name: member.handle || member.name })}
                     onClick={() => mention(member)}
                   >
-                    @{member.name}
+                    @{member.handle || member.name}
                   </button>
                 ))}
               </div>
             ) : null}
+            <p className="groups-hint">{t("groups.rosterLocked")}</p>
             <div className="transcript">
               {messages.map((message) => (
                 <div
