@@ -475,6 +475,21 @@ export const zh = {
   "subgoal.action.add": "添加子目标",
   "subgoal.action.status": "查看状态",
   "subgoal.action.clear": "清除",
+
+  "loop.title": "会话循环",
+  "loop.input": "循环提示词",
+  "loop.action.start": "开始循环",
+  "loop.action.status": "查看状态",
+  "loop.action.pause": "暂停",
+  "loop.action.resume": "继续",
+  "loop.action.stop": "停止",
+  "heartbeat.title": "心跳",
+  "heartbeat.input": "心跳提示词",
+  "heartbeat.action.start": "启动心跳",
+  "heartbeat.action.status": "查看状态",
+  "heartbeat.action.pause": "暂停",
+  "heartbeat.action.resume": "继续",
+  "heartbeat.action.stop": "停止",
 } as const;
 
 export type TranslationKey = keyof typeof zh;

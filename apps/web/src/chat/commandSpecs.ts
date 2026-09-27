@@ -46,6 +46,36 @@ export const SLASH_COMMAND_SPECS: SlashCommandSpec[] = [
       { id: "clear", labelKey: "subgoal.action.clear", args: "clear", kind: "danger" },
     ],
   },
+  {
+    command: "loop",
+    titleKey: "loop.title",
+    inputKey: "loop.input",
+    actions: [
+      { id: "start", labelKey: "loop.action.start", args: "start", kind: "primary", withInput: true },
+      { id: "status", labelKey: "loop.action.status", args: "status" },
+      { id: "pause", labelKey: "loop.action.pause", args: "pause" },
+      { id: "resume", labelKey: "loop.action.resume", args: "resume" },
+      { id: "stop", labelKey: "loop.action.stop", args: "stop", kind: "danger" },
+    ],
+  },
+  {
+    command: "heartbeat",
+    titleKey: "heartbeat.title",
+    inputKey: "heartbeat.input",
+    actions: [
+      {
+        id: "start",
+        labelKey: "heartbeat.action.start",
+        args: "start",
+        kind: "primary",
+        withInput: true,
+      },
+      { id: "status", labelKey: "heartbeat.action.status", args: "status" },
+      { id: "pause", labelKey: "heartbeat.action.pause", args: "pause" },
+      { id: "resume", labelKey: "heartbeat.action.resume", args: "resume" },
+      { id: "stop", labelKey: "heartbeat.action.stop", args: "stop", kind: "danger" },
+    ],
+  },
 ];
 
 export function specForCommand(command: string): SlashCommandSpec | undefined {

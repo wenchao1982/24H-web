@@ -40,3 +40,24 @@ describe("CommandPanel T20.2 持久目标", () => {
     expect(gateway.paramsOf("slash.exec")).toEqual([{ command: "/subgoal", args: "status" }]);
   });
 });
+
+describe("CommandPanel T20.3 循环/心跳", () => {
+  it("starts a loop with the typed prompt and stops a heartbeat", async () => {
+    const gateway = renderPanel();
+    const user = userEvent.setup();
+
+    await user.selectOptions(screen.getByLabelText("选择命令"), "loop");
+    await user.type(screen.getByLabelText("循环提示词"), "巡检");
+    await user.click(screen.getByRole("button", { name: "开始循环" }));
+
+    expect(gateway.paramsOf("slash.exec")).toEqual([{ command: "/loop", args: "start 巡检" }]);
+
+    await user.selectOptions(screen.getByLabelText("选择命令"), "heartbeat");
+    await user.click(screen.getByRole("button", { name: "停止" }));
+
+    expect(gateway.paramsOf("slash.exec")).toEqual([
+      { command: "/loop", args: "start 巡检" },
+      { command: "/heartbeat", args: "stop" },
+    ]);
+  });
+});
