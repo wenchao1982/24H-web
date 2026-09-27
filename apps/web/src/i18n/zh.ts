@@ -730,6 +730,21 @@ export const zh = {
   "botScreen.unsupported": "当前内核未开放 Bot 屏幕能力。",
   "botScreen.empty": "未发现可用的 Bot 屏幕。",
   "botScreen.error.load": "查询 Bot 屏幕失败",
+
+  "advanced.tab.computerUse": "计算机使用",
+  "computerUse.title": "Computer Use",
+  "computerUse.hint": "查看 Computer Use 状态并授予权限。",
+  "computerUse.loading": "查询 Computer Use…",
+  "computerUse.availableLabel": "Computer Use 可用性",
+  "computerUse.available": "可用",
+  "computerUse.unavailable": "不可用",
+  "computerUse.grantedLabel": "Computer Use 授权",
+  "computerUse.granted": "已授权",
+  "computerUse.notGranted": "未授权",
+  "computerUse.empty": "暂无可用的 Computer Use 状态。",
+  "computerUse.grant": "授予权限",
+  "computerUse.error.load": "查询 Computer Use 失败",
+  "computerUse.error.grant": "授予权限失败",
 } as const;
 
 export type TranslationKey = keyof typeof zh;
