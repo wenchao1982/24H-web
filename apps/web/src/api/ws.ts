@@ -39,6 +39,7 @@ export class GatewayClient implements Gateway {
   private ws: WebSocket | null = null;
   private nextId = 1;
   private readonly pending = new Map<number, Pending>();
+  private readonly outbox: string[] = [];
   private readonly handlers = new Map<string, Set<GatewayEventHandler>>();
   private readonly serverRequests = new Map<string, Set<GatewayServerRequestHandler>>();
 
@@ -55,6 +56,10 @@ export class GatewayClient implements Gateway {
       });
     }).then(() => {
       ws.addEventListener("message", (event) => this.dispatch(String(event.data)));
+      // Flush requests issued while the socket was still connecting.
+      for (const frame of this.outbox.splice(0)) {
+        ws.send(frame);
+      }
     });
   }
 
@@ -120,11 +125,20 @@ export class GatewayClient implements Gateway {
   }
 
   request<T>(method: string, params: Record<string, unknown> = {}): Promise<T> {
-    if (!this.ws) {
+    const ws = this.ws;
+    if (!ws) {
       return Promise.reject(new Error("gateway 未连接"));
     }
     const id = this.nextId++;
-    this.ws.send(JSON.stringify({ jsonrpc: "2.0", id, method, params }));
+    const frame = JSON.stringify({ jsonrpc: "2.0", id, method, params });
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(frame);
+    } else if (ws.readyState === WebSocket.CONNECTING) {
+      // Queue until connect() resolves so early requests are never lost.
+      this.outbox.push(frame);
+    } else {
+      return Promise.reject(new Error("gateway 未连接"));
+    }
     return new Promise<T>((resolve, reject) => {
       this.pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
     });

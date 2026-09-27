@@ -30,51 +30,75 @@ async function bridge(
   request: FastifyRequest,
   options: HermesWsOptions,
 ): Promise<void> {
-  const target = resolveTarget(options.db, options.defaultBaseUrl, readConnectionId(request));
-  const upstream = hermesUpstream({ hermesBaseUrl: options.defaultBaseUrl }, target.baseUrl);
-  const token = target.token ?? (await getHermesToken(upstream.baseUrl));
-  const upstreamSocket = new WebSocket(
-    `${upstream.wsBaseUrl}/api/ws?token=${encodeURIComponent(token)}`,
-  );
-
   const pending: PendingFrame[] = [];
+  const outbound: PendingFrame[] = [];
+  let upstreamSocket: WebSocket | null = null;
 
+  // Attach the client listener synchronously: on a cold start the upstream
+  // token fetch below is async, and any frame sent by the client before the
+  // upstream socket exists must not be dropped.
   socket.on("message", (data: RawData, isBinary: boolean) => {
-    if (upstreamSocket.readyState === WebSocket.OPEN) {
+    if (upstreamSocket && upstreamSocket.readyState === WebSocket.OPEN) {
       upstreamSocket.send(data, { binary: isBinary });
-    } else if (upstreamSocket.readyState === WebSocket.CONNECTING) {
+    } else if (!upstreamSocket || upstreamSocket.readyState === WebSocket.CONNECTING) {
       pending.push({ data, isBinary });
     }
   });
   socket.on("close", () => {
-    upstreamSocket.close();
+    upstreamSocket?.close();
   });
   socket.on("error", () => {
-    upstreamSocket.terminate();
+    upstreamSocket?.terminate();
   });
 
-  upstreamSocket.on("open", () => {
+  const target = resolveTarget(options.db, options.defaultBaseUrl, readConnectionId(request));
+  const upstream = hermesUpstream({ hermesBaseUrl: options.defaultBaseUrl }, target.baseUrl);
+  const token = target.token ?? (await getHermesToken(upstream.baseUrl));
+  const ws = new WebSocket(
+    `${upstream.wsBaseUrl}/api/ws?token=${encodeURIComponent(token)}`,
+  );
+  upstreamSocket = ws;
+
+  const flushOutbound = () => {
+    if (socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    for (const frame of outbound.splice(0)) {
+      socket.send(frame.data, { binary: frame.isBinary });
+    }
+  };
+
+  ws.on("open", () => {
     for (const frame of pending.splice(0)) {
-      upstreamSocket.send(frame.data, { binary: frame.isBinary });
+      ws.send(frame.data, { binary: frame.isBinary });
     }
   });
-  upstreamSocket.on("message", (data: RawData, isBinary: boolean) => {
+  ws.on("message", (data: RawData, isBinary: boolean) => {
     if (socket.readyState === WebSocket.OPEN) {
       socket.send(data, { binary: isBinary });
+    } else {
+      // Defensive: the client may not be ready yet; replay once it opens.
+      outbound.push({ data, isBinary });
     }
   });
-  upstreamSocket.on("close", () => {
+  ws.on("close", () => {
     if (socket.readyState === WebSocket.OPEN) {
       socket.close(1000, "UPSTREAM_CLOSED");
     }
   });
-  upstreamSocket.on("error", () => {
+  ws.on("error", () => {
     if (socket.readyState === WebSocket.OPEN) {
       socket.close(1011, "UPSTREAM_ERROR");
     } else {
       socket.terminate();
     }
   });
+
+  if (socket.readyState === WebSocket.OPEN) {
+    flushOutbound();
+  } else {
+    socket.once("open", flushOutbound);
+  }
 }
 
 export const hermesWsRoutes: FastifyPluginAsync<HermesWsOptions> = async (app, opts) => {

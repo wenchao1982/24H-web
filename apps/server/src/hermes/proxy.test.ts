@@ -59,6 +59,48 @@ function nextMessage(ws: WebSocket, timeoutMs = 3000): Promise<string> {
   });
 }
 
+interface MessageQueue {
+  next(timeoutMs?: number): Promise<string>;
+}
+
+/** Collect every inbound frame so we can assert order without a listener race. */
+function messageQueue(ws: WebSocket): MessageQueue {
+  const queued: string[] = [];
+  const waiters: Array<{
+    resolve: (value: string) => void;
+    reject: (error: Error) => void;
+    timer: NodeJS.Timeout;
+  }> = [];
+  ws.on("message", (data: RawData) => {
+    const value = data.toString();
+    const waiter = waiters.shift();
+    if (waiter) {
+      clearTimeout(waiter.timer);
+      waiter.resolve(value);
+    } else {
+      queued.push(value);
+    }
+  });
+  return {
+    next(timeoutMs = 3000) {
+      const value = queued.shift();
+      if (value !== undefined) {
+        return Promise.resolve(value);
+      }
+      return new Promise<string>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          const index = waiters.findIndex((entry) => entry.timer === timer);
+          if (index >= 0) {
+            waiters.splice(index, 1);
+          }
+          reject(new Error("timed out waiting for a websocket message"));
+        }, timeoutMs);
+        waiters.push({ resolve, reject, timer });
+      });
+    },
+  };
+}
+
 function waitForOpen(ws: WebSocket, timeoutMs = 3000): Promise<void> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("timed out waiting for open")), timeoutMs);
@@ -113,6 +155,43 @@ describe("GET /api/hermes/ws", () => {
 
     client.send("from-client");
     expect(await nextMessage(client)).toBe("echo:from-client");
+  });
+
+  it("forwards a client frame sent before the upstream connects (cold-start race)", async () => {
+    upstream = await startMockHermes({ token: "ws-race-token" });
+    // Delay serving the session token so the upstream WebSocket is only opened
+    // *after* the client has already sent its first frame.
+    upstream.setHandler(({ request, res }) => {
+      if (request.method === "GET" && request.path === "/") {
+        setTimeout(() => {
+          res.setHeader("content-type", "text/html");
+          res.end(
+            `<html><body><script>window.__HERMES_SESSION_TOKEN__="ws-race-token";</script></body></html>`,
+          );
+        }, 300);
+        return true;
+      }
+      return false;
+    });
+    ctx = await createTestContext({ hermesBaseUrl: upstream.baseUrl });
+    const { session } = await loginAndGetCookies(ctx.app);
+    await ctx.app.listen({ port: 0, host: "127.0.0.1" });
+
+    const upstreamState = startEchoUpstream();
+
+    const client = new WebSocket(`${wsAddress(ctx.app)}/api/hermes/ws`, {
+      headers: { cookie: `24h_session=${session}` },
+    });
+    clients.push(client);
+    const messages = messageQueue(client);
+    await waitForOpen(client);
+
+    // Send immediately, without waiting for the upstream to connect.
+    client.send("early-frame");
+
+    expect(await messages.next()).toBe("from-upstream");
+    expect(await messages.next()).toBe("echo:early-frame");
+    expect(upstreamState.urls[0]).toBe("/api/ws?token=ws-race-token");
   });
 
   it("closes the connection when no session cookie is provided", async () => {
