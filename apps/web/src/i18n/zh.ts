@@ -568,6 +568,11 @@ export const zh = {
   "memwrite.action.reject": "拒绝",
   "memwrite.action.on": "开启审批",
   "memwrite.action.off": "关闭审批",
+
+  "bundles.title": "技能包",
+  "bundles.input": "技能包名称",
+  "bundles.action.list": "列出技能包",
+  "bundles.action.run": "运行技能包",
 } as const;
 
 export type TranslationKey = keyof typeof zh;

@@ -261,6 +261,21 @@ export const SLASH_COMMAND_SPECS: SlashCommandSpec[] = [
       { id: "off", labelKey: "memwrite.action.off", args: "approval off" },
     ],
   },
+  {
+    command: "bundles",
+    titleKey: "bundles.title",
+    inputKey: "bundles.input",
+    actions: [
+      { id: "list", labelKey: "bundles.action.list", args: "list" },
+      {
+        id: "run",
+        labelKey: "bundles.action.run",
+        args: "run",
+        kind: "primary",
+        withInput: true,
+      },
+    ],
+  },
 ];
 
 export function specForCommand(command: string): SlashCommandSpec | undefined {

@@ -251,3 +251,22 @@ describe("CommandPanel T20.13 写入审批", () => {
     ]);
   });
 });
+
+describe("CommandPanel T20.14 技能包", () => {
+  it("lists and runs bundles", async () => {
+    const gateway = renderPanel(() => ({ text: "bundle: deploy" }));
+    const user = userEvent.setup();
+
+    await user.selectOptions(screen.getByLabelText("选择命令"), "bundles");
+    await user.click(screen.getByRole("button", { name: "列出技能包" }));
+    expect(await screen.findByLabelText("执行结果")).toHaveTextContent("bundle: deploy");
+
+    await user.type(screen.getByLabelText("技能包名称"), "deploy");
+    await user.click(screen.getByRole("button", { name: "运行技能包" }));
+
+    expect(gateway.paramsOf("slash.exec")).toEqual([
+      { command: "/bundles", args: "list" },
+      { command: "/bundles", args: "run deploy" },
+    ]);
+  });
+});
