@@ -9,6 +9,7 @@ import Composer from "./Composer";
 import StatusBar from "./StatusBar";
 import ServerRequestCard from "./ServerRequestCard";
 import SubagentsPanel from "./SubagentsPanel";
+import ImageGenAction from "./ImageGenAction";
 import {
   appendDelta,
   completeAssistant,
@@ -63,6 +64,7 @@ export default function ChatPage() {
   const [workspaces, setWorkspaces] = useState<string[]>([]);
   const [workspace, setWorkspace] = useState("");
   const [subagentsOpen, setSubagentsOpen] = useState(false);
+  const [imageOpen, setImageOpen] = useState(false);
 
   const activeIdRef = useRef<string | null>(null);
   const respondersRef = useRef(new Map<string, (result: Record<string, unknown>) => void>());
@@ -575,6 +577,14 @@ export default function ChatPage() {
               >
                 {t("chat.subagents")}
               </button>
+              <button
+                type="button"
+                className="ghost"
+                aria-pressed={imageOpen}
+                onClick={() => setImageOpen((value) => !value)}
+              >
+                {t("chat.image")}
+              </button>
               <select
                 className="chat-workspace"
                 aria-label="工作区"
@@ -593,6 +603,7 @@ export default function ChatPage() {
             {subagentsOpen ? (
               <SubagentsPanel sessionId={activeId} onClose={() => setSubagentsOpen(false)} />
             ) : null}
+            {imageOpen ? <ImageGenAction onClose={() => setImageOpen(false)} /> : null}
             <Transcript items={items} />
             {pending.length > 0 ? (
               <div className="pending-requests">

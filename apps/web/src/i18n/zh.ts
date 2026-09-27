@@ -39,6 +39,17 @@ export const zh = {
   "chat.backToList": "返回会话列表",
   "chat.showList": "会话列表",
   "chat.subagents": "子代理",
+  "chat.image": "图片",
+
+  "image.title": "图片生成",
+  "image.prompt": "图片提示词",
+  "image.placeholder": "描述你想生成的图片",
+  "image.generate": "生成",
+  "image.close": "关闭图片生成",
+  "image.loading": "生成中…",
+  "image.alt": "生成的图片",
+  "image.empty": "未返回图片。",
+  "image.error": "图片生成失败",
 
   "subagents.title": "子代理",
   "subagents.close": "收起子代理",
