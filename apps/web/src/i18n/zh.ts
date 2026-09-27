@@ -612,6 +612,18 @@ export const zh = {
   "worktree.input": "Worktree 名称",
   "worktree.action.list": "列出 Worktree",
   "worktree.action.new": "新建 Worktree",
+
+  "context.open": "上下文",
+  "context.title": "上下文文件",
+  "context.hint": "项目上下文文件（.hermes.md / AGENTS.md / CLAUDE.md / SOUL.md / .cursorrules）及加载状态。",
+  "context.close": "收起上下文文件",
+  "context.loading": "加载上下文文件…",
+  "context.empty": "未发现项目上下文文件。",
+  "context.error.load": "加载上下文文件失败",
+  "context.listLabel": "上下文文件列表",
+  "context.statusOf": "{{path}} 的加载状态",
+  "context.loaded": "已加载",
+  "context.notLoaded": "未加载",
 } as const;
 
 export type TranslationKey = keyof typeof zh;

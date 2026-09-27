@@ -11,6 +11,7 @@ import ServerRequestCard from "./ServerRequestCard";
 import SubagentsPanel from "./SubagentsPanel";
 import ImageGenAction from "./ImageGenAction";
 import CommandPanel from "./CommandPanel";
+import ContextFilesPanel from "./ContextFilesPanel";
 import {
   normalizeCatalog,
   normalizeCompletions,
@@ -73,6 +74,7 @@ export default function ChatPage() {
   const [subagentsOpen, setSubagentsOpen] = useState(false);
   const [imageOpen, setImageOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
+  const [contextOpen, setContextOpen] = useState(false);
   const [commands, setCommands] = useState<SlashCommand[]>([]);
 
   const activeIdRef = useRef<string | null>(null);
@@ -654,6 +656,14 @@ export default function ChatPage() {
               >
                 {t("cmd.open")}
               </button>
+              <button
+                type="button"
+                className="ghost"
+                aria-pressed={contextOpen}
+                onClick={() => setContextOpen((value) => !value)}
+              >
+                {t("context.open")}
+              </button>
               <select
                 className="chat-workspace"
                 aria-label="工作区"
@@ -673,6 +683,7 @@ export default function ChatPage() {
               <SubagentsPanel sessionId={activeId} onClose={() => setSubagentsOpen(false)} />
             ) : null}
             {imageOpen ? <ImageGenAction onClose={() => setImageOpen(false)} /> : null}
+            {contextOpen ? <ContextFilesPanel onClose={() => setContextOpen(false)} /> : null}
             {commandOpen ? (
               <CommandPanel
                 onClose={() => setCommandOpen(false)}
