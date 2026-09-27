@@ -110,3 +110,20 @@ describe("CommandPanel T20.6 会话分支", () => {
     ]);
   });
 });
+
+describe("CommandPanel T20.7 撤销/重试", () => {
+  it("dispatches /undo and /retry", async () => {
+    const gateway = renderPanel();
+    const user = userEvent.setup();
+
+    await user.selectOptions(screen.getByLabelText("选择命令"), "undo");
+    await user.click(screen.getByRole("button", { name: "撤销上一步" }));
+    await user.selectOptions(screen.getByLabelText("选择命令"), "retry");
+    await user.click(screen.getByRole("button", { name: "重试上一步" }));
+
+    expect(gateway.paramsOf("slash.exec")).toEqual([
+      { command: "/undo", args: "run" },
+      { command: "/retry", args: "run" },
+    ]);
+  });
+});

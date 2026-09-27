@@ -510,6 +510,11 @@ export const zh = {
   "fork.input": "分叉名称",
   "fork.action.run": "创建分叉",
   "fork.action.list": "列出分叉",
+
+  "undo.title": "撤销",
+  "undo.action.run": "撤销上一步",
+  "retry.title": "重试",
+  "retry.action.run": "重试上一步",
 } as const;
 
 export type TranslationKey = keyof typeof zh;

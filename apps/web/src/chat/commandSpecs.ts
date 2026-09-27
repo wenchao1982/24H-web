@@ -119,6 +119,16 @@ export const SLASH_COMMAND_SPECS: SlashCommandSpec[] = [
       { id: "list", labelKey: "fork.action.list", args: "list" },
     ],
   },
+  {
+    command: "undo",
+    titleKey: "undo.title",
+    actions: [{ id: "run", labelKey: "undo.action.run", args: "run", kind: "primary" }],
+  },
+  {
+    command: "retry",
+    titleKey: "retry.title",
+    actions: [{ id: "run", labelKey: "retry.action.run", args: "run", kind: "primary" }],
+  },
 ];
 
 export function specForCommand(command: string): SlashCommandSpec | undefined {
