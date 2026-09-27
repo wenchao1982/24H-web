@@ -501,6 +501,15 @@ export const zh = {
   "review.input": "评审范围（可选）",
   "review.action.run": "发起评审",
   "review.action.status": "查看状态",
+
+  "branch.title": "会话分支",
+  "branch.input": "分支名称",
+  "branch.action.create": "创建分支",
+  "branch.action.list": "列出分支",
+  "fork.title": "会话分叉",
+  "fork.input": "分叉名称",
+  "fork.action.run": "创建分叉",
+  "fork.action.list": "列出分叉",
 } as const;
 
 export type TranslationKey = keyof typeof zh;

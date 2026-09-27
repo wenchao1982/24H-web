@@ -95,6 +95,30 @@ export const SLASH_COMMAND_SPECS: SlashCommandSpec[] = [
       { id: "status", labelKey: "review.action.status", args: "status" },
     ],
   },
+  {
+    command: "branch",
+    titleKey: "branch.title",
+    inputKey: "branch.input",
+    actions: [
+      {
+        id: "create",
+        labelKey: "branch.action.create",
+        args: "create",
+        kind: "primary",
+        withInput: true,
+      },
+      { id: "list", labelKey: "branch.action.list", args: "list" },
+    ],
+  },
+  {
+    command: "fork",
+    titleKey: "fork.title",
+    inputKey: "fork.input",
+    actions: [
+      { id: "run", labelKey: "fork.action.run", args: "run", kind: "primary", withInput: true },
+      { id: "list", labelKey: "fork.action.list", args: "list" },
+    ],
+  },
 ];
 
 export function specForCommand(command: string): SlashCommandSpec | undefined {

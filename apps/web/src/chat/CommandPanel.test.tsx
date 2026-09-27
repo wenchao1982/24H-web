@@ -88,3 +88,25 @@ describe("CommandPanel T20.5 评审", () => {
     expect(await screen.findByLabelText("执行结果")).toHaveTextContent("评审完成");
   });
 });
+
+describe("CommandPanel T20.6 会话分支", () => {
+  it("creates a branch and forks the session", async () => {
+    const gateway = renderPanel();
+    const user = userEvent.setup();
+
+    await user.selectOptions(screen.getByLabelText("选择命令"), "branch");
+    await user.type(screen.getByLabelText("分支名称"), "feature-x");
+    await user.click(screen.getByRole("button", { name: "创建分支" }));
+    expect(gateway.paramsOf("slash.exec")).toEqual([
+      { command: "/branch", args: "create feature-x" },
+    ]);
+
+    await user.selectOptions(screen.getByLabelText("选择命令"), "fork");
+    await user.type(screen.getByLabelText("分叉名称"), "fork-1");
+    await user.click(screen.getByRole("button", { name: "创建分叉" }));
+    expect(gateway.paramsOf("slash.exec")).toEqual([
+      { command: "/branch", args: "create feature-x" },
+      { command: "/fork", args: "run fork-1" },
+    ]);
+  });
+});
