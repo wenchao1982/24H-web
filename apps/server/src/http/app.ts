@@ -10,6 +10,7 @@ import { authRoutes } from "../routes/auth";
 import { adminRoutes } from "../routes/admin";
 import { adminConnectionsRoutes } from "../routes/adminConnections";
 import { hermesRoutes } from "../routes/hermes";
+import { systemRoutes } from "../routes/system";
 import { hermesWsRoutes } from "../hermes/proxy";
 import { integrationsRoutes } from "../routes/integrations";
 import type { GhRunner } from "../integrations/github";
@@ -46,6 +47,10 @@ export function buildApp(db: Db, options: BuildAppOptions = {}): FastifyInstance
   app.register(adminRoutes, { db });
   app.register(adminConnectionsRoutes, { db });
   app.register(hermesRoutes, {
+    db,
+    defaultBaseUrl: options.hermesBaseUrl ?? config.hermesBaseUrl,
+  });
+  app.register(systemRoutes, {
     db,
     defaultBaseUrl: options.hermesBaseUrl ?? config.hermesBaseUrl,
   });

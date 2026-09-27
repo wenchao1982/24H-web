@@ -21,6 +21,8 @@ export interface SidebarProps {
   onToggleTheme?: () => void;
   /** 通知项点击：跳转到对应会话。 */
   onOpenNotifications?: (sessionId: string | null) => void;
+  /** 点击品牌行核心灯：打开系统升级。 */
+  onOpenSystem?: () => void;
 }
 
 function visibleBottom(isSuperAdmin: boolean): NavItem[] {
@@ -42,6 +44,7 @@ export default function Sidebar({
   theme = "light",
   onToggleTheme,
   onOpenNotifications,
+  onOpenSystem,
 }: SidebarProps) {
   return (
     <nav
@@ -54,13 +57,16 @@ export default function Sidebar({
       <div className="brand">
         <span className="brand-mark">{t("sidebar.brand")}</span>
         {version ? <span className="brand-version">{version}</span> : null}
-        <span
-          className="brand-status"
+        <button
+          type="button"
+          className="brand-status brand-core"
           title={coreOnline ? t("sidebar.coreOnline") : t("sidebar.coreOffline")}
+          aria-label={t("sidebar.openSystem")}
+          onClick={onOpenSystem}
         >
           <i className="dot" data-on={coreOnline} aria-hidden="true" />
           {t("sidebar.core")}
-        </span>
+        </button>
         <span
           className="brand-status"
           title={channelOnline ? t("sidebar.channelOnline") : t("sidebar.channelOffline")}

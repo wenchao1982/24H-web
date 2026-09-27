@@ -23,6 +23,7 @@ export const zh = {
   "sidebar.channel": "渠道",
   "sidebar.coreOnline": "核心在线",
   "sidebar.coreOffline": "核心离线",
+  "sidebar.openSystem": "打开系统升级",
   "sidebar.channelOnline": "渠道在线",
   "sidebar.channelOffline": "渠道离线",
   "sidebar.expand": "展开侧栏",
@@ -179,6 +180,7 @@ export const zh = {
   "projects.error.delete": "删除项目失败",
 
   "settings.section.advanced": "高级",
+  "settings.section.system": "系统",
   "advanced.tabsAria": "高级子分区",
   "advanced.tab.localModels": "本地模型",
 
@@ -397,6 +399,22 @@ export const zh = {
   "learning.empty": "暂无策展条目。",
   "learning.graphEmpty": "暂无学习旅程数据。",
   "learning.error.load": "加载学习数据失败",
+
+  "upgrade.title": "系统升级",
+  "upgrade.hint": "查看核心与 web 版本；在线升级需由运维在主机侧执行。",
+  "upgrade.loading": "读取版本信息中…",
+  "upgrade.core": "核心版本",
+  "upgrade.coreLabel": "核心版本",
+  "upgrade.web": "Web 版本",
+  "upgrade.webLabel": "Web 版本",
+  "upgrade.unknown": "未知",
+  "upgrade.check": "检查更新",
+  "upgrade.apply": "升级",
+  "upgrade.resultLabel": "升级结果",
+  "upgrade.unsupported": "在线升级不受支持，请由运维在主机侧执行。",
+  "upgrade.queued": "升级请求已记录，需运维执行。",
+  "upgrade.error.load": "读取版本信息失败",
+  "upgrade.error.update": "升级请求失败",
 
   "notifications.title": "通知",
   "notifications.empty": "暂无通知。",

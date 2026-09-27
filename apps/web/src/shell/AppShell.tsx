@@ -16,6 +16,8 @@ export interface AppShellProps {
   list?: ReactNode;
   /** 点击通知项：跳转到对应会话。 */
   onOpenNotifications?: (sessionId: string | null) => void;
+  /** 点击品牌行核心灯：打开系统升级。 */
+  onOpenSystem?: () => void;
   children?: ReactNode;
 }
 
@@ -38,6 +40,7 @@ export default function AppShell({
   title,
   list,
   onOpenNotifications,
+  onOpenSystem,
   children,
 }: AppShellProps) {
   const narrow = useMediaQuery("(max-width: 900px)");
@@ -98,6 +101,7 @@ export default function AppShell({
         theme={theme}
         onToggleTheme={toggleTheme}
         onOpenNotifications={onOpenNotifications}
+        onOpenSystem={onOpenSystem}
       >
         {list}
       </Sidebar>

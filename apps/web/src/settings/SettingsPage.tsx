@@ -11,6 +11,7 @@ import ProjectsPanel from "./ProjectsPanel";
 import ChannelsPanel from "./ChannelsPanel";
 import IntegrationsPanel from "./IntegrationsPanel";
 import AdvancedSettingsPanel from "./AdvancedSettingsPanel";
+import UpgradePanel from "./UpgradePanel";
 import { t, type TranslationKey } from "../i18n";
 
 interface SectionDef {
@@ -31,11 +32,21 @@ const SECTIONS: SectionDef[] = [
   { id: "integrations", labelKey: "settings.section.integrations" },
   { id: "advanced", labelKey: "settings.section.advanced" },
   { id: "projects", labelKey: "settings.section.projects" },
+  { id: "system", labelKey: "settings.section.system" },
 ];
+
+/** 从 `?section=` 读取初始分区（品牌行核心灯可直达系统升级）。 */
+function initialSection(): string {
+  if (typeof window === "undefined") {
+    return "keys";
+  }
+  const requested = new URLSearchParams(window.location.search).get("section");
+  return requested && SECTIONS.some((item) => item.id === requested) ? requested : "keys";
+}
 
 /** 设置页：分区导航 + 分区详情（M6）。 */
 export default function SettingsPage() {
-  const [section, setSection] = useState<string>("keys");
+  const [section, setSection] = useState<string>(initialSection);
 
   return (
     <div className="page settings-page">
@@ -66,6 +77,7 @@ export default function SettingsPage() {
         {section === "integrations" ? <IntegrationsPanel /> : null}
         {section === "advanced" ? <AdvancedSettingsPanel /> : null}
         {section === "projects" ? <ProjectsPanel /> : null}
+        {section === "system" ? <UpgradePanel /> : null}
       </div>
     </div>
   );

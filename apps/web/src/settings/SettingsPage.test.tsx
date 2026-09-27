@@ -33,6 +33,7 @@ function stubFetch(handlers: StubRoute[]) {
 afterEach(() => {
   vi.unstubAllGlobals();
   localStorage.clear();
+  window.history.replaceState({}, "", "/");
 });
 
 describe("SettingsPage T8.1 Keys 管理", () => {
@@ -409,5 +410,47 @@ describe("SettingsPage T17.4 集成 → Webhooks", () => {
 
     expect(await screen.findByRole("heading", { name: "Webhooks" })).toBeInTheDocument();
     expect(await screen.findByText("暂无 Webhook。")).toBeInTheDocument();
+  });
+});
+
+describe("SettingsPage T18.16 系统升级", () => {
+  it("opens the system section from ?section=system (brand core light)", async () => {
+    window.history.replaceState({}, "", "/settings?section=system");
+    vi.stubGlobal(
+      "fetch",
+      stubFetch([
+        {
+          path: "/api/system/version",
+          method: "GET",
+          status: 200,
+          body: { ok: true, core: "1.4.2", web: "0.1.0" },
+        },
+      ]),
+    );
+
+    render(<SettingsPage />);
+
+    expect(await screen.findByRole("heading", { name: "系统升级" })).toBeInTheDocument();
+    expect(await screen.findByLabelText("核心版本")).toHaveTextContent("1.4.2");
+  });
+
+  it("opens the system section from the sidebar nav", async () => {
+    vi.stubGlobal(
+      "fetch",
+      stubFetch([
+        {
+          path: "/api/system/version",
+          method: "GET",
+          status: 200,
+          body: { ok: true, core: "1.0.0", web: "0.1.0" },
+        },
+      ]),
+    );
+    const user = userEvent.setup();
+
+    render(<SettingsPage />);
+    await user.click(screen.getByRole("button", { name: "系统" }));
+
+    expect(await screen.findByRole("heading", { name: "系统升级" })).toBeInTheDocument();
   });
 });
