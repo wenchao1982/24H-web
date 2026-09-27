@@ -292,3 +292,23 @@ describe("CommandPanel T20.15 自动化建议/蓝图", () => {
     ]);
   });
 });
+
+describe("CommandPanel T20.16 重载", () => {
+  it("dispatches reload, reload-mcp and reload-skills", async () => {
+    const gateway = renderPanel();
+    const user = userEvent.setup();
+
+    await user.selectOptions(screen.getByLabelText("选择命令"), "reload");
+    await user.click(screen.getByRole("button", { name: "重载全部" }));
+    await user.selectOptions(screen.getByLabelText("选择命令"), "reload-mcp");
+    await user.click(screen.getByRole("button", { name: "重载 MCP" }));
+    await user.selectOptions(screen.getByLabelText("选择命令"), "reload-skills");
+    await user.click(screen.getByRole("button", { name: "重载技能" }));
+
+    expect(gateway.paramsOf("slash.exec")).toEqual([
+      { command: "/reload", args: "run" },
+      { command: "/reload-mcp", args: "run" },
+      { command: "/reload-skills", args: "run" },
+    ]);
+  });
+});

@@ -313,6 +313,21 @@ export const SLASH_COMMAND_SPECS: SlashCommandSpec[] = [
       },
     ],
   },
+  {
+    command: "reload",
+    titleKey: "reload.title",
+    actions: [{ id: "run", labelKey: "reload.action.run", args: "run", kind: "primary" }],
+  },
+  {
+    command: "reload-mcp",
+    titleKey: "reloadMcp.title",
+    actions: [{ id: "run", labelKey: "reloadMcp.action.run", args: "run", kind: "primary" }],
+  },
+  {
+    command: "reload-skills",
+    titleKey: "reloadSkills.title",
+    actions: [{ id: "run", labelKey: "reloadSkills.action.run", args: "run", kind: "primary" }],
+  },
 ];
 
 export function specForCommand(command: string): SlashCommandSpec | undefined {

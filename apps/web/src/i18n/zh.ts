@@ -583,6 +583,13 @@ export const zh = {
   "blueprint.input": "蓝图名称",
   "blueprint.action.list": "列出蓝图",
   "blueprint.action.create": "创建蓝图",
+
+  "reload.title": "重载配置",
+  "reload.action.run": "重载全部",
+  "reloadMcp.title": "重载 MCP",
+  "reloadMcp.action.run": "重载 MCP",
+  "reloadSkills.title": "重载技能",
+  "reloadSkills.action.run": "重载技能",
 } as const;
 
 export type TranslationKey = keyof typeof zh;
