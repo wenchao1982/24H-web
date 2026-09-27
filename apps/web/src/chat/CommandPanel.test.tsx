@@ -355,3 +355,22 @@ describe("CommandPanel T20.19 Egress 状态", () => {
     expect(await screen.findByLabelText("执行结果")).toHaveTextContent("egress: direct");
   });
 });
+
+describe("CommandPanel T20.20 Git worktree", () => {
+  it("lists and creates worktrees", async () => {
+    const gateway = renderPanel(() => ({ text: "worktree: main" }));
+    const user = userEvent.setup();
+
+    await user.selectOptions(screen.getByLabelText("选择命令"), "worktree");
+    await user.click(screen.getByRole("button", { name: "列出 Worktree" }));
+    expect(await screen.findByLabelText("执行结果")).toHaveTextContent("worktree: main");
+
+    await user.type(screen.getByLabelText("Worktree 名称"), "feature");
+    await user.click(screen.getByRole("button", { name: "新建 Worktree" }));
+
+    expect(gateway.paramsOf("slash.exec")).toEqual([
+      { command: "/worktree", args: "list" },
+      { command: "/worktree", args: "new feature" },
+    ]);
+  });
+});

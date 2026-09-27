@@ -607,6 +607,11 @@ export const zh = {
 
   "egress.title": "Egress 状态",
   "egress.action.status": "查看状态",
+
+  "worktree.title": "Git Worktree",
+  "worktree.input": "Worktree 名称",
+  "worktree.action.list": "列出 Worktree",
+  "worktree.action.new": "新建 Worktree",
 } as const;
 
 export type TranslationKey = keyof typeof zh;

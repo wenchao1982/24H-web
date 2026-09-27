@@ -357,6 +357,21 @@ export const SLASH_COMMAND_SPECS: SlashCommandSpec[] = [
     titleKey: "egress.title",
     actions: [{ id: "status", labelKey: "egress.action.status", args: "status" }],
   },
+  {
+    command: "worktree",
+    titleKey: "worktree.title",
+    inputKey: "worktree.input",
+    actions: [
+      { id: "list", labelKey: "worktree.action.list", args: "list" },
+      {
+        id: "new",
+        labelKey: "worktree.action.new",
+        args: "new",
+        kind: "primary",
+        withInput: true,
+      },
+    ],
+  },
 ];
 
 export function specForCommand(command: string): SlashCommandSpec | undefined {
