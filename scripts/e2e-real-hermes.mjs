@@ -19,6 +19,9 @@
  *     --user admin --pass <password> [--prompt '仅回复两个字：pong'] [--timeout 60000]
  *
  * 环境变量：E2E_BASE / E2E_USER / E2E_PASS / E2E_PROMPT / E2E_TIMEOUT_MS / E2E_RAW=1
+ *           E2E_WAIT_READY=1（恢复旧的就绪屏障，等 `gateway.ready` 再发首个请求）
+ * 默认（no-wait）：WS `open` 后**立即**发 `session.create`，不等待转发的 `gateway.ready`
+ *   —— 这是对 BFF「上游未建立前先缓存客户端帧」冷启动修复的端到端验证；失败即回归。
  * 退出码：0 = 到达最终答复（含模型调用失败时的 WARN）；1 = 未取得任何助手文本 / 连接失败。
  */
 
@@ -41,6 +44,8 @@ function parseArgs(argv) {
     prompt: process.env.E2E_PROMPT || "仅回复两个字：pong",
     timeoutMs: Number(process.env.E2E_TIMEOUT_MS || 60000),
     raw: process.env.E2E_RAW === "1",
+    // 默认不等待 gateway.ready（回归 BFF 冷启动缓存修复）。
+    noWait: process.env.E2E_WAIT_READY !== "1",
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -54,6 +59,8 @@ function parseArgs(argv) {
     else if (arg.startsWith("--prompt=")) opts.prompt = arg.slice(9);
     else if (arg === "--timeout") opts.timeoutMs = Number(argv[++i] ?? opts.timeoutMs);
     else if (arg === "--raw") opts.raw = true;
+    else if (arg === "--no-wait") opts.noWait = true;
+    else if (arg === "--wait-ready") opts.noWait = false;
   }
   return opts;
 }
@@ -538,17 +545,22 @@ async function main() {
     finish();
   });
 
-  // 就绪屏障：BFF 在建立上游（异步取 token）前会丢弃客户端帧，故必须等到
-  // Hermes 的 `gateway.ready`（经 BFF 透传）后再发首个请求。
-  const becameReady = await Promise.race([
-    ready.then(() => true),
-    sleep(Math.min(5000, opts.timeoutMs)).then(() => false),
-  ]);
-  console.log(
-    `[${becameReady ? PASS : WARN}] gateway.ready — ${
-      becameReady ? "已就绪" : "5s 内未收到，仍继续尝试"
-    }`,
-  );
+  // 默认（no-wait）：open 后立即发首个请求，验证 BFF 在异步取上游 token 期间也能
+  // 缓存客户端帧（冷启动竞态修复）。`--wait-ready` / `E2E_WAIT_READY=1` 可恢复旧的
+  // 就绪屏障，等 Hermes 的 `gateway.ready`（经 BFF 透传）后再发。
+  if (opts.noWait) {
+    console.log(`[${PASS}] no-wait — open 后立即发送 session.create（不等待 gateway.ready）`);
+  } else {
+    const becameReady = await Promise.race([
+      ready.then(() => true),
+      sleep(Math.min(5000, opts.timeoutMs)).then(() => false),
+    ]);
+    console.log(
+      `[${becameReady ? PASS : WARN}] gateway.ready — ${
+        becameReady ? "已就绪" : "5s 内未收到，仍继续尝试"
+      }`,
+    );
+  }
 
   // 3. session.create
   let sessionId;
