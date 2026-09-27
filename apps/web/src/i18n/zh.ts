@@ -692,6 +692,19 @@ export const zh = {
   "searchTools.extractionEnabled": "启用文档抽取",
   "searchTools.error.load": "加载搜索配置失败",
   "searchTools.error.save": "保存搜索配置失败",
+
+  "advanced.tab.toolGateway": "工具网关",
+  "toolGateway.title": "Tool Gateway",
+  "toolGateway.hint": "Nous Portal 工具网关：一键启用 web / image / TTS / browser。",
+  "toolGateway.web": "Web 工具",
+  "toolGateway.image": "图片工具",
+  "toolGateway.tts": "语音合成（TTS）",
+  "toolGateway.browser": "浏览器工具",
+
+  "advanced.tab.toolSearch": "工具搜索",
+  "toolSearch.title": "Tool Search",
+  "toolSearch.hint": "工具延迟加载（tool_search）。",
+  "toolSearch.enabled": "启用工具搜索",
 } as const;
 
 export type TranslationKey = keyof typeof zh;
