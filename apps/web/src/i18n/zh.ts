@@ -553,6 +553,21 @@ export const zh = {
   "compress.title": "手动压缩",
   "compress.action.run": "压缩上下文",
   "compress.action.status": "查看状态",
+
+  "skillwrite.title": "技能写入审批",
+  "skillwrite.input": "待审批技能",
+  "skillwrite.action.pending": "查看待审批",
+  "skillwrite.action.approve": "批准",
+  "skillwrite.action.reject": "拒绝",
+  "skillwrite.action.on": "开启审批",
+  "skillwrite.action.off": "关闭审批",
+  "memwrite.title": "记忆写入审批",
+  "memwrite.input": "待审批记忆",
+  "memwrite.action.pending": "查看待审批",
+  "memwrite.action.approve": "批准",
+  "memwrite.action.reject": "拒绝",
+  "memwrite.action.on": "开启审批",
+  "memwrite.action.off": "关闭审批",
 } as const;
 
 export type TranslationKey = keyof typeof zh;

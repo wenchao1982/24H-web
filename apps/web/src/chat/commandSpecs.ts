@@ -213,6 +213,54 @@ export const SLASH_COMMAND_SPECS: SlashCommandSpec[] = [
       { id: "status", labelKey: "compress.action.status", args: "status" },
     ],
   },
+  {
+    command: "skills",
+    titleKey: "skillwrite.title",
+    inputKey: "skillwrite.input",
+    actions: [
+      { id: "pending", labelKey: "skillwrite.action.pending", args: "pending" },
+      {
+        id: "approve",
+        labelKey: "skillwrite.action.approve",
+        args: "approve",
+        kind: "primary",
+        withInput: true,
+      },
+      {
+        id: "reject",
+        labelKey: "skillwrite.action.reject",
+        args: "reject",
+        kind: "danger",
+        withInput: true,
+      },
+      { id: "on", labelKey: "skillwrite.action.on", args: "approval on" },
+      { id: "off", labelKey: "skillwrite.action.off", args: "approval off" },
+    ],
+  },
+  {
+    command: "memory",
+    titleKey: "memwrite.title",
+    inputKey: "memwrite.input",
+    actions: [
+      { id: "pending", labelKey: "memwrite.action.pending", args: "pending" },
+      {
+        id: "approve",
+        labelKey: "memwrite.action.approve",
+        args: "approve",
+        kind: "primary",
+        withInput: true,
+      },
+      {
+        id: "reject",
+        labelKey: "memwrite.action.reject",
+        args: "reject",
+        kind: "danger",
+        withInput: true,
+      },
+      { id: "on", labelKey: "memwrite.action.on", args: "approval on" },
+      { id: "off", labelKey: "memwrite.action.off", args: "approval off" },
+    ],
+  },
 ];
 
 export function specForCommand(command: string): SlashCommandSpec | undefined {

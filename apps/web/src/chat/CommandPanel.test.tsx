@@ -225,3 +225,29 @@ describe("CommandPanel T20.12 手动压缩", () => {
     expect(await screen.findByLabelText("执行结果")).toHaveTextContent("已压缩上下文");
   });
 });
+
+describe("CommandPanel T20.13 写入审批", () => {
+  it("reviews skill and memory writes and toggles approval", async () => {
+    const gateway = renderPanel();
+    const user = userEvent.setup();
+
+    await user.selectOptions(screen.getByLabelText("选择命令"), "skills");
+    await user.click(screen.getByRole("button", { name: "查看待审批" }));
+    await user.type(screen.getByLabelText("待审批技能"), "web_search");
+    await user.click(screen.getByRole("button", { name: "批准" }));
+    await user.click(screen.getByRole("button", { name: "关闭审批" }));
+
+    await user.selectOptions(screen.getByLabelText("选择命令"), "memory");
+    await user.type(screen.getByLabelText("待审批记忆"), "mem-1");
+    await user.click(screen.getByRole("button", { name: "拒绝" }));
+    await user.click(screen.getByRole("button", { name: "开启审批" }));
+
+    expect(gateway.paramsOf("slash.exec")).toEqual([
+      { command: "/skills", args: "pending" },
+      { command: "/skills", args: "approve web_search" },
+      { command: "/skills", args: "approval off" },
+      { command: "/memory", args: "reject mem-1" },
+      { command: "/memory", args: "approval on" },
+    ]);
+  });
+});
