@@ -1,19 +1,35 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api } from "../api/client";
 import { t } from "../i18n";
-import { normalizeProjects, readStoredProject, storeProject, type Project } from "./projects";
+import {
+  buildProjectBody,
+  normalizeProjects,
+  parseFolders,
+  readStoredProject,
+  storeProject,
+  type Project,
+} from "./projects";
 
-/** 设置 → 项目：项目列表与「当前项目」切换（本地持久化）。 */
+const PROJECTS_PATH = "/api/hermes/projects";
+
+/** 设置 → 项目：列表 / 切换 / 新建 / 编辑 / 删除（多文件夹 + 默认目录）。 */
 export default function ProjectsPanel() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [current, setCurrent] = useState<string | null>(() => readStoredProject());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [foldersText, setFoldersText] = useState("");
+  const [defaultDir, setDefaultDir] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setProjects(normalizeProjects(await api<unknown>("/api/hermes/projects")));
+      setProjects(normalizeProjects(await api<unknown>(PROJECTS_PATH)));
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("projects.error.load"));
@@ -31,6 +47,78 @@ export default function ProjectsPanel() {
     storeProject(id);
   };
 
+  const openCreate = () => {
+    setEditingId(null);
+    setName("");
+    setFoldersText("");
+    setDefaultDir("");
+    setFormOpen(true);
+  };
+
+  const openEdit = (project: Project) => {
+    setEditingId(project.id);
+    setName(project.name);
+    setFoldersText(project.folders.join("\n"));
+    setDefaultDir(project.defaultDir ?? "");
+    setFormOpen(true);
+  };
+
+  const closeForm = () => {
+    setFormOpen(false);
+    setEditingId(null);
+  };
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      setError(t("projects.error.save"));
+      return;
+    }
+    const body = buildProjectBody({
+      name: trimmedName,
+      folders: parseFolders(foldersText),
+      defaultDir: defaultDir.trim(),
+    });
+    setBusy(true);
+    void (async () => {
+      try {
+        if (editingId) {
+          await api(`${PROJECTS_PATH}/${encodeURIComponent(editingId)}`, {
+            method: "PATCH",
+            body: JSON.stringify(body),
+          });
+        } else {
+          await api(PROJECTS_PATH, { method: "POST", body: JSON.stringify(body) });
+        }
+        closeForm();
+        await load();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t("projects.error.save"));
+      } finally {
+        setBusy(false);
+      }
+    })();
+  };
+
+  const remove = (project: Project) => {
+    setBusy(true);
+    void (async () => {
+      try {
+        await api(`${PROJECTS_PATH}/${encodeURIComponent(project.id)}`, { method: "DELETE" });
+        if (current === project.id) {
+          setCurrent(null);
+          storeProject(null);
+        }
+        await load();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t("projects.error.delete"));
+      } finally {
+        setBusy(false);
+      }
+    })();
+  };
+
   if (loading) {
     return <p className="empty">{t("projects.loading")}</p>;
   }
@@ -41,6 +129,11 @@ export default function ProjectsPanel() {
         <h3>{t("projects.title")}</h3>
         <p className="muted">{t("projects.hint")}</p>
         {error ? <p className="err">{error}</p> : null}
+        <div className="row">
+          <button type="button" className="primary" onClick={openCreate}>
+            {t("projects.new")}
+          </button>
+        </div>
         {projects.length === 0 ? (
           <p className="empty">{t("projects.empty")}</p>
         ) : (
@@ -65,12 +158,71 @@ export default function ProjectsPanel() {
                     </span>
                     {active ? <span className="project-current">{t("projects.current")}</span> : null}
                   </button>
+                  <button
+                    type="button"
+                    className="ghost"
+                    aria-label={t("projects.editAria", { name: project.name })}
+                    onClick={() => openEdit(project)}
+                  >
+                    {t("projects.edit")}
+                  </button>
+                  <button
+                    type="button"
+                    className="danger"
+                    aria-label={t("projects.deleteAria", { name: project.name })}
+                    disabled={busy}
+                    onClick={() => remove(project)}
+                  >
+                    {t("projects.delete")}
+                  </button>
                 </li>
               );
             })}
           </ul>
         )}
       </div>
+
+      {formOpen ? (
+        <div className="card">
+          <h3>{editingId ? t("projects.edit") : t("projects.new")}</h3>
+          <form onSubmit={submit}>
+            <label className="config-row">
+              <span>{t("projects.name")}</span>
+              <input
+                aria-label={t("projects.name")}
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+              />
+            </label>
+            <label className="config-row">
+              <span>{t("projects.folders")}</span>
+              <textarea
+                className="project-folders"
+                aria-label={t("projects.folders")}
+                placeholder={t("projects.foldersHint")}
+                value={foldersText}
+                onChange={(event) => setFoldersText(event.target.value)}
+              />
+            </label>
+            <label className="config-row">
+              <span>{t("projects.defaultDir")}</span>
+              <input
+                aria-label={t("projects.defaultDir")}
+                value={defaultDir}
+                onChange={(event) => setDefaultDir(event.target.value)}
+              />
+            </label>
+            <div className="row">
+              <button type="submit" className="primary" disabled={busy}>
+                {t("projects.save")}
+              </button>
+              <button type="button" className="ghost" onClick={closeForm}>
+                {t("projects.cancel")}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </div>
   );
 }

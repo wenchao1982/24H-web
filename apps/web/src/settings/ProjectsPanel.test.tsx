@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ProjectsPanel from "./ProjectsPanel";
 import { normalizeProjects, PROJECT_STORAGE_KEY } from "./projects";
@@ -82,6 +82,74 @@ describe("ProjectsPanel T21.1 项目列表/切换", () => {
       "aria-pressed",
       "false",
     );
+  });
+
+  it("creates a project with the exact POST body", async () => {
+    const fetchMock = stubFetch([
+      { path: "/api/hermes/projects", method: "GET", status: 200, body: { projects: [] } },
+      { path: "/api/hermes/projects", method: "POST", status: 200, body: { ok: true } },
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<ProjectsPanel />);
+
+    await user.click(await screen.findByRole("button", { name: "新建项目" }));
+    await user.type(screen.getByLabelText("名称"), "Gamma");
+    await user.type(screen.getByLabelText("文件夹"), "/x,/y");
+    await user.type(screen.getByLabelText("默认目录"), "/x");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (entry) => (entry[1] as RequestInit | undefined)?.method === "POST",
+      );
+      expect(call).toBeTruthy();
+      expect(JSON.parse(String((call?.[1] as RequestInit).body))).toEqual({
+        name: "Gamma",
+        folders: ["/x", "/y"],
+        default_dir: "/x",
+      });
+    });
+  });
+
+  it("deletes a project via DELETE and PATCHes edits", async () => {
+    const fetchMock = stubFetch([
+      { path: "/api/hermes/projects", method: "GET", status: 200, body: PROJECTS },
+      { path: "/api/hermes/projects/alpha", method: "DELETE", status: 200, body: { ok: true } },
+      { path: "/api/hermes/projects/beta", method: "PATCH", status: 200, body: { ok: true } },
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<ProjectsPanel />);
+
+    await user.click(await screen.findByRole("button", { name: "删除项目 Alpha" }));
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (entry) => String(entry[0]).endsWith("/api/hermes/projects/alpha"),
+      );
+      expect(call).toBeTruthy();
+      expect((call?.[1] as RequestInit).method).toBe("DELETE");
+    });
+
+    await user.click(screen.getByRole("button", { name: "编辑项目 Beta" }));
+    const nameInput = screen.getByLabelText("名称");
+    await user.clear(nameInput);
+    await user.type(nameInput, "Beta2");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (entry) =>
+          String(entry[0]).endsWith("/api/hermes/projects/beta") &&
+          (entry[1] as RequestInit | undefined)?.method === "PATCH",
+      );
+      expect(call).toBeTruthy();
+      expect(JSON.parse(String((call?.[1] as RequestInit).body))).toEqual({
+        name: "Beta2",
+        folders: [],
+        default_dir: "",
+      });
+    });
   });
 
   it("normalizeProjects tolerates array / items / dirs variants", () => {

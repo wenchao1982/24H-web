@@ -95,3 +95,33 @@ export function storeProject(
     // 存储不可用时忽略
   }
 }
+
+/** 把多行 / 逗号分隔的输入解析为去重后的文件夹列表。 */
+export function parseFolders(text: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of text.split(/[\n,]+/)) {
+    const folder = part.trim();
+    if (folder && !seen.has(folder)) {
+      seen.add(folder);
+      out.push(folder);
+    }
+  }
+  return out;
+}
+
+export interface ProjectInput {
+  name: string;
+  folders: string[];
+  defaultDir?: string;
+}
+
+/** 构造 POST/PATCH `/api/hermes/projects` 的请求体。 */
+export function buildProjectBody(input: ProjectInput): Record<string, unknown> {
+  return {
+    name: input.name,
+    folders: input.folders,
+    default_dir: input.defaultDir ?? "",
+  };
+}
+

@@ -72,6 +72,19 @@ export const zh = {
   "projects.current": "当前项目",
   "projects.select": "选择项目 {{name}}",
   "projects.error.load": "加载项目失败",
+  "projects.new": "新建项目",
+  "projects.edit": "编辑",
+  "projects.delete": "删除",
+  "projects.name": "名称",
+  "projects.folders": "文件夹",
+  "projects.foldersHint": "每行一个文件夹，或用逗号分隔",
+  "projects.defaultDir": "默认目录",
+  "projects.save": "保存",
+  "projects.cancel": "取消",
+  "projects.editAria": "编辑项目 {{name}}",
+  "projects.deleteAria": "删除项目 {{name}}",
+  "projects.error.save": "保存项目失败",
+  "projects.error.delete": "删除项目失败",
 } as const;
 
 export type TranslationKey = keyof typeof zh;
