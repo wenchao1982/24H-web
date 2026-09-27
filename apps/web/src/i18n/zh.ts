@@ -573,6 +573,16 @@ export const zh = {
   "bundles.input": "技能包名称",
   "bundles.action.list": "列出技能包",
   "bundles.action.run": "运行技能包",
+
+  "suggestions.title": "自动化建议",
+  "suggestions.input": "建议 ID",
+  "suggestions.action.catalog": "查看建议目录",
+  "suggestions.action.accept": "采纳",
+  "suggestions.action.dismiss": "忽略",
+  "blueprint.title": "自动化蓝图",
+  "blueprint.input": "蓝图名称",
+  "blueprint.action.list": "列出蓝图",
+  "blueprint.action.create": "创建蓝图",
 } as const;
 
 export type TranslationKey = keyof typeof zh;

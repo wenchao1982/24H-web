@@ -276,6 +276,43 @@ export const SLASH_COMMAND_SPECS: SlashCommandSpec[] = [
       },
     ],
   },
+  {
+    command: "suggestions",
+    titleKey: "suggestions.title",
+    inputKey: "suggestions.input",
+    actions: [
+      { id: "catalog", labelKey: "suggestions.action.catalog", args: "catalog" },
+      {
+        id: "accept",
+        labelKey: "suggestions.action.accept",
+        args: "accept",
+        kind: "primary",
+        withInput: true,
+      },
+      {
+        id: "dismiss",
+        labelKey: "suggestions.action.dismiss",
+        args: "dismiss",
+        kind: "danger",
+        withInput: true,
+      },
+    ],
+  },
+  {
+    command: "blueprint",
+    titleKey: "blueprint.title",
+    inputKey: "blueprint.input",
+    actions: [
+      { id: "list", labelKey: "blueprint.action.list", args: "list" },
+      {
+        id: "create",
+        labelKey: "blueprint.action.create",
+        args: "create",
+        kind: "primary",
+        withInput: true,
+      },
+    ],
+  },
 ];
 
 export function specForCommand(command: string): SlashCommandSpec | undefined {

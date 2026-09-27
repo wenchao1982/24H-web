@@ -270,3 +270,25 @@ describe("CommandPanel T20.14 技能包", () => {
     ]);
   });
 });
+
+describe("CommandPanel T20.15 自动化建议/蓝图", () => {
+  it("accepts a suggestion and creates a blueprint", async () => {
+    const gateway = renderPanel();
+    const user = userEvent.setup();
+
+    await user.selectOptions(screen.getByLabelText("选择命令"), "suggestions");
+    await user.click(screen.getByRole("button", { name: "查看建议目录" }));
+    await user.type(screen.getByLabelText("建议 ID"), "sug-1");
+    await user.click(screen.getByRole("button", { name: "采纳" }));
+
+    await user.selectOptions(screen.getByLabelText("选择命令"), "blueprint");
+    await user.type(screen.getByLabelText("蓝图名称"), "夜间巡检");
+    await user.click(screen.getByRole("button", { name: "创建蓝图" }));
+
+    expect(gateway.paramsOf("slash.exec")).toEqual([
+      { command: "/suggestions", args: "catalog" },
+      { command: "/suggestions", args: "accept sug-1" },
+      { command: "/blueprint", args: "create 夜间巡检" },
+    ]);
+  });
+});
