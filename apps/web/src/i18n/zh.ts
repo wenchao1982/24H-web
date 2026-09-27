@@ -668,6 +668,16 @@ export const zh = {
   "apiServer.enabled": "启用 API Server",
   "apiServer.port": "端口",
   "apiServer.portPlaceholder": "如 8000",
+
+  "advanced.tab.eventHooks": "事件钩子",
+  "eventHooks.title": "Event Hooks",
+  "eventHooks.hint": "管理 hooks 配置与 shell 钩子；勾选即启停。",
+  "eventHooks.loading": "加载钩子…",
+  "eventHooks.empty": "暂无事件钩子。",
+  "eventHooks.enable": "启用钩子 {{name}}",
+  "eventHooks.shell": "shell",
+  "eventHooks.error.load": "加载钩子失败",
+  "eventHooks.error.save": "保存钩子失败",
 } as const;
 
 export type TranslationKey = keyof typeof zh;
