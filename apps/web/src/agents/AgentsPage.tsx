@@ -19,6 +19,7 @@ import SkillsPanel from "./SkillsPanel";
 import ToolsetsPanel from "./ToolsetsPanel";
 import McpPanel from "./McpPanel";
 import PluginsPanel from "./PluginsPanel";
+import BotScreenPanel from "./BotScreenPanel";
 
 interface TabDef {
   id: string;
@@ -30,6 +31,7 @@ const TABS: TabDef[] = [
   { id: "toolsets", label: "工具" },
   { id: "mcp", label: "MCP" },
   { id: "plugins", label: "插件" },
+  { id: "bot-screen", label: "Bot 屏幕" },
 ];
 
 /** 智能体页：agent 列表 + 详情 + 技能/工具/MCP/插件 子面板 + 经验→Skill（/learn）。 */
@@ -511,6 +513,7 @@ export default function AgentsPage() {
             {tab === "toolsets" ? <ToolsetsPanel profile={selected ?? undefined} /> : null}
             {tab === "mcp" ? <McpPanel profile={selected ?? undefined} /> : null}
             {tab === "plugins" ? <PluginsPanel /> : null}
+            {tab === "bot-screen" ? <BotScreenPanel /> : null}
           </div>
         </section>
       </div>
