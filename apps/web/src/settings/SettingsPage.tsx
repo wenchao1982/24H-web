@@ -7,6 +7,7 @@ import ApprovalPanel from "./ApprovalPanel";
 import OAuthPanel from "./OAuthPanel";
 import GithubPanel from "./GithubPanel";
 import MonitorPanel from "./MonitorPanel";
+import ProjectsPanel from "./ProjectsPanel";
 import { t, type TranslationKey } from "../i18n";
 
 interface SectionDef {
@@ -23,6 +24,7 @@ const SECTIONS: SectionDef[] = [
   { id: "oauth", labelKey: "settings.section.oauth" },
   { id: "github", labelKey: "settings.section.github" },
   { id: "monitor", labelKey: "settings.section.monitor" },
+  { id: "projects", labelKey: "settings.section.projects" },
 ];
 
 /** 设置页：分区导航 + 分区详情（M6）。 */
@@ -54,6 +56,7 @@ export default function SettingsPage() {
         {section === "oauth" ? <OAuthPanel /> : null}
         {section === "github" ? <GithubPanel /> : null}
         {section === "monitor" ? <MonitorPanel /> : null}
+        {section === "projects" ? <ProjectsPanel /> : null}
       </div>
     </div>
   );

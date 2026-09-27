@@ -63,6 +63,15 @@ export const zh = {
   "settings.section.github": "GitHub 集成",
   "settings.section.monitor": "监控",
   "settings.section.projects": "项目",
+
+  "projects.title": "项目",
+  "projects.hint": "项目是可切换的具名多文件夹工作区。",
+  "projects.empty": "暂无项目。",
+  "projects.loading": "加载项目中…",
+  "projects.noFolders": "未配置文件夹",
+  "projects.current": "当前项目",
+  "projects.select": "选择项目 {{name}}",
+  "projects.error.load": "加载项目失败",
 } as const;
 
 export type TranslationKey = keyof typeof zh;

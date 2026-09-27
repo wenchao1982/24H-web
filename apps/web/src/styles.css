@@ -1627,3 +1627,58 @@ button.danger {
   }
 }
 
+/* ---------- 设置 → 项目（T21） ---------- */
+
+.project-list {
+  list-style: none;
+  margin: var(--ds-space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-1);
+}
+
+.project-item {
+  margin: 0;
+}
+
+.project-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  width: 100%;
+  padding: var(--ds-space-2) var(--ds-space-3);
+  border: var(--ds-hairline) solid var(--ds-border-l1);
+  border-radius: var(--ds-radius-sm);
+  background: transparent;
+  color: var(--ds-label-primary);
+  text-align: left;
+}
+
+.project-btn:hover {
+  background: var(--ds-surface-l3);
+}
+
+.project-btn[data-active="true"] {
+  border-color: var(--ds-accent);
+  background: var(--ds-accent-weak);
+}
+
+.project-btn .skill-desc {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-current {
+  flex: 0 0 auto;
+  padding: 0 var(--ds-space-2);
+  border-radius: var(--ds-radius-pill);
+  background: var(--ds-accent);
+  color: var(--ds-bg-base);
+  font-size: var(--ds-font-size-xs);
+}
+
+
