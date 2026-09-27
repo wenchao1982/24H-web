@@ -3,6 +3,7 @@ import type { Db } from "../db";
 import { ApiError } from "../http/errors";
 import { issueCsrfToken } from "../http/csrf";
 import { verifyPassword, hashPassword } from "../auth/password";
+import { authProviderInfos, getPasswordProvider } from "../auth/providers";
 import { clearLoginFailures, getLockedUntil, recordLoginFailure } from "../auth/rateLimit";
 import { findUserByUsername, findUserById, listUserProfiles } from "../users/repo";
 import { parseAvatarDataUrl } from "../users/avatar";
@@ -26,6 +27,8 @@ function readString(body: unknown, key: string): string {
 export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, opts) => {
   const { db } = opts;
 
+  app.get("/api/auth/providers", async () => ({ providers: authProviderInfos() }));
+
   app.post("/api/auth/login", async (request, reply) => {
     const username = readString(request.body, "username");
     const password = readString(request.body, "password");
@@ -38,17 +41,9 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, opt
       throw new ApiError(429, "LOGIN_LOCKED", "尝试次数过多，请稍后再试");
     }
 
-    const user = findUserByUsername(db, username);
-    if (!user || user.status !== "active") {
-      const { locked } = recordLoginFailure(db, ip, username);
-      if (locked) {
-        throw new ApiError(429, "LOGIN_LOCKED", "尝试次数过多，请稍后再试");
-      }
-      throw new ApiError(401, "INVALID_CREDENTIALS", "用户名或密码错误");
-    }
-
-    const valid = await verifyPassword(password, user.password_hash);
-    if (!valid) {
+    const provider = getPasswordProvider();
+    const user = await provider.login({ db, username, password });
+    if (!user) {
       const { locked } = recordLoginFailure(db, ip, username);
       if (locked) {
         throw new ApiError(429, "LOGIN_LOCKED", "尝试次数过多，请稍后再试");

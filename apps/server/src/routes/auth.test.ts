@@ -98,4 +98,30 @@ describe("POST /api/auth/login", () => {
     expect(res.statusCode).toBe(400);
     expect(res.json().error).toBe("INVALID_INPUT");
   });
+
+  it("authenticates through the password AuthProvider", async () => {
+    ctx = await createTestContext();
+
+    const res = await ctx.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: TEST_ADMIN_USERNAME, password: TEST_ADMIN_PASSWORD },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().user.username).toBe(TEST_ADMIN_USERNAME);
+  });
+});
+
+describe("GET /api/auth/providers", () => {
+  it("lists the password provider without requiring auth", async () => {
+    ctx = await createTestContext();
+
+    const res = await ctx.app.inject({ method: "GET", url: "/api/auth/providers" });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      providers: [{ id: "password", kind: "password", displayName: "用户名密码" }],
+    });
+  });
 });
