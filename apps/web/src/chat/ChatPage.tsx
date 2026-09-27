@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGateway } from "./GatewayProvider";
 import { api } from "../api/client";
+import { useMediaQuery } from "../shell/useMediaQuery";
+import { t } from "../i18n";
 import SessionList from "./SessionList";
 import Transcript from "./Transcript";
 import Composer from "./Composer";
@@ -44,6 +46,8 @@ function readFileText(file: File): Promise<string> {
 
 export default function ChatPage() {
   const gateway = useGateway();
+  const narrow = useMediaQuery("(max-width: 900px)");
+  const [view, setView] = useState<"list" | "chat">("list");
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
@@ -66,6 +70,13 @@ export default function ChatPage() {
   useEffect(() => {
     activeIdRef.current = activeId;
   }, [activeId]);
+
+  // 窄屏：选中会话后切到 transcript 视图。
+  useEffect(() => {
+    if (narrow && activeId) {
+      setView("chat");
+    }
+  }, [narrow, activeId]);
 
   useEffect(() => {
     let alive = true;
@@ -485,7 +496,7 @@ export default function ChatPage() {
   const active = sessions.find((session) => session.id === activeId) ?? null;
 
   return (
-    <div className="chat">
+    <div className="chat" data-narrow={narrow} data-view={view}>
       <aside className="chat-list">
         <SessionList
           sessions={visible}
@@ -503,6 +514,16 @@ export default function ChatPage() {
       </aside>
 
       <section className="chat-main">
+        {narrow && active ? (
+          <button
+            type="button"
+            className="ghost chat-back"
+            aria-label={t("chat.backToList")}
+            onClick={() => setView("list")}
+          >
+            ‹ {t("chat.showList")}
+          </button>
+        ) : null}
         {error ? <p className="err chat-error">{error}</p> : null}
         <h2 className="chat-title">{active ? active.title : "对话"}</h2>
         {active ? (

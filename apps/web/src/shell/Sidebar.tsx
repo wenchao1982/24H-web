@@ -7,6 +7,9 @@ export interface SidebarProps {
   onNavigate?: (id: string) => void;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
+  /** 窄屏抽屉模式。 */
+  mobile?: boolean;
+  drawerOpen?: boolean;
   isSuperAdmin?: boolean;
   version?: string;
   coreOnline?: boolean;
@@ -26,6 +29,8 @@ export default function Sidebar({
   onNavigate,
   collapsed = false,
   onToggleCollapse,
+  mobile = false,
+  drawerOpen = false,
   isSuperAdmin = false,
   version,
   coreOnline = true,
@@ -35,7 +40,13 @@ export default function Sidebar({
   onToggleTheme,
 }: SidebarProps) {
   return (
-    <nav className="sidebar" data-collapsed={collapsed} aria-label={t("sidebar.aria")}>
+    <nav
+      className="sidebar"
+      data-collapsed={collapsed}
+      data-mobile={mobile}
+      data-drawer={mobile ? (drawerOpen ? "open" : "closed") : undefined}
+      aria-label={t("sidebar.aria")}
+    >
       <div className="brand">
         <span className="brand-mark">{t("sidebar.brand")}</span>
         {version ? <span className="brand-version">{version}</span> : null}
@@ -53,14 +64,16 @@ export default function Sidebar({
           <i className="dot" data-on={channelOnline} aria-hidden="true" />
           {t("sidebar.channel")}
         </span>
-        <button
-          type="button"
-          className="icon-btn sidebar-toggle"
-          aria-label={collapsed ? t("sidebar.expand") : t("sidebar.collapse")}
-          onClick={onToggleCollapse}
-        >
-          {collapsed ? "»" : "«"}
-        </button>
+        {mobile ? null : (
+          <button
+            type="button"
+            className="icon-btn sidebar-toggle"
+            aria-label={collapsed ? t("sidebar.expand") : t("sidebar.collapse")}
+            onClick={onToggleCollapse}
+          >
+            {collapsed ? "»" : "«"}
+          </button>
+        )}
       </div>
 
       <ul className="nav-primary">

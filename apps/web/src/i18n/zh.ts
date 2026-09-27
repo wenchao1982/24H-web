@@ -27,12 +27,17 @@ export const zh = {
   "sidebar.channelOffline": "渠道离线",
   "sidebar.expand": "展开侧栏",
   "sidebar.collapse": "收起侧栏",
+  "sidebar.openNav": "打开导航",
+  "sidebar.closeNav": "关闭导航",
   "sidebar.theme.toggle": "切换主题",
   "sidebar.theme.light": "浅色",
   "sidebar.theme.dark": "深色",
 
   "shell.openDetails": "打开详情面板",
   "shell.closeDetails": "关闭详情面板",
+
+  "chat.backToList": "返回会话列表",
+  "chat.showList": "会话列表",
 
   "details.aria": "详情面板",
   "details.tabsAria": "详情标签",

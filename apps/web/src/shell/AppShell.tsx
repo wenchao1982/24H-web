@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Sidebar from "./Sidebar";
 import DetailsPanel, { type DetailsTab } from "./DetailsPanel";
+import { useMediaQuery } from "./useMediaQuery";
 import { t } from "../i18n";
 
 export interface AppShellProps {
@@ -36,26 +37,19 @@ export default function AppShell({
   list,
   children,
 }: AppShellProps) {
+  const narrow = useMediaQuery("(max-width: 900px)");
   const [collapsed, setCollapsed] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [detailsTab, setDetailsTab] = useState<DetailsTab>("files");
   const [theme, setTheme] = useState<Theme>(initialTheme);
 
-  // 让步链：窄屏自动把侧栏折叠为 56px 轨道。
+  // 离开窄屏时收起抽屉，回到三栏。
   useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-      return;
+    if (!narrow) {
+      setDrawerOpen(false);
     }
-    const mq = window.matchMedia("(max-width: 900px)");
-    const apply = () => {
-      if (mq.matches) {
-        setCollapsed(true);
-      }
-    };
-    apply();
-    mq.addEventListener("change", apply);
-    return () => mq.removeEventListener("change", apply);
-  }, []);
+  }, [narrow]);
 
   useEffect(() => {
     if (typeof document !== "undefined") {
@@ -68,13 +62,32 @@ export default function AppShell({
     [],
   );
 
+  const toggleSidebar = useCallback(() => {
+    if (narrow) {
+      setDrawerOpen((value) => !value);
+    } else {
+      setCollapsed((value) => !value);
+    }
+  }, [narrow]);
+
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-narrow={narrow}>
+      {narrow && drawerOpen ? (
+        <div
+          className="sidebar-backdrop"
+          role="presentation"
+          aria-hidden="true"
+          onClick={() => setDrawerOpen(false)}
+        />
+      ) : null}
+
       <Sidebar
         active={active}
         onNavigate={onNavigate}
         collapsed={collapsed}
-        onToggleCollapse={() => setCollapsed((value) => !value)}
+        onToggleCollapse={toggleSidebar}
+        mobile={narrow}
+        drawerOpen={drawerOpen}
         isSuperAdmin={isSuperAdmin}
         version={version}
         coreOnline={coreOnline}
@@ -87,6 +100,17 @@ export default function AppShell({
 
       <div className="main">
         <header className="main-header">
+          {narrow ? (
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label={drawerOpen ? t("sidebar.closeNav") : t("sidebar.openNav")}
+              aria-expanded={drawerOpen}
+              onClick={toggleSidebar}
+            >
+              ☰
+            </button>
+          ) : null}
           <h1 className="main-title">{title}</h1>
           <div className="main-actions">
             <button
