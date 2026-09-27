@@ -1004,6 +1004,39 @@ button {
   background: var(--ds-surface-l1);
 }
 
+.channel-item {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.channel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-3);
+}
+
+.channel-head .config-row {
+  padding: 0;
+}
+
+.channel-fields {
+  display: flex;
+  flex-direction: column;
+}
+
+.channel-fields .config-row input {
+  flex: 1;
+  min-width: 0;
+  padding: var(--ds-space-1) var(--ds-space-2);
+  border: var(--ds-border-1) solid var(--ds-border-l2);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-l1);
+  color: var(--ds-label-primary);
+  font: inherit;
+  font-size: var(--ds-font-size-sm);
+}
+
 .toolset-config {
   flex-basis: 100%;
   margin: 0;
