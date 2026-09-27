@@ -13,6 +13,7 @@ import AdminUsersPage from "./pages/AdminUsersPage";
 import { ToastProvider } from "./ui/Toast";
 import ChatPage from "./chat/ChatPage";
 import { GatewayProvider } from "./chat/GatewayProvider";
+import { NotificationsProvider } from "./notifications/NotificationsProvider";
 import { t } from "./i18n";
 
 /** 路由表（可注入 MemoryRouter 单测）。 */
@@ -47,7 +48,9 @@ export default function App() {
       <ToastProvider>
         <SessionProvider>
           <GatewayProvider>
-            <AppRoutes />
+            <NotificationsProvider>
+              <AppRoutes />
+            </NotificationsProvider>
           </GatewayProvider>
         </SessionProvider>
       </ToastProvider>

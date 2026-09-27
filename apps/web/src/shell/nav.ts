@@ -22,5 +22,4 @@ export const BOTTOM_NAV: NavItem[] = [
   { id: "settings", labelKey: "nav.settings", icon: "⚙" },
   { id: "admin", labelKey: "nav.admin", icon: "🛡", superAdminOnly: true },
   { id: "account", labelKey: "nav.account", icon: "👤" },
-  { id: "notifications", labelKey: "nav.notifications", icon: "🔔" },
 ];

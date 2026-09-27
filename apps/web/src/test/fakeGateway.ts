@@ -25,8 +25,8 @@ export class FakeGateway implements Gateway {
   readonly serverRequests: RecordedServerRequest[] = [];
   connected = false;
 
-  private readonly handlers = new Map<string, GatewayEventHandler>();
-  private readonly serverHandlers = new Map<string, GatewayServerRequestHandler>();
+  private readonly handlers = new Map<string, Set<GatewayEventHandler>>();
+  private readonly serverHandlers = new Map<string, Set<GatewayServerRequestHandler>>();
 
   constructor(
     private readonly impl: (
@@ -50,16 +50,22 @@ export class FakeGateway implements Gateway {
   }
 
   on(type: string, handler: GatewayEventHandler): void {
-    this.handlers.set(type, handler);
+    const set = this.handlers.get(type) ?? new Set<GatewayEventHandler>();
+    set.add(handler);
+    this.handlers.set(type, set);
   }
 
   onServerRequest(method: string, handler: GatewayServerRequestHandler): void {
-    this.serverHandlers.set(method, handler);
+    const set = this.serverHandlers.get(method) ?? new Set<GatewayServerRequestHandler>();
+    set.add(handler);
+    this.serverHandlers.set(method, set);
   }
 
   /** 触发一个 server→client 事件。 */
   emit(type: string, payload: GatewayEventPayload = {}): void {
-    this.handlers.get(type)?.(payload);
+    for (const handler of this.handlers.get(type) ?? []) {
+      handler(payload);
+    }
   }
 
   /** 触发一个 server→client 请求，返回回包 spy。 */
@@ -69,7 +75,9 @@ export class FakeGateway implements Gateway {
   ): ReturnType<typeof vi.fn<(result: GatewayEventPayload) => void>> {
     const respond = vi.fn<(result: GatewayEventPayload) => void>();
     this.serverRequests.push({ method, params, respond });
-    this.serverHandlers.get(method)?.(params, respond);
+    for (const handler of this.serverHandlers.get(method) ?? []) {
+      handler(params, respond);
+    }
     return respond;
   }
 

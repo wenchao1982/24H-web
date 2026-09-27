@@ -1699,4 +1699,118 @@ button.danger {
   resize: vertical;
 }
 
+/* ---------- 通知中心（T22） ---------- */
+
+.notifications {
+  position: relative;
+}
+
+.notifications-btn {
+  position: relative;
+}
+
+.notifications-badge {
+  margin-left: auto;
+  min-width: 18px;
+  padding: 0 4px;
+  border-radius: var(--ds-radius-pill);
+  background: var(--ds-accent);
+  color: var(--ds-bg-base);
+  font-size: var(--ds-font-size-xs);
+  line-height: 18px;
+  text-align: center;
+}
+
+.sidebar[data-collapsed="true"] .notifications-badge {
+  position: absolute;
+  top: 2px;
+  right: 6px;
+  margin: 0;
+}
+
+.notifications-panel {
+  position: absolute;
+  bottom: calc(100% + var(--ds-space-1));
+  left: var(--ds-space-1);
+  z-index: 50;
+  width: 300px;
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: var(--ds-hairline) solid var(--ds-border-l1);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-l1);
+  box-shadow: var(--ds-elevation-panel);
+}
+
+.notifications-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-2) var(--ds-space-3);
+  border-bottom: var(--ds-hairline) solid var(--ds-border-l1);
+}
+
+.notifications-head-title {
+  font-size: var(--ds-font-size-sm);
+  font-weight: 600;
+}
+
+.notifications-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--ds-space-1);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-1);
+}
+
+.notification-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: var(--ds-space-2);
+  border: var(--ds-hairline) solid transparent;
+  border-radius: var(--ds-radius-sm);
+  background: transparent;
+  color: var(--ds-label-primary);
+  text-align: left;
+}
+
+.notification-item:hover {
+  background: var(--ds-surface-l3);
+}
+
+.notification-item[data-unread="true"] {
+  border-color: var(--ds-border-l1);
+  background: var(--ds-accent-weak);
+}
+
+.notification-item-title {
+  font-size: var(--ds-font-size-sm);
+  font-weight: 600;
+}
+
+.notification-item-detail,
+.notification-item-session {
+  font-size: var(--ds-font-size-xs);
+  color: var(--ds-label-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notification-item[data-kind="request"] .notification-item-title {
+  color: var(--ds-warning);
+}
+
+.notifications-panel .empty {
+  padding: var(--ds-space-3);
+}
+
+
 

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { t } from "../i18n";
+import NotificationsBell from "../notifications/NotificationsBell";
 import { BOTTOM_NAV, PRIMARY_NAV, type NavItem } from "./nav";
 
 export interface SidebarProps {
@@ -18,6 +19,8 @@ export interface SidebarProps {
   children?: ReactNode;
   theme?: "light" | "dark";
   onToggleTheme?: () => void;
+  /** 通知项点击：跳转到对应会话。 */
+  onOpenNotifications?: (sessionId: string | null) => void;
 }
 
 function visibleBottom(isSuperAdmin: boolean): NavItem[] {
@@ -38,6 +41,7 @@ export default function Sidebar({
   children,
   theme = "light",
   onToggleTheme,
+  onOpenNotifications,
 }: SidebarProps) {
   return (
     <nav
@@ -113,6 +117,7 @@ export default function Sidebar({
             <span className="nav-label">{t(item.labelKey)}</span>
           </button>
         ))}
+        <NotificationsBell onSelect={onOpenNotifications} />
         <button
           type="button"
           className="nav-btn theme-toggle"

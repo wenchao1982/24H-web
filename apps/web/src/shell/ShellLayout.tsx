@@ -42,6 +42,9 @@ export default function ShellLayout() {
       isSuperAdmin={user?.role === "super_admin"}
       title={t(LABELS[active] ?? "app.name")}
       version="v0.1.0"
+      onOpenNotifications={(sessionId) =>
+        navigate(sessionId ? `/chat?session=${encodeURIComponent(sessionId)}` : "/notifications")
+      }
     >
       <Outlet />
     </AppShell>

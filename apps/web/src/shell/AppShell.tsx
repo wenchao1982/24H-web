@@ -14,6 +14,8 @@ export interface AppShellProps {
   title?: string;
   /** 侧栏上下文列表。 */
   list?: ReactNode;
+  /** 点击通知项：跳转到对应会话。 */
+  onOpenNotifications?: (sessionId: string | null) => void;
   children?: ReactNode;
 }
 
@@ -35,6 +37,7 @@ export default function AppShell({
   channelOnline = true,
   title,
   list,
+  onOpenNotifications,
   children,
 }: AppShellProps) {
   const narrow = useMediaQuery("(max-width: 900px)");
@@ -94,6 +97,7 @@ export default function AppShell({
         channelOnline={channelOnline}
         theme={theme}
         onToggleTheme={toggleTheme}
+        onOpenNotifications={onOpenNotifications}
       >
         {list}
       </Sidebar>

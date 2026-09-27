@@ -85,6 +85,18 @@ export const zh = {
   "projects.deleteAria": "删除项目 {{name}}",
   "projects.error.save": "保存项目失败",
   "projects.error.delete": "删除项目失败",
+
+  "notifications.title": "通知",
+  "notifications.empty": "暂无通知。",
+  "notifications.markAllRead": "全部已读",
+  "notifications.aria": "通知（{{count}} 条未读）",
+  "notifications.open": "打开通知",
+  "notifications.request.approval": "等待审批",
+  "notifications.request.clarify": "等待回答",
+  "notifications.request.sudo": "等待授权",
+  "notifications.request.secret": "等待密钥",
+  "notifications.request.mcp.setup": "等待 MCP 配置",
+  "notifications.activity.done": "会话有新动态",
 } as const;
 
 export type TranslationKey = keyof typeof zh;

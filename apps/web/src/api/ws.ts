@@ -39,8 +39,8 @@ export class GatewayClient implements Gateway {
   private ws: WebSocket | null = null;
   private nextId = 1;
   private readonly pending = new Map<number, Pending>();
-  private readonly handlers = new Map<string, GatewayEventHandler>();
-  private readonly serverRequests = new Map<string, GatewayServerRequestHandler>();
+  private readonly handlers = new Map<string, Set<GatewayEventHandler>>();
+  private readonly serverRequests = new Map<string, Set<GatewayServerRequestHandler>>();
 
   connect(url: string = wsUrl(location.origin)): Promise<void> {
     if (typeof WebSocket === "undefined") {
@@ -90,18 +90,29 @@ export class GatewayClient implements Gateway {
     if (frame.method === "event") {
       const type = frame.params?.type;
       if (type) {
-        this.handlers.get(type)?.(frame.params?.payload ?? {});
+        const payload = frame.params?.payload ?? {};
+        for (const handler of this.handlers.get(type) ?? []) {
+          handler(payload);
+        }
       }
       return;
     }
 
-    // 服务端 → 客户端请求：必须回包，否则 turn 卡住
+    // 服务端 → 客户端请求：必须回包，否则 turn 卡住（多订阅者只回一次）
     if (frame.id != null && frame.method) {
-      const respond = (result: Record<string, unknown>) =>
+      let responded = false;
+      const respond = (result: Record<string, unknown>) => {
+        if (responded) {
+          return;
+        }
+        responded = true;
         this.ws?.send(JSON.stringify({ jsonrpc: "2.0", id: frame.id, result }));
-      const handler = this.serverRequests.get(frame.method);
-      if (handler) {
-        handler(frame.params ?? {}, respond);
+      };
+      const handlers = this.serverRequests.get(frame.method);
+      if (handlers && handlers.size > 0) {
+        for (const handler of handlers) {
+          handler(frame.params ?? {}, respond);
+        }
       } else {
         respond({});
       }
@@ -120,11 +131,15 @@ export class GatewayClient implements Gateway {
   }
 
   on(type: string, handler: GatewayEventHandler): void {
-    this.handlers.set(type, handler);
+    const set = this.handlers.get(type) ?? new Set<GatewayEventHandler>();
+    set.add(handler);
+    this.handlers.set(type, set);
   }
 
   onServerRequest(method: string, handler: GatewayServerRequestHandler): void {
-    this.serverRequests.set(method, handler);
+    const set = this.serverRequests.get(method) ?? new Set<GatewayServerRequestHandler>();
+    set.add(handler);
+    this.serverRequests.set(method, set);
   }
 
   close(): void {

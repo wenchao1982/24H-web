@@ -214,6 +214,20 @@ export default function ChatPage() {
     };
   }, [activeId, gateway]);
 
+  const linkedRef = useRef(false);
+  // 通知中心直达：`/chat?session=<id>` 选中该会话（仅一次）。
+  useEffect(() => {
+    if (linkedRef.current || sessions.length === 0 || typeof window === "undefined") {
+      return;
+    }
+    const target = new URLSearchParams(window.location.search).get("session");
+    if (target && sessions.some((session) => session.id === target)) {
+      linkedRef.current = true;
+      setActiveId(target);
+      setItems([]);
+    }
+  }, [sessions]);
+
   const createSession = useCallback(async () => {
     try {
       const result = await gateway.request("session.create", {});
