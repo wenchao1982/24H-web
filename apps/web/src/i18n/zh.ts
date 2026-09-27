@@ -217,6 +217,18 @@ export const zh = {
   "pairing.error.load": "加载配对信息失败",
   "pairing.error.action": "配对操作失败",
 
+  "advanced.tab.portal": "门户",
+  "portal.title": "门户",
+  "portal.hint": "当前套餐与用量概览。",
+  "portal.loading": "加载门户信息中…",
+  "portal.plan": "套餐",
+  "portal.status": "状态",
+  "portal.renews": "续费时间",
+  "portal.usage": "用量",
+  "portal.openUsage": "查看用量",
+  "portal.empty": "暂无门户信息。",
+  "portal.error.load": "加载门户信息失败",
+
   "notifications.title": "通知",
   "notifications.empty": "暂无通知。",
   "notifications.markAllRead": "全部已读",
