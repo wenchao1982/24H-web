@@ -20,6 +20,7 @@ import ToolGatewayPanel from "./ToolGatewayPanel";
 import ToolSearchPanel from "./ToolSearchPanel";
 import LspPanel from "./LspPanel";
 import ComputerUsePanel from "./ComputerUsePanel";
+import CodexRuntimePanel from "./CodexRuntimePanel";
 import { t, type TranslationKey } from "../i18n";
 
 interface TabDef {
@@ -49,6 +50,7 @@ const TABS: TabDef[] = [
   { id: "tool-search", labelKey: "advanced.tab.toolSearch" },
   { id: "lsp", labelKey: "advanced.tab.lsp" },
   { id: "computer-use", labelKey: "advanced.tab.computerUse" },
+  { id: "codex-runtime", labelKey: "advanced.tab.codexRuntime" },
 ];
 
 /** 设置 → 高级：本地模型 / 配对 / 运维 / 网关工具等子分区。 */
@@ -92,6 +94,7 @@ export default function AdvancedSettingsPanel() {
       {tab === "tool-search" ? <ToolSearchPanel /> : null}
       {tab === "lsp" ? <LspPanel /> : null}
       {tab === "computer-use" ? <ComputerUsePanel /> : null}
+      {tab === "codex-runtime" ? <CodexRuntimePanel /> : null}
     </div>
   );
 }

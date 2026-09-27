@@ -721,6 +721,8 @@ export const zh = {
   "codexRuntime.disable": "停用 Codex 运行时",
   "codexRuntime.status": "查看状态",
   "codexRuntime.loading": "执行中…",
+  "codexRuntime.result": "Codex 运行时结果",
+  "codexRuntime.done": "已执行 {{action}}",
   "codexRuntime.error": "Codex 运行时操作失败",
 
   "advanced.tab.botScreen": "Bot 屏幕",
