@@ -515,6 +515,11 @@ export const zh = {
   "undo.action.run": "撤销上一步",
   "retry.title": "重试",
   "retry.action.run": "重试上一步",
+
+  "rollback.title": "文件回滚",
+  "rollback.input": "检查点 ID",
+  "rollback.action.list": "列出检查点",
+  "rollback.action.restore": "恢复检查点",
 } as const;
 
 export type TranslationKey = keyof typeof zh;

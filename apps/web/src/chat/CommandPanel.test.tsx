@@ -127,3 +127,22 @@ describe("CommandPanel T20.7 撤销/重试", () => {
     ]);
   });
 });
+
+describe("CommandPanel T20.8 文件回滚", () => {
+  it("lists checkpoints and restores one", async () => {
+    const gateway = renderPanel(() => ({ text: "cp1 2026-01-01" }));
+    const user = userEvent.setup();
+
+    await user.selectOptions(screen.getByLabelText("选择命令"), "rollback");
+    await user.click(screen.getByRole("button", { name: "列出检查点" }));
+    expect(await screen.findByLabelText("执行结果")).toHaveTextContent("cp1");
+
+    await user.type(screen.getByLabelText("检查点 ID"), "cp1");
+    await user.click(screen.getByRole("button", { name: "恢复检查点" }));
+
+    expect(gateway.paramsOf("slash.exec")).toEqual([
+      { command: "/rollback", args: "list" },
+      { command: "/rollback", args: "restore cp1" },
+    ]);
+  });
+});

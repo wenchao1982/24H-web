@@ -129,6 +129,21 @@ export const SLASH_COMMAND_SPECS: SlashCommandSpec[] = [
     titleKey: "retry.title",
     actions: [{ id: "run", labelKey: "retry.action.run", args: "run", kind: "primary" }],
   },
+  {
+    command: "rollback",
+    titleKey: "rollback.title",
+    inputKey: "rollback.input",
+    actions: [
+      { id: "list", labelKey: "rollback.action.list", args: "list" },
+      {
+        id: "restore",
+        labelKey: "rollback.action.restore",
+        args: "restore",
+        kind: "primary",
+        withInput: true,
+      },
+    ],
+  },
 ];
 
 export function specForCommand(command: string): SlashCommandSpec | undefined {
