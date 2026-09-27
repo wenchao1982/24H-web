@@ -4,9 +4,27 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+      # Install at the monorepo root (npm workspaces links apps/* and packages/*).
+      - run: npm ci
+      - run: npm run check
+      - run: npm run build
+
+  e2e:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,7 +32,30 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      # 在 monorepo 根安装（npm workspaces 会链接 apps/* 与 packages/*）。
-      - run: npm install --no-audit --no-fund
-      - run: npm run check
-      - run: npm run build
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      # Playwright boots an isolated BFF (temp DB) + SPA via webServer in
+      # playwright.config.ts; no real Hermes or model calls are involved.
+      - run: npm run test:e2e
+
+  # Optional real-Hermes read-only smoke. Dispatch-only, and it never fails
+  # when the deployment secrets are absent (prints a skip and exits 0).
+  e2e-real:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Real-Hermes smoke (skips when secrets are absent)
+        env:
+          OS_SMOKE_BASE: ${{ secrets.OS_SMOKE_BASE }}
+          OS_SMOKE_USER: ${{ secrets.OS_SMOKE_USER }}
+          OS_SMOKE_PASS: ${{ secrets.OS_SMOKE_PASS }}
+        run: |
+          if [ -z "${OS_SMOKE_BASE}" ] || [ -z "${OS_SMOKE_USER}" ] || [ -z "${OS_SMOKE_PASS}" ]; then
+            echo "SKIP: OS_SMOKE_BASE/OS_SMOKE_USER/OS_SMOKE_PASS secrets are not configured; skipping real-Hermes smoke."
+            exit 0
+          fi
+          node scripts/smoke-hermes.mjs --base "${OS_SMOKE_BASE}"
