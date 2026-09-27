@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { t } from "../i18n";
 import { BOTTOM_NAV, PRIMARY_NAV, type NavItem } from "./nav";
 
 export interface SidebarProps {
@@ -34,22 +35,28 @@ export default function Sidebar({
   onToggleTheme,
 }: SidebarProps) {
   return (
-    <nav className="sidebar" data-collapsed={collapsed} aria-label="主导航">
+    <nav className="sidebar" data-collapsed={collapsed} aria-label={t("sidebar.aria")}>
       <div className="brand">
-        <span className="brand-mark">24H</span>
+        <span className="brand-mark">{t("sidebar.brand")}</span>
         {version ? <span className="brand-version">{version}</span> : null}
-        <span className="brand-status" title={coreOnline ? "核心在线" : "核心离线"}>
+        <span
+          className="brand-status"
+          title={coreOnline ? t("sidebar.coreOnline") : t("sidebar.coreOffline")}
+        >
           <i className="dot" data-on={coreOnline} aria-hidden="true" />
-          核心
+          {t("sidebar.core")}
         </span>
-        <span className="brand-status" title={channelOnline ? "渠道在线" : "渠道离线"}>
+        <span
+          className="brand-status"
+          title={channelOnline ? t("sidebar.channelOnline") : t("sidebar.channelOffline")}
+        >
           <i className="dot" data-on={channelOnline} aria-hidden="true" />
-          渠道
+          {t("sidebar.channel")}
         </span>
         <button
           type="button"
           className="icon-btn sidebar-toggle"
-          aria-label={collapsed ? "展开侧栏" : "收起侧栏"}
+          aria-label={collapsed ? t("sidebar.expand") : t("sidebar.collapse")}
           onClick={onToggleCollapse}
         >
           {collapsed ? "»" : "«"}
@@ -69,7 +76,7 @@ export default function Sidebar({
               <span className="nav-icon" aria-hidden="true">
                 {item.icon}
               </span>
-              <span className="nav-label">{item.label}</span>
+              <span className="nav-label">{t(item.labelKey)}</span>
             </button>
           </li>
         ))}
@@ -90,19 +97,21 @@ export default function Sidebar({
             <span className="nav-icon" aria-hidden="true">
               {item.icon}
             </span>
-            <span className="nav-label">{item.label}</span>
+            <span className="nav-label">{t(item.labelKey)}</span>
           </button>
         ))}
         <button
           type="button"
           className="nav-btn theme-toggle"
-          aria-label="切换主题"
+          aria-label={t("sidebar.theme.toggle")}
           onClick={onToggleTheme}
         >
           <span className="nav-icon" aria-hidden="true">
             {theme === "dark" ? "☾" : "☀"}
           </span>
-          <span className="nav-label">{theme === "dark" ? "深色" : "浅色"}</span>
+          <span className="nav-label">
+            {theme === "dark" ? t("sidebar.theme.dark") : t("sidebar.theme.light")}
+          </span>
         </button>
       </div>
     </nav>

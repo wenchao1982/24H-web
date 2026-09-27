@@ -13,6 +13,7 @@ import AdminUsersPage from "./pages/AdminUsersPage";
 import { ToastProvider } from "./ui/Toast";
 import ChatPage from "./chat/ChatPage";
 import { GatewayProvider } from "./chat/GatewayProvider";
+import { t } from "./i18n";
 
 /** 路由表（可注入 MemoryRouter 单测）。 */
 export function AppRoutes() {
@@ -24,15 +25,15 @@ export function AppRoutes() {
           <Route index element={<Navigate to="/chat" replace />} />
           <Route path="/chat" element={<ChatPage />} />
           <Route path="/agents" element={<AgentsPage />} />
-          <Route path="/groups" element={<PlaceholderPage title="群聊" />} />
+          <Route path="/groups" element={<PlaceholderPage title={t("page.groups")} />} />
           <Route path="/tasks" element={<TasksPage />} />
           <Route path="/usage" element={<UsagePage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route element={<RequireSuperAdmin />}>
             <Route path="/admin/users" element={<AdminUsersPage />} />
           </Route>
-          <Route path="/account" element={<PlaceholderPage title="账户" />} />
-          <Route path="/notifications" element={<PlaceholderPage title="通知" />} />
+          <Route path="/account" element={<PlaceholderPage title={t("page.account")} />} />
+          <Route path="/notifications" element={<PlaceholderPage title={t("page.notifications")} />} />
           <Route path="*" element={<Navigate to="/chat" replace />} />
         </Route>
       </Route>

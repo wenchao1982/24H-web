@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Sidebar from "./Sidebar";
 import DetailsPanel, { type DetailsTab } from "./DetailsPanel";
+import { t } from "../i18n";
 
 export interface AppShellProps {
   active?: string;
@@ -91,7 +92,7 @@ export default function AppShell({
             <button
               type="button"
               className="icon-btn"
-              aria-label={detailsOpen ? "关闭详情面板" : "打开详情面板"}
+              aria-label={detailsOpen ? t("shell.closeDetails") : t("shell.openDetails")}
               aria-pressed={detailsOpen}
               onClick={() => setDetailsOpen((value) => !value)}
             >

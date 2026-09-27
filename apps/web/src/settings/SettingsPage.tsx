@@ -7,21 +7,22 @@ import ApprovalPanel from "./ApprovalPanel";
 import OAuthPanel from "./OAuthPanel";
 import GithubPanel from "./GithubPanel";
 import MonitorPanel from "./MonitorPanel";
+import { t, type TranslationKey } from "../i18n";
 
 interface SectionDef {
   id: string;
-  label: string;
+  labelKey: TranslationKey;
 }
 
 const SECTIONS: SectionDef[] = [
-  { id: "keys", label: "模型与密钥" },
-  { id: "model", label: "模型设置" },
-  { id: "appearance", label: "外观" },
-  { id: "config", label: "配置中心" },
-  { id: "approvals", label: "审批策略" },
-  { id: "oauth", label: "服务商登录" },
-  { id: "github", label: "GitHub 集成" },
-  { id: "monitor", label: "监控" },
+  { id: "keys", labelKey: "settings.section.keys" },
+  { id: "model", labelKey: "settings.section.model" },
+  { id: "appearance", labelKey: "settings.section.appearance" },
+  { id: "config", labelKey: "settings.section.config" },
+  { id: "approvals", labelKey: "settings.section.approvals" },
+  { id: "oauth", labelKey: "settings.section.oauth" },
+  { id: "github", labelKey: "settings.section.github" },
+  { id: "monitor", labelKey: "settings.section.monitor" },
 ];
 
 /** 设置页：分区导航 + 分区详情（M6）。 */
@@ -30,7 +31,7 @@ export default function SettingsPage() {
 
   return (
     <div className="page settings-page">
-      <nav className="settings-nav" aria-label="设置分区">
+      <nav className="settings-nav" aria-label={t("settings.aria")}>
         {SECTIONS.map((item) => (
           <button
             key={item.id}
@@ -40,7 +41,7 @@ export default function SettingsPage() {
             aria-current={section === item.id ? "page" : undefined}
             onClick={() => setSection(item.id)}
           >
-            {item.label}
+            {t(item.labelKey)}
           </button>
         ))}
       </nav>

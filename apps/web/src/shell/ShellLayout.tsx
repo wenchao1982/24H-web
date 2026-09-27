@@ -2,6 +2,7 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import AppShell from "./AppShell";
 import { BOTTOM_NAV, PRIMARY_NAV } from "./nav";
 import { useSession } from "../auth/SessionProvider";
+import { t, type TranslationKey } from "../i18n";
 
 const ROUTES: Record<string, string> = {
   chat: "/chat",
@@ -15,8 +16,8 @@ const ROUTES: Record<string, string> = {
   notifications: "/notifications",
 };
 
-const LABELS: Record<string, string> = Object.fromEntries(
-  [...PRIMARY_NAV, ...BOTTOM_NAV].map((item) => [item.id, item.label]),
+const LABELS: Record<string, TranslationKey> = Object.fromEntries(
+  [...PRIMARY_NAV, ...BOTTOM_NAV].map((item) => [item.id, item.labelKey]),
 );
 
 function activeId(pathname: string): string {
@@ -39,7 +40,7 @@ export default function ShellLayout() {
       active={active}
       onNavigate={(id) => navigate(ROUTES[id] ?? "/chat")}
       isSuperAdmin={user?.role === "super_admin"}
-      title={LABELS[active] ?? "24H"}
+      title={t(LABELS[active] ?? "app.name")}
       version="v0.1.0"
     >
       <Outlet />
