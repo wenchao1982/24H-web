@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
+import { defaultSkillRoots as appDefaultSkillRoots } from "../paths";
 import {
   SKILL_UI_PROTOCOL,
   type DiscoveredSkillUi,
@@ -20,7 +20,7 @@ export function defaultSkillRoots(env: NodeJS.ProcessEnv = process.env): string[
   if (configured.length > 0) {
     return configured.map((entry) => resolve(entry));
   }
-  return [fileURLToPath(new URL("../../../../examples/skills", import.meta.url))];
+  return appDefaultSkillRoots();
 }
 
 function parseManifest(raw: string): SkillUiManifest | null {
