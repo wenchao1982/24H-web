@@ -646,6 +646,21 @@ export const zh = {
   "providerRouting.hint": "配置 provider_routing：排序 / 白名单 / 黑名单 / 参数要求。",
   "fallback.title": "回退 Provider",
   "fallback.hint": "配置 fallback：主备降级链 + 辅助任务独立降级。",
+  "credentialPools.title": "凭证池",
+  "credentialPools.hint": "同 provider 多 key 轮换。密钥仅以掩码展示，绝不回显明文；添加新 key 会合并写回。",
+  "credentialPools.loading": "加载凭证池…",
+  "credentialPools.empty": "暂无凭证池。",
+  "credentialPools.provider": "Provider",
+  "credentialPools.providerPlaceholder": "openai",
+  "credentialPools.value": "新密钥",
+  "credentialPools.valuePlaceholder": "值（不会回显）",
+  "credentialPools.save": "添加凭证",
+  "credentialPools.saved": "已保存",
+  "credentialPools.count": "{{count}} 个密钥",
+  "credentialPools.masked": "{{provider}} 的密钥（掩码）",
+  "credentialPools.error.load": "加载凭证池失败",
+  "credentialPools.error.save": "保存凭证池失败",
+  "credentialPools.error.input": "请填写 provider 与密钥值",
 } as const;
 
 export type TranslationKey = keyof typeof zh;
