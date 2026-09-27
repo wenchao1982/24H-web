@@ -352,6 +352,11 @@ export const SLASH_COMMAND_SPECS: SlashCommandSpec[] = [
       { id: "status", labelKey: "reasoning.action.status", args: "status" },
     ],
   },
+  {
+    command: "egress",
+    titleKey: "egress.title",
+    actions: [{ id: "status", labelKey: "egress.action.status", args: "status" }],
+  },
 ];
 
 export function specForCommand(command: string): SlashCommandSpec | undefined {

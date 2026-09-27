@@ -604,6 +604,9 @@ export const zh = {
   "reasoning.action.medium": "中",
   "reasoning.action.high": "高",
   "reasoning.action.status": "查看状态",
+
+  "egress.title": "Egress 状态",
+  "egress.action.status": "查看状态",
 } as const;
 
 export type TranslationKey = keyof typeof zh;

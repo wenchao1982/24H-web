@@ -342,3 +342,16 @@ describe("CommandPanel T20.18 运行档", () => {
     ]);
   });
 });
+
+describe("CommandPanel T20.19 Egress 状态", () => {
+  it("reads egress status", async () => {
+    const gateway = renderPanel(() => ({ text: "egress: direct" }));
+    const user = userEvent.setup();
+
+    await user.selectOptions(screen.getByLabelText("选择命令"), "egress");
+    await user.click(screen.getByRole("button", { name: "查看状态" }));
+
+    expect(gateway.paramsOf("slash.exec")).toEqual([{ command: "/egress", args: "status" }]);
+    expect(await screen.findByLabelText("执行结果")).toHaveTextContent("egress: direct");
+  });
+});
