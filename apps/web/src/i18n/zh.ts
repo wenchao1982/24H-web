@@ -296,6 +296,18 @@ export const zh = {
   "exec.confirm": "确认执行命令「{{command}}」？",
   "exec.error": "命令执行失败",
 
+  "advanced.tab.oneshot": "单次补全",
+  "oneshot.title": "单次补全",
+  "oneshot.hint": "输入提示词并选择模型，快速获得一次补全结果。",
+  "oneshot.model": "模型（可选）",
+  "oneshot.modelPlaceholder": "留空使用默认模型",
+  "oneshot.prompt": "提示词",
+  "oneshot.placeholder": "输入提示词",
+  "oneshot.run": "补全",
+  "oneshot.loading": "补全中…",
+  "oneshot.empty": "无输出。",
+  "oneshot.error": "补全失败",
+
   "notifications.title": "通知",
   "notifications.empty": "暂无通知。",
   "notifications.markAllRead": "全部已读",
