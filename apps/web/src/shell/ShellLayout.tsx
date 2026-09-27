@@ -10,6 +10,7 @@ const ROUTES: Record<string, string> = {
   groups: "/group-chat",
   tasks: "/tasks",
   usage: "/usage",
+  skillhost: "/skills-ui",
   settings: "/settings",
   admin: "/admin/users",
   account: "/account",

@@ -1,0 +1,10 @@
+{
+  "protocol": "24os-skill-ui/1",
+  "id": "hello-ui",
+  "title": "Hello UI",
+  "entry": "index.html",
+  "host": "iframe",
+  "capabilities": ["callModel", "notify"],
+  "permissions": ["model:call"],
+  "size": { "width": 720, "height": 480 }
+}

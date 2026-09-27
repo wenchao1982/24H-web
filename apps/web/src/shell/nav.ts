@@ -15,6 +15,7 @@ export const PRIMARY_NAV: NavItem[] = [
   { id: "groups", labelKey: "nav.groups", icon: "❏" },
   { id: "tasks", labelKey: "nav.tasks", icon: "◷" },
   { id: "usage", labelKey: "nav.usage", icon: "◉" },
+  { id: "skillhost", labelKey: "nav.skillhost", icon: "▣" },
 ];
 
 /** 侧栏底部固定项。 */

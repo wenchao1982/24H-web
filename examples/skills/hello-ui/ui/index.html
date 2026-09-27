@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hello UI</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Hello UI</h1>
+      <p class="hint">沙箱内的 Skill UI：一切能力都经 postMessage RPC 走宿主。</p>
+      <label for="prompt">提示词</label>
+      <textarea id="prompt" rows="3" placeholder="例如：用一句话介绍 24H">你好</textarea>
+      <div class="actions">
+        <button id="ask" type="button">调用模型</button>
+        <span id="status" class="status"></span>
+      </div>
+      <pre id="output" aria-live="polite"></pre>
+    </main>
+    <script src="main.js"></script>
+  </body>
+</html>

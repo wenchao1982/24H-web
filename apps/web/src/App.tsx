@@ -9,6 +9,7 @@ import AgentsPage from "./agents/AgentsPage";
 import GroupChatPage from "./groups/GroupChatPage";
 import TasksPage from "./tasks/TasksPage";
 import UsagePage from "./usage/UsagePage";
+import SkillsHostPage from "./skillhost/SkillsHostPage";
 import SettingsPage from "./settings/SettingsPage";
 import AdminUsersPage from "./pages/AdminUsersPage";
 import { ToastProvider } from "./ui/Toast";
@@ -31,6 +32,7 @@ export function AppRoutes() {
           <Route path="/groups" element={<Navigate to="/group-chat" replace />} />
           <Route path="/tasks" element={<TasksPage />} />
           <Route path="/usage" element={<UsagePage />} />
+          <Route path="/skills-ui" element={<SkillsHostPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route element={<RequireSuperAdmin />}>
             <Route path="/admin/users" element={<AdminUsersPage />} />

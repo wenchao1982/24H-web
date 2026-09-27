@@ -13,13 +13,24 @@ import { hermesRoutes } from "../routes/hermes";
 import { systemRoutes } from "../routes/system";
 import { hermesWsRoutes } from "../hermes/proxy";
 import { integrationsRoutes } from "../routes/integrations";
+import { skillUiRoutes } from "../routes/skillUi";
 import type { GhRunner } from "../integrations/github";
+import { defaultSkillRoots } from "../skillui/discover";
+import { defaultWorkspaceRoot, type CallModelFn } from "../skillui/broker";
+import { llmOneshot } from "../hermes/oneshot";
 import { registerSessionMiddleware } from "../session/middleware";
+
+export interface SkillHostOptions {
+  roots?: string[];
+  workspaceRoot?: string;
+  callModel?: CallModelFn;
+}
 
 export interface BuildAppOptions {
   logger?: boolean;
   hermesBaseUrl?: string;
   githubRunner?: GhRunner;
+  skillHost?: SkillHostOptions;
 }
 
 export function buildApp(db: Db, options: BuildAppOptions = {}): FastifyInstance {
@@ -61,6 +72,16 @@ export function buildApp(db: Db, options: BuildAppOptions = {}): FastifyInstance
   app.register(integrationsRoutes, {
     db,
     ...(options.githubRunner ? { githubRunner: options.githubRunner } : {}),
+  });
+
+  const hermesBaseUrl = options.hermesBaseUrl ?? config.hermesBaseUrl;
+  const workspaceRoot = options.skillHost?.workspaceRoot ?? defaultWorkspaceRoot();
+  app.register(skillUiRoutes, {
+    roots: options.skillHost?.roots ?? defaultSkillRoots(),
+    deps: {
+      workspaceRoot,
+      callModel: options.skillHost?.callModel ?? ((input) => llmOneshot(hermesBaseUrl, input)),
+    },
   });
 
   app.get("/health", async () => ({ ok: true }));

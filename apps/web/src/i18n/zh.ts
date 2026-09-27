@@ -16,6 +16,17 @@ export const zh = {
   "nav.admin": "管理",
   "nav.account": "账户",
   "nav.notifications": "通知",
+  "nav.skillhost": "技能界面",
+
+  "skillhost.pageTitle": "技能界面",
+  "skillhost.hint": "运行由技能自带、在沙箱中加载的界面；能力经宿主代理调用。",
+  "skillhost.aria": "技能界面：{{title}}",
+  "skillhost.loading": "加载中…",
+  "skillhost.ready": "已连接",
+  "skillhost.error": "出错",
+  "skillhost.close": "关闭技能界面",
+  "skillhost.empty": "暂无自带界面的技能。",
+  "skillhost.error.load": "加载技能界面失败",
 
   "sidebar.aria": "主导航",
   "sidebar.brand": "24H",

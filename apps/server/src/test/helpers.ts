@@ -5,7 +5,7 @@ import type { FastifyInstance } from "fastify";
 import { openDb, type Db } from "../db";
 import { migrate } from "../db/migrate";
 import { ensureFirstAdmin } from "../users/repo";
-import { buildApp } from "../http/app";
+import { buildApp, type SkillHostOptions } from "../http/app";
 import type { GhRunner } from "../integrations/github";
 
 export const TEST_ADMIN_USERNAME = "admin";
@@ -47,7 +47,7 @@ export interface TestContext {
 }
 
 export async function createTestContext(
-  options: { hermesBaseUrl?: string; githubRunner?: GhRunner } = {},
+  options: { hermesBaseUrl?: string; githubRunner?: GhRunner; skillHost?: SkillHostOptions } = {},
 ): Promise<TestContext> {
   const dir = mkdtempSync(join(tmpdir(), "24h-test-"));
   const db = openDb(join(dir, "test.db"));
@@ -61,6 +61,7 @@ export async function createTestContext(
     logger: false,
     ...(options.hermesBaseUrl ? { hermesBaseUrl: options.hermesBaseUrl } : {}),
     ...(options.githubRunner ? { githubRunner: options.githubRunner } : {}),
+    ...(options.skillHost ? { skillHost: options.skillHost } : {}),
   });
 
   return {
