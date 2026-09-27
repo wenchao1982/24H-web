@@ -97,6 +97,11 @@ export const zh = {
   "notifications.request.secret": "等待密钥",
   "notifications.request.mcp.setup": "等待 MCP 配置",
   "notifications.activity.done": "会话有新动态",
+  "notifications.prefs.title": "通知偏好",
+  "notifications.prefs.enabled": "启用通知",
+  "notifications.prefs.sound": "提示音",
+  "notifications.prefs.dnd": "免打扰",
+  "notifications.disabled": "通知已关闭。",
 } as const;
 
 export type TranslationKey = keyof typeof zh;

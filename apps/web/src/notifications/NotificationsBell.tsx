@@ -1,17 +1,42 @@
 import { useEffect, useRef, useState } from "react";
 import { t } from "../i18n";
 import { useNotifications } from "./NotificationsProvider";
+import {
+  badgeVisible,
+  playNotificationSound,
+  readNotificationPrefs,
+  storeNotificationPrefs,
+  type NotificationPreferences,
+} from "./preferences";
 
 export interface NotificationsBellProps {
   /** 点击某条通知：跳转到对应会话（无会话则空）。 */
   onSelect?: (sessionId: string | null) => void;
 }
 
-/** 侧栏底部通知铃：未读徽标 + 挂起/活动聚合面板。 */
+/** 侧栏底部通知铃：未读徽标 + 挂起/活动聚合面板 + 本地偏好。 */
 export default function NotificationsBell({ onSelect }: NotificationsBellProps) {
   const { items, unread, markRead, markAllRead } = useNotifications();
   const [open, setOpen] = useState(false);
+  const [prefs, setPrefs] = useState<NotificationPreferences>(() => readNotificationPrefs());
   const rootRef = useRef<HTMLDivElement>(null);
+  const prevUnread = useRef(unread);
+
+  const updatePrefs = (patch: Partial<NotificationPreferences>) => {
+    setPrefs((current) => {
+      const next = { ...current, ...patch };
+      storeNotificationPrefs(next);
+      return next;
+    });
+  };
+
+  // 新通知到达且启用提示音时播放（无 WebAudio 时静默）。
+  useEffect(() => {
+    if (unread > prevUnread.current && prefs.enabled && prefs.sound && !prefs.dnd) {
+      playNotificationSound();
+    }
+    prevUnread.current = unread;
+  }, [unread, prefs]);
 
   useEffect(() => {
     if (!open) {
@@ -41,6 +66,8 @@ export default function NotificationsBell({ onSelect }: NotificationsBellProps) 
     onSelect?.(sessionId);
   };
 
+  const showBadge = unread > 0 && badgeVisible(prefs);
+
   return (
     <div className="notifications" ref={rootRef}>
       <button
@@ -56,7 +83,7 @@ export default function NotificationsBell({ onSelect }: NotificationsBellProps) 
           🔔
         </span>
         <span className="nav-label">{t("nav.notifications")}</span>
-        {unread > 0 ? (
+        {showBadge ? (
           <span className="notifications-badge" data-testid="notifications-badge" aria-hidden="true">
             {unread > 99 ? "99+" : unread}
           </span>
@@ -73,7 +100,10 @@ export default function NotificationsBell({ onSelect }: NotificationsBellProps) 
               </button>
             ) : null}
           </div>
-          {items.length === 0 ? (
+
+          {!prefs.enabled ? (
+            <p className="empty">{t("notifications.disabled")}</p>
+          ) : items.length === 0 ? (
             <p className="empty">{t("notifications.empty")}</p>
           ) : (
             <ul className="notifications-list">
@@ -98,6 +128,37 @@ export default function NotificationsBell({ onSelect }: NotificationsBellProps) 
               ))}
             </ul>
           )}
+
+          <div className="notifications-prefs">
+            <span className="notifications-prefs-title">{t("notifications.prefs.title")}</span>
+            <label>
+              <input
+                type="checkbox"
+                checked={prefs.enabled}
+                aria-label={t("notifications.prefs.enabled")}
+                onChange={(event) => updatePrefs({ enabled: event.target.checked })}
+              />
+              {t("notifications.prefs.enabled")}
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={prefs.sound}
+                aria-label={t("notifications.prefs.sound")}
+                onChange={(event) => updatePrefs({ sound: event.target.checked })}
+              />
+              {t("notifications.prefs.sound")}
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={prefs.dnd}
+                aria-label={t("notifications.prefs.dnd")}
+                onChange={(event) => updatePrefs({ dnd: event.target.checked })}
+              />
+              {t("notifications.prefs.dnd")}
+            </label>
+          </div>
         </div>
       ) : null}
     </div>
