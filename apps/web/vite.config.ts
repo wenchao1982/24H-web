@@ -11,4 +11,10 @@ export default defineConfig({
       "/api": { target: "http://127.0.0.1:9119", changeOrigin: true, ws: true },
     },
   },
+  // e2e：`vite preview` 也把 REST 与 WebSocket 转发到本地 BFF（4599）。
+  preview: {
+    proxy: {
+      "/api": { target: "http://127.0.0.1:4599", changeOrigin: true, ws: true },
+    },
+  },
 });
