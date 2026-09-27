@@ -745,6 +745,35 @@ export const zh = {
   "computerUse.grant": "授予权限",
   "computerUse.error.load": "查询 Computer Use 失败",
   "computerUse.error.grant": "授予权限失败",
+
+  "channels.tab.platforms": "平台",
+  "channels.tab.deliverable": "Deliverable",
+  "channels.tabsAria": "渠道子分区",
+  "deliverable.title": "Deliverable 模式",
+  "deliverable.hint": "把产物作为附件投递（deliverable）。",
+  "deliverable.enabled": "启用 Deliverable 模式",
+
+  "integrations.tab.plugins": "插件目录",
+  "pluginCatalog.title": "插件目录",
+  "pluginCatalog.hint": "浏览并安装插件（buildplugins 目录）。",
+  "pluginCatalog.loading": "加载插件目录…",
+  "pluginCatalog.empty": "插件目录为空。",
+  "pluginCatalog.installed": "已安装",
+  "pluginCatalog.install": "安装",
+  "pluginCatalog.installOf": "安装插件 {{name}}",
+  "pluginCatalog.error.load": "加载插件目录失败",
+  "pluginCatalog.error.install": "安装插件失败",
+
+  "chat.personality": "人格",
+  "personality.title": "Personality 预设",
+  "personality.hint": "经 `/personality` 选择并应用人格预设。",
+  "personality.loading": "加载人格预设…",
+  "personality.presets": "预设",
+  "personality.set": "应用",
+  "personality.setOf": "应用人格 {{name}}",
+  "personality.empty": "暂无人格预设。",
+  "personality.error.list": "加载人格预设失败",
+  "personality.error.set": "应用人格失败",
 } as const;
 
 export type TranslationKey = keyof typeof zh;
