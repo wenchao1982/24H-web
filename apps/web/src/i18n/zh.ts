@@ -590,6 +590,9 @@ export const zh = {
   "reloadMcp.action.run": "重载 MCP",
   "reloadSkills.title": "重载技能",
   "reloadSkills.action.run": "重载技能",
+
+  "init.title": "生成 AGENTS.md",
+  "init.action.run": "生成 AGENTS.md",
 } as const;
 
 export type TranslationKey = keyof typeof zh;

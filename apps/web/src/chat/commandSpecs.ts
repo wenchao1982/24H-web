@@ -328,6 +328,11 @@ export const SLASH_COMMAND_SPECS: SlashCommandSpec[] = [
     titleKey: "reloadSkills.title",
     actions: [{ id: "run", labelKey: "reloadSkills.action.run", args: "run", kind: "primary" }],
   },
+  {
+    command: "init",
+    titleKey: "init.title",
+    actions: [{ id: "run", labelKey: "init.action.run", args: "run", kind: "primary" }],
+  },
 ];
 
 export function specForCommand(command: string): SlashCommandSpec | undefined {

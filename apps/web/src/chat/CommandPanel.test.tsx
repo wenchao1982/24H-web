@@ -312,3 +312,16 @@ describe("CommandPanel T20.16 重载", () => {
     ]);
   });
 });
+
+describe("CommandPanel T20.17 生成 AGENTS.md", () => {
+  it("dispatches /init", async () => {
+    const gateway = renderPanel(() => ({ text: "已生成 AGENTS.md" }));
+    const user = userEvent.setup();
+
+    await user.selectOptions(screen.getByLabelText("选择命令"), "init");
+    await user.click(screen.getByRole("button", { name: "生成 AGENTS.md" }));
+
+    expect(gateway.paramsOf("slash.exec")).toEqual([{ command: "/init", args: "run" }]);
+    expect(await screen.findByLabelText("执行结果")).toHaveTextContent("已生成 AGENTS.md");
+  });
+});
