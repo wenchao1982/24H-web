@@ -284,6 +284,18 @@ export const zh = {
   "voice.error.load": "读取语音状态失败",
   "voice.error.action": "语音操作失败",
 
+  "advanced.tab.exec": "命令执行",
+  "exec.title": "命令执行",
+  "exec.hint": "通过网关执行命令；执行前需确认，输出只读展示。",
+  "exec.kindLabel": "命令类型",
+  "exec.kind.cli": "CLI",
+  "exec.kind.shell": "Shell",
+  "exec.command": "命令",
+  "exec.placeholder": "输入要执行的命令",
+  "exec.run": "执行",
+  "exec.confirm": "确认执行命令「{{command}}」？",
+  "exec.error": "命令执行失败",
+
   "notifications.title": "通知",
   "notifications.empty": "暂无通知。",
   "notifications.markAllRead": "全部已读",
