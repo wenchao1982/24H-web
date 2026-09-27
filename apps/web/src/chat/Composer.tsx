@@ -1,8 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { t } from "../i18n";
+import { useGateway } from "./GatewayProvider";
 import type { Attachment } from "./types";
 import { filterCommands, parseSlash, type SlashCommand } from "./slash";
+import { buildMessage, normalizePathSuggestions, type PathSuggestion } from "./references";
 import SlashMenu from "./SlashMenu";
+import ReferenceMenu from "./ReferenceMenu";
 
 export interface ComposerProps {
   onSend: (text: string) => void;
@@ -27,9 +30,14 @@ export default function Composer({
   commands = [],
   onSlash,
 }: ComposerProps) {
+  const gateway = useGateway();
   const [draft, setDraft] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const [dismissed, setDismissed] = useState(false);
+  const [references, setReferences] = useState<string[]>([]);
+  const [pathMatches, setPathMatches] = useState<PathSuggestion[]>([]);
+  const [pathIndex, setPathIndex] = useState(0);
+  const [pathDismissed, setPathDismissed] = useState(false);
 
   const slashQuery = draft.startsWith("/") && !/\s/.test(draft) ? draft.slice(1) : null;
   const matches = useMemo(
@@ -38,9 +46,50 @@ export default function Composer({
   );
   const menuOpen = !dismissed && slashQuery !== null && commands.length > 0;
 
+  const pathQuery = draft.startsWith("@") && !/\s/.test(draft) ? draft.slice(1) : null;
+  const pathMenuOpen = !pathDismissed && pathQuery !== null;
+
+  // T23.2 `@` 引用：查询 `complete.path`，结果作为候选。
+  useEffect(() => {
+    if (pathQuery === null) {
+      setPathMatches([]);
+      return;
+    }
+    let alive = true;
+    void gateway
+      .connect()
+      .catch(() => undefined)
+      .then(() => gateway.request("complete.path", { prefix: pathQuery }))
+      .then((result) => {
+        if (alive) {
+          setPathMatches(normalizePathSuggestions(result).slice(0, 8));
+        }
+      })
+      .catch(() => {
+        if (alive) {
+          setPathMatches([]);
+        }
+      });
+    return () => {
+      alive = false;
+    };
+  }, [gateway, pathQuery]);
+
   const resetMenu = () => {
     setDismissed(false);
     setActiveIndex(0);
+    setPathDismissed(false);
+    setPathIndex(0);
+  };
+
+  const addReference = (path: string) => {
+    setReferences((current) => (current.includes(path) ? current : [...current, path]));
+    setDraft("");
+    resetMenu();
+  };
+
+  const removeReference = (path: string) => {
+    setReferences((current) => current.filter((entry) => entry !== path));
   };
 
   const runCommand = (command: string, args: string) => {
@@ -56,7 +105,7 @@ export default function Composer({
 
   const submit = () => {
     const text = draft.trim();
-    if (!text || running) {
+    if ((!text && references.length === 0) || running) {
       return;
     }
     const slash = parseSlash(text);
@@ -66,7 +115,9 @@ export default function Composer({
     }
     setDraft("");
     resetMenu();
-    onSend(text);
+    const message = buildMessage(text, references);
+    setReferences([]);
+    onSend(message);
   };
 
   return (
@@ -77,6 +128,24 @@ export default function Composer({
         submit();
       }}
     >
+      {references.length > 0 ? (
+        <div className="attachments references" aria-label={t("reference.menu")}>
+          {references.map((path) => (
+            <span key={path} className="attachment-chip">
+              @{path}
+              <button
+                type="button"
+                className="attachment-remove"
+                aria-label={t("reference.remove", { path })}
+                onClick={() => removeReference(path)}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : null}
+
       {attachments.length > 0 ? (
         <div className="attachments">
           {attachments.map((attachment) => (
@@ -105,6 +174,16 @@ export default function Composer({
         </div>
       ) : null}
 
+      {pathMenuOpen ? (
+        <div className="composer-slash composer-reference">
+          {pathMatches.length > 0 ? (
+            <ReferenceMenu paths={pathMatches} activeIndex={pathIndex} onPick={addReference} />
+          ) : (
+            <p className="slash-empty muted">{t("reference.empty")}</p>
+          )}
+        </div>
+      ) : null}
+
       <textarea
         className="composer-input"
         aria-label="消息"
@@ -115,6 +194,8 @@ export default function Composer({
           setDraft(event.target.value);
           setDismissed(false);
           setActiveIndex(0);
+          setPathDismissed(false);
+          setPathIndex(0);
         }}
         onKeyDown={(event) => {
           if (menuOpen && matches.length > 0) {
@@ -138,6 +219,31 @@ export default function Composer({
               const selected = matches[activeIndex] ?? matches[0];
               if (selected) {
                 pick(selected);
+              }
+              return;
+            }
+          }
+          if (pathMenuOpen && pathMatches.length > 0) {
+            if (event.key === "ArrowDown") {
+              event.preventDefault();
+              setPathIndex((current) => (current + 1) % pathMatches.length);
+              return;
+            }
+            if (event.key === "ArrowUp") {
+              event.preventDefault();
+              setPathIndex((current) => (current - 1 + pathMatches.length) % pathMatches.length);
+              return;
+            }
+            if (event.key === "Escape") {
+              event.preventDefault();
+              setPathDismissed(true);
+              return;
+            }
+            if (event.key === "Enter" && !event.shiftKey && !running) {
+              event.preventDefault();
+              const selected = pathMatches[pathIndex] ?? pathMatches[0];
+              if (selected) {
+                addReference(selected.path);
               }
               return;
             }
@@ -175,7 +281,7 @@ export default function Composer({
           type="submit"
           className="primary composer-send"
           aria-label="发送"
-          disabled={draft.trim() === ""}
+          disabled={draft.trim() === "" && references.length === 0}
         >
           发送
         </button>

@@ -624,6 +624,11 @@ export const zh = {
   "context.statusOf": "{{path}} 的加载状态",
   "context.loaded": "已加载",
   "context.notLoaded": "未加载",
+
+  "reference.menu": "上下文引用",
+  "reference.empty": "无匹配的文件或目录",
+  "reference.hint": "输入 @ 引用文件/目录",
+  "reference.remove": "移除引用 {{path}}",
 } as const;
 
 export type TranslationKey = keyof typeof zh;
