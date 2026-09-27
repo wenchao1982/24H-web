@@ -19,10 +19,14 @@
  *     --user admin --pass <password> [--prompt '仅回复两个字：pong'] [--timeout 60000]
  *   node scripts/e2e-real-hermes.mjs --base http://127.0.0.1:8931 \
  *     --user admin --pass <password> --probe-groups   # 只读探测群聊能力，不建会话/不花模型调用
+ *   node scripts/e2e-real-hermes.mjs --base http://127.0.0.1:8931 \
+ *     --user admin --pass <password> --groups-round   # 真实群聊一轮（groups.create/send/log；会花模型调用）
  *
  * 环境变量：E2E_BASE / E2E_USER / E2E_PASS / E2E_PROMPT / E2E_TIMEOUT_MS / E2E_RAW=1
  *           E2E_WAIT_READY=1（恢复旧的就绪屏障，等 `gateway.ready` 再发首个请求）
  *           E2E_PROBE_GROUPS=1（等价 --probe-groups）
+ *           E2E_GROUPS_ROUND=1（等价 --groups-round）
+ *           E2E_GROUPS_TIMEOUT_MS（群聊轮次等待上限，默认 120000）
  * 默认（no-wait）：WS `open` 后**立即**发 `session.create`，不等待转发的 `gateway.ready`
  *   —— 这是对 BFF「上游未建立前先缓存客户端帧」冷启动修复的端到端验证；失败即回归。
  * 退出码：0 = 到达最终答复（含模型调用失败时的 WARN）；1 = 未取得任何助手文本 / 连接失败。
@@ -50,6 +54,8 @@ function parseArgs(argv) {
     // 默认不等待 gateway.ready（回归 BFF 冷启动缓存修复）。
     noWait: process.env.E2E_WAIT_READY !== "1",
     probeGroups: process.env.E2E_PROBE_GROUPS === "1",
+    groupsRound: process.env.E2E_GROUPS_ROUND === "1",
+    groupsTimeoutMs: Number(process.env.E2E_GROUPS_TIMEOUT_MS || 120000),
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -66,6 +72,8 @@ function parseArgs(argv) {
     else if (arg === "--no-wait") opts.noWait = true;
     else if (arg === "--wait-ready") opts.noWait = false;
     else if (arg === "--probe-groups") opts.probeGroups = true;
+    else if (arg === "--groups-round") opts.groupsRound = true;
+    else if (arg === "--groups-timeout") opts.groupsTimeoutMs = Number(argv[++i] ?? opts.groupsTimeoutMs);
   }
   return opts;
 }
@@ -426,6 +434,167 @@ function openSocket(WS, url, options, timeoutMs) {
   });
 }
 
+/**
+ * 真实群聊一轮：`profiles.list` → `groups.create`（两个 profile）→ `groups.send`
+ * （`@all 用一句话各报一个数字`）→ 轮询 `groups.log`/`groups.state` 直至轮次收敛或超时，
+ * 打印 speaker + text 转录。会真实花掉若干模型调用（预期）。
+ *
+ * 无 ≥2 个 profile 时 WARN 跳过（不伪造），返回 0。
+ */
+async function runGroupsRound(gateway, opts) {
+  console.log("");
+  console.log("=== groups round (real, spends model calls) ===");
+
+  try {
+    const caps = await withTimeout(gateway.request("groups.capabilities", {}), 30000, "groups.capabilities");
+    if (caps && caps.driver === false) {
+      console.log(`[${FAIL}] groups.capabilities — driver unavailable（该 gateway 未启用群聊驱动）`);
+      return 1;
+    }
+  } catch (error) {
+    console.log(`[${FAIL}] groups.capabilities — ${error.message}`);
+    return 1;
+  }
+
+  let profiles = [];
+  try {
+    const result = await withTimeout(gateway.request("profiles.list", {}), 30000, "profiles.list");
+    profiles = Array.isArray(result?.profiles) ? result.profiles : [];
+  } catch (error) {
+    console.log(`[${FAIL}] profiles.list — ${error.message}`);
+    return 1;
+  }
+  const names = profiles
+    .map((profile) => String(profile?.name ?? "").trim())
+    .filter((name) => name !== "");
+  if (names.length < 2) {
+    console.log(
+      `[${WARN}] profiles.list — 仅 ${names.length} 个 profile，需 ≥2 才能群聊；跳过（不伪造）`,
+    );
+    return 0;
+  }
+  const members = names.slice(0, 2).map((name) => ({
+    member_id: name,
+    profile: name,
+    handle: name,
+  }));
+  console.log(
+    `[${PASS}] profiles.list — ${names.length} profile(s)；本轮成员 ${members.map((m) => m.profile).join(", ")}`,
+  );
+
+  const roomId = `e2e-room-${Date.now().toString(36)}`;
+  const threadId = `e2e-thread-${Date.now().toString(36)}`;
+  try {
+    const created = await withTimeout(
+      gateway.request("groups.create", { room_id: roomId, name: "E2E group round", members }),
+      30000,
+      "groups.create",
+    );
+    const memberCount = Array.isArray(created?.room?.members) ? created.room.members.length : members.length;
+    console.log(`[${PASS}] groups.create — room=${roomId} members=${memberCount}`);
+  } catch (error) {
+    console.log(`[${FAIL}] groups.create — ${error.message}`);
+    return 1;
+  }
+
+  const sendText = "@all 用一句话各报一个数字";
+  try {
+    await withTimeout(
+      gateway.request("groups.send", {
+        room_id: roomId,
+        event_id: `e2e-event-${Date.now().toString(36)}`,
+        payload: { text: sendText, thread_id: threadId },
+      }),
+      30000,
+      "groups.send",
+    );
+    console.log(`[${PASS}] groups.send — ${JSON.stringify(sendText)}`);
+  } catch (error) {
+    console.log(`[${FAIL}] groups.send — ${error.message}`);
+    return 1;
+  }
+
+  const events = [];
+  const seen = new Set();
+  let cursor = 0;
+  let settled = false;
+  let lastWorking = false;
+  const deadline = Date.now() + opts.groupsTimeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const page = await withTimeout(
+        gateway.request("groups.log", { room_id: roomId, since_seq: cursor }),
+        30000,
+        "groups.log",
+      );
+      for (const event of Array.isArray(page?.events) ? page.events : []) {
+        const key = `${event?.seq ?? ""}:${event?.event_id ?? ""}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          events.push(event);
+        }
+      }
+      const next = Number(page?.cursor);
+      if (Number.isFinite(next)) {
+        cursor = next;
+      }
+    } catch (error) {
+      console.log(`[${WARN}] groups.log — ${error.message}`);
+    }
+    try {
+      const state = await withTimeout(
+        gateway.request("groups.state", { room_id: roomId }),
+        30000,
+        "groups.state",
+      );
+      const status = state?.driver_status ?? {};
+      lastWorking = status.working === true;
+      const pending = Array.isArray(status.pending_actions) ? status.pending_actions.length : 0;
+      const memberTexts = events.filter(
+        (event) => event?.kind === "message.member" && typeof event?.payload?.text === "string",
+      ).length;
+      const terminals = events.filter((event) => /^turn\./.test(String(event?.kind))).length;
+      if (!lastWorking && pending === 0 && (memberTexts > 0 || terminals > 0)) {
+        settled = true;
+        break;
+      }
+    } catch (error) {
+      console.log(`[${WARN}] groups.state — ${error.message}`);
+    }
+    await sleep(2000);
+  }
+
+  console.log("");
+  console.log("--- transcript ---");
+  const transcript = [];
+  for (const event of events) {
+    const text = typeof event?.payload?.text === "string" ? event.payload.text.trim() : "";
+    if (!text) continue;
+    const actor = event?.actor ?? {};
+    const kind = String(event?.kind ?? "");
+    const speaker =
+      actor.kind === "user"
+        ? "user"
+        : String(actor.display_name || event?.payload?.member_id || actor.id || "?").trim();
+    transcript.push({ speaker, text, kind });
+    console.log(`${speaker} [${kind}]: ${text}`);
+  }
+  const spoken = transcript.filter((entry) => entry.kind === "message.member");
+
+  if (settled && spoken.length > 0) {
+    console.log(`[${PASS}] groups round — settled；${spoken.length} 条成员消息`);
+    return 0;
+  }
+  if (!settled) {
+    console.log(
+      `[${FAIL}] groups round — 未在 ${opts.groupsTimeoutMs}ms 内收敛（working=${lastWorking}）`,
+    );
+    return 1;
+  }
+  console.log(`[${FAIL}] groups round — 已收敛但无成员消息`);
+  return 1;
+}
+
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
   const base = opts.base.replace(/\/+$/, "");
@@ -581,6 +750,13 @@ async function main() {
     }
     socket.close();
     return 0;
+  }
+
+  // 真实群聊一轮：会花模型调用（预期）。
+  if (opts.groupsRound) {
+    const code = await runGroupsRound(gateway, opts);
+    socket.close();
+    return code;
   }
 
   // 3. session.create
