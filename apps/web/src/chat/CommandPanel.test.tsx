@@ -186,3 +186,29 @@ describe("CommandPanel T20.10 后台/旁问", () => {
     ]);
   });
 });
+
+describe("CommandPanel T20.11 繁忙行为", () => {
+  it("manages the queue, steers and sets busy mode", async () => {
+    const gateway = renderPanel();
+    const user = userEvent.setup();
+
+    await user.selectOptions(screen.getByLabelText("选择命令"), "queue");
+    await user.type(screen.getByLabelText("队列内容"), "补一个用例");
+    await user.click(screen.getByRole("button", { name: "加入队列" }));
+    await user.click(screen.getByRole("button", { name: "清空队列" }));
+
+    await user.selectOptions(screen.getByLabelText("选择命令"), "steer");
+    await user.type(screen.getByLabelText("指点内容"), "先做 A");
+    await user.click(screen.getByRole("button", { name: "发送指点" }));
+
+    await user.selectOptions(screen.getByLabelText("选择命令"), "busy");
+    await user.click(screen.getByRole("button", { name: "排队模式" }));
+
+    expect(gateway.paramsOf("slash.exec")).toEqual([
+      { command: "/queue", args: "add 补一个用例" },
+      { command: "/queue", args: "clear" },
+      { command: "/steer", args: "send 先做 A" },
+      { command: "/busy", args: "queue" },
+    ]);
+  });
+});

@@ -536,6 +536,19 @@ export const zh = {
   "btw.input": "旁问内容",
   "btw.action.ask": "发起旁问",
   "btw.action.status": "查看状态",
+
+  "queue.title": "排队",
+  "queue.input": "队列内容",
+  "queue.action.add": "加入队列",
+  "queue.action.list": "列出队列",
+  "queue.action.clear": "清空队列",
+  "steer.title": "指点",
+  "steer.input": "指点内容",
+  "steer.action.send": "发送指点",
+  "busy.title": "繁忙行为",
+  "busy.action.queue": "排队模式",
+  "busy.action.steer": "指点模式",
+  "busy.action.interrupt": "打断模式",
 } as const;
 
 export type TranslationKey = keyof typeof zh;

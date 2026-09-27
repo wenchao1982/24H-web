@@ -178,6 +178,33 @@ export const SLASH_COMMAND_SPECS: SlashCommandSpec[] = [
       { id: "status", labelKey: "btw.action.status", args: "status" },
     ],
   },
+  {
+    command: "queue",
+    titleKey: "queue.title",
+    inputKey: "queue.input",
+    actions: [
+      { id: "add", labelKey: "queue.action.add", args: "add", kind: "primary", withInput: true },
+      { id: "list", labelKey: "queue.action.list", args: "list" },
+      { id: "clear", labelKey: "queue.action.clear", args: "clear", kind: "danger" },
+    ],
+  },
+  {
+    command: "steer",
+    titleKey: "steer.title",
+    inputKey: "steer.input",
+    actions: [
+      { id: "send", labelKey: "steer.action.send", args: "send", kind: "primary", withInput: true },
+    ],
+  },
+  {
+    command: "busy",
+    titleKey: "busy.title",
+    actions: [
+      { id: "queue", labelKey: "busy.action.queue", args: "queue" },
+      { id: "steer", labelKey: "busy.action.steer", args: "steer" },
+      { id: "interrupt", labelKey: "busy.action.interrupt", args: "interrupt", kind: "danger" },
+    ],
+  },
 ];
 
 export function specForCommand(command: string): SlashCommandSpec | undefined {
