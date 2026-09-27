@@ -229,6 +229,18 @@ export const zh = {
   "portal.empty": "暂无门户信息。",
   "portal.error.load": "加载门户信息失败",
 
+  "advanced.tab.ops": "运维",
+  "ops.title": "运维",
+  "ops.hint": "系统诊断、备份、导入与转储；需要超级管理员权限。",
+  "ops.importPath": "导入路径（可选）",
+  "ops.action.doctor": "系统诊断",
+  "ops.action.backup": "备份",
+  "ops.action.import": "导入",
+  "ops.action.dump": "转储",
+  "ops.runAria": "运行{{name}}",
+  "ops.confirm": "确认执行「{{name}}」？",
+  "ops.error.action": "运维操作失败",
+
   "notifications.title": "通知",
   "notifications.empty": "暂无通知。",
   "notifications.markAllRead": "全部已读",
