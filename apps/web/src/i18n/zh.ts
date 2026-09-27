@@ -520,6 +520,13 @@ export const zh = {
   "rollback.input": "检查点 ID",
   "rollback.action.list": "列出检查点",
   "rollback.action.restore": "恢复检查点",
+
+  "snapshot.title": "状态快照",
+  "snapshot.input": "快照 ID",
+  "snapshot.action.create": "创建快照",
+  "snapshot.action.restore": "恢复快照",
+  "snapshot.action.prune": "清理快照",
+  "snapshot.action.list": "列出快照",
 } as const;
 
 export type TranslationKey = keyof typeof zh;

@@ -144,6 +144,22 @@ export const SLASH_COMMAND_SPECS: SlashCommandSpec[] = [
       },
     ],
   },
+  {
+    command: "snapshot",
+    titleKey: "snapshot.title",
+    inputKey: "snapshot.input",
+    actions: [
+      { id: "create", labelKey: "snapshot.action.create", args: "create", kind: "primary" },
+      {
+        id: "restore",
+        labelKey: "snapshot.action.restore",
+        args: "restore",
+        withInput: true,
+      },
+      { id: "prune", labelKey: "snapshot.action.prune", args: "prune", kind: "danger" },
+      { id: "list", labelKey: "snapshot.action.list", args: "list" },
+    ],
+  },
 ];
 
 export function specForCommand(command: string): SlashCommandSpec | undefined {

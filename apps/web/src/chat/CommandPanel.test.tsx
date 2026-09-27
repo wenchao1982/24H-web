@@ -146,3 +146,22 @@ describe("CommandPanel T20.8 文件回滚", () => {
     ]);
   });
 });
+
+describe("CommandPanel T20.9 状态快照", () => {
+  it("creates, restores and prunes snapshots", async () => {
+    const gateway = renderPanel();
+    const user = userEvent.setup();
+
+    await user.selectOptions(screen.getByLabelText("选择命令"), "snapshot");
+    await user.click(screen.getByRole("button", { name: "创建快照" }));
+    await user.type(screen.getByLabelText("快照 ID"), "snap-1");
+    await user.click(screen.getByRole("button", { name: "恢复快照" }));
+    await user.click(screen.getByRole("button", { name: "清理快照" }));
+
+    expect(gateway.paramsOf("slash.exec")).toEqual([
+      { command: "/snapshot", args: "create" },
+      { command: "/snapshot", args: "restore snap-1" },
+      { command: "/snapshot", args: "prune" },
+    ]);
+  });
+});
