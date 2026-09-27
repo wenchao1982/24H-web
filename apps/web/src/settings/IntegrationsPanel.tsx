@@ -1,5 +1,6 @@
 import { useState } from "react";
 import MemoryPanel from "./MemoryPanel";
+import WebhooksPanel from "./WebhooksPanel";
 import { t, type TranslationKey } from "../i18n";
 
 interface TabDef {
@@ -7,7 +8,10 @@ interface TabDef {
   labelKey: TranslationKey;
 }
 
-const TABS: TabDef[] = [{ id: "memory", labelKey: "integrations.tab.memory" }];
+const TABS: TabDef[] = [
+  { id: "memory", labelKey: "integrations.tab.memory" },
+  { id: "webhooks", labelKey: "integrations.tab.webhooks" },
+];
 
 /** 设置 → 集成：记忆 / Webhooks 等子分区。 */
 export default function IntegrationsPanel() {
@@ -30,6 +34,7 @@ export default function IntegrationsPanel() {
         ))}
       </nav>
       {tab === "memory" ? <MemoryPanel /> : null}
+      {tab === "webhooks" ? <WebhooksPanel /> : null}
     </div>
   );
 }

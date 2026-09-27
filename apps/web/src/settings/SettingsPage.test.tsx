@@ -391,3 +391,23 @@ describe("SettingsPage T17.3 集成 → 记忆", () => {
     expect(await screen.findByLabelText("选择提供方")).toHaveValue("sqlite");
   });
 });
+
+describe("SettingsPage T17.4 集成 → Webhooks", () => {
+  it("opens the integrations section and switches to the webhooks tab", async () => {
+    vi.stubGlobal(
+      "fetch",
+      stubFetch([
+        { path: "/api/hermes/env", method: "GET", status: 200, body: { keys: [] } },
+        { path: "/api/hermes/webhooks", method: "GET", status: 200, body: { webhooks: [] } },
+      ]),
+    );
+    const user = userEvent.setup();
+
+    render(<SettingsPage />);
+    await user.click(screen.getByRole("button", { name: "集成" }));
+    await user.click(screen.getByRole("button", { name: "Webhooks" }));
+
+    expect(await screen.findByRole("heading", { name: "Webhooks" })).toBeInTheDocument();
+    expect(await screen.findByText("暂无 Webhook。")).toBeInTheDocument();
+  });
+});
