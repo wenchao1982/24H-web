@@ -513,3 +513,31 @@ describe("ChatPage T6.15 工作区", () => {
     });
   });
 });
+
+describe("ChatPage T17.5 子代理观测", () => {
+  it("toggles the subagents panel for the active session", async () => {
+    const gateway = createFakeGateway((method) => {
+      if (method === "session.list") {
+        return { sessions: [{ id: "s1", title: "会话一" }] };
+      }
+      if (method === "subagent.list") {
+        return { subagents: [{ id: "a1", name: "reviewer", status: "running" }] };
+      }
+      if (method === "delegation.status") {
+        return { paused: false };
+      }
+      return {};
+    });
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+
+    const toggle = screen.getByRole("button", { name: "子代理" });
+    await user.click(toggle);
+
+    expect(
+      await screen.findByRole("button", { name: "查看子代理 reviewer 输出" }),
+    ).toBeInTheDocument();
+    expect(gateway.paramsOf("subagent.list")).toEqual([{ session_id: "s1" }]);
+  });
+});

@@ -38,6 +38,22 @@ export const zh = {
 
   "chat.backToList": "返回会话列表",
   "chat.showList": "会话列表",
+  "chat.subagents": "子代理",
+
+  "subagents.title": "子代理",
+  "subagents.close": "收起子代理",
+  "subagents.refresh": "刷新",
+  "subagents.selectSession": "选择会话后查看子代理。",
+  "subagents.loading": "加载子代理中…",
+  "subagents.empty": "当前会话暂无子代理。",
+  "subagents.interrupt": "中断",
+  "subagents.steer": "指点",
+  "subagents.steerPlaceholder": "输入指令并指派",
+  "subagents.pause": "暂停委派",
+  "subagents.tailAria": "查看子代理 {{name}} 输出",
+  "subagents.noTail": "暂无输出。",
+  "subagents.error.load": "加载子代理失败",
+  "subagents.error.control": "子代理操作失败",
 
   "details.aria": "详情面板",
   "details.tabsAria": "详情标签",
