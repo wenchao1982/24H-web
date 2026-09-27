@@ -549,6 +549,10 @@ export const zh = {
   "busy.action.queue": "排队模式",
   "busy.action.steer": "指点模式",
   "busy.action.interrupt": "打断模式",
+
+  "compress.title": "手动压缩",
+  "compress.action.run": "压缩上下文",
+  "compress.action.status": "查看状态",
 } as const;
 
 export type TranslationKey = keyof typeof zh;

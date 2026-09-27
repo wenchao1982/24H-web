@@ -205,6 +205,14 @@ export const SLASH_COMMAND_SPECS: SlashCommandSpec[] = [
       { id: "interrupt", labelKey: "busy.action.interrupt", args: "interrupt", kind: "danger" },
     ],
   },
+  {
+    command: "compress",
+    titleKey: "compress.title",
+    actions: [
+      { id: "run", labelKey: "compress.action.run", args: "run", kind: "primary" },
+      { id: "status", labelKey: "compress.action.status", args: "status" },
+    ],
+  },
 ];
 
 export function specForCommand(command: string): SlashCommandSpec | undefined {

@@ -212,3 +212,16 @@ describe("CommandPanel T20.11 繁忙行为", () => {
     ]);
   });
 });
+
+describe("CommandPanel T20.12 手动压缩", () => {
+  it("dispatches /compress", async () => {
+    const gateway = renderPanel(() => ({ text: "已压缩上下文" }));
+    const user = userEvent.setup();
+
+    await user.selectOptions(screen.getByLabelText("选择命令"), "compress");
+    await user.click(screen.getByRole("button", { name: "压缩上下文" }));
+
+    expect(gateway.paramsOf("slash.exec")).toEqual([{ command: "/compress", args: "run" }]);
+    expect(await screen.findByLabelText("执行结果")).toHaveTextContent("已压缩上下文");
+  });
+});
