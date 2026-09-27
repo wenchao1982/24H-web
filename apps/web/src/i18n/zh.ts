@@ -678,6 +678,20 @@ export const zh = {
   "eventHooks.shell": "shell",
   "eventHooks.error.load": "加载钩子失败",
   "eventHooks.error.save": "保存钩子失败",
+
+  "advanced.tab.searchTools": "搜索/抽取",
+  "searchTools.title": "搜索 / 抽取",
+  "searchTools.hint": "Web Search provider（密钥掩码展示）与文档抽取开关。",
+  "searchTools.loading": "加载搜索配置…",
+  "searchTools.webSearch": "Web Search",
+  "searchTools.providerLabel": "搜索 provider",
+  "searchTools.provider": "provider：{{provider}}",
+  "searchTools.empty": "未配置 Web Search。",
+  "searchTools.keyMasked": "{{name}}（掩码）",
+  "searchTools.extraction": "Document Extraction",
+  "searchTools.extractionEnabled": "启用文档抽取",
+  "searchTools.error.load": "加载搜索配置失败",
+  "searchTools.error.save": "保存搜索配置失败",
 } as const;
 
 export type TranslationKey = keyof typeof zh;

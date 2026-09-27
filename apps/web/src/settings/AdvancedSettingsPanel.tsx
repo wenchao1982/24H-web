@@ -15,6 +15,7 @@ import BillingPanel from "./BillingPanel";
 import LearningPanel from "./LearningPanel";
 import ApiServerPanel from "./ApiServerPanel";
 import EventHooksPanel from "./EventHooksPanel";
+import SearchExtractionPanel from "./SearchExtractionPanel";
 import { t, type TranslationKey } from "../i18n";
 
 interface TabDef {
@@ -39,6 +40,7 @@ const TABS: TabDef[] = [
   { id: "learning", labelKey: "advanced.tab.learning" },
   { id: "api-server", labelKey: "advanced.tab.apiServer" },
   { id: "event-hooks", labelKey: "advanced.tab.eventHooks" },
+  { id: "search-tools", labelKey: "advanced.tab.searchTools" },
 ];
 
 /** 设置 → 高级：本地模型 / 配对 / 运维 / 网关工具等子分区。 */
@@ -77,6 +79,7 @@ export default function AdvancedSettingsPanel() {
       {tab === "learning" ? <LearningPanel /> : null}
       {tab === "api-server" ? <ApiServerPanel /> : null}
       {tab === "event-hooks" ? <EventHooksPanel /> : null}
+      {tab === "search-tools" ? <SearchExtractionPanel /> : null}
     </div>
   );
 }
