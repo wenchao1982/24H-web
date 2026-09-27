@@ -4,6 +4,7 @@ import PairingPanel from "./PairingPanel";
 import PortalPanel from "./PortalPanel";
 import OpsPanel from "./OpsPanel";
 import BrowserPanel from "./BrowserPanel";
+import VoicePanel from "./VoicePanel";
 import { t, type TranslationKey } from "../i18n";
 
 interface TabDef {
@@ -17,6 +18,7 @@ const TABS: TabDef[] = [
   { id: "portal", labelKey: "advanced.tab.portal" },
   { id: "ops", labelKey: "advanced.tab.ops" },
   { id: "browser", labelKey: "advanced.tab.browser" },
+  { id: "voice", labelKey: "advanced.tab.voice" },
 ];
 
 /** 设置 → 高级：本地模型 / 配对 / 运维 / 网关工具等子分区。 */
@@ -44,6 +46,7 @@ export default function AdvancedSettingsPanel() {
       {tab === "portal" ? <PortalPanel /> : null}
       {tab === "ops" ? <OpsPanel /> : null}
       {tab === "browser" ? <BrowserPanel /> : null}
+      {tab === "voice" ? <VoicePanel /> : null}
     </div>
   );
 }
