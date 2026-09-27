@@ -62,6 +62,9 @@ BFF 用 esbuild 打成单文件 ESM bundle（`packages: external`，依赖不内
 
 ## 部署（A2）
 
+完整部署指南（拓扑 / systemd / Caddyfile / bootstrap / 升级 / 安全）见
+[`docs/DEPLOY.md`](./docs/DEPLOY.md)。
+
 - Hermes 只绑 **loopback（127.0.0.1）**，不触发其 auth gate。
 - **BFF + SPA 同源**：由反代（Caddy/nginx）托管 SPA 静态产物，并把 `/api` 转发到 BFF；
   TLS 与登录由 BFF 承担。
@@ -77,6 +80,12 @@ BFF 用 esbuild 打成单文件 ESM bundle（`packages: external`，依赖不内
 ```bash
 npm run check       # typecheck + 两套 vitest（server + web），当前 400+ 用例
 npm run test:e2e    # Playwright e2e（隔离 temp DB + 首启 admin；不进 check）
+```
+
+只读上线冒烟（对运行中的 BFF，不调模型）：
+
+```bash
+OS_SMOKE_BASE=https://24h.example.com OS_SMOKE_USER=admin OS_SMOKE_PASS=... npm run smoke
 ```
 
 `npm run test:e2e` 用 Playwright 自建**隔离环境**：临时 SQLite DB、首启 `admin`、构建并运行
