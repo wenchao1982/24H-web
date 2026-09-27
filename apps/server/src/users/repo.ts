@@ -13,6 +13,8 @@ export interface UserRow {
   updated_at: number;
   last_login_at: number | null;
   avatar: string | null;
+  external_id: string | null;
+  auth_provider: string;
 }
 
 export function countUsers(db: Db): number {
@@ -47,6 +49,76 @@ export function findUserByUsername(db: Db, username: string): UserRow | null {
 export function findUserById(db: Db, id: number): UserRow | null {
   const row = db.prepare("SELECT * FROM users WHERE id = ?").get(id) as UserRow | undefined;
   return row ?? null;
+}
+
+export function findUserByExternalId(
+  db: Db,
+  provider: string,
+  externalId: string,
+): UserRow | null {
+  const row = db
+    .prepare("SELECT * FROM users WHERE auth_provider = ? AND external_id = ?")
+    .get(provider, externalId) as UserRow | undefined;
+  return row ?? null;
+}
+
+function normalizeExternalUsername(raw: string, externalId: string): string {
+  const candidate = raw.trim();
+  if (/^[a-zA-Z0-9][a-zA-Z0-9_.-]{2,31}$/.test(candidate)) {
+    return candidate;
+  }
+  const fallback = `oidc_${externalId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 24)}`;
+  return fallback.length >= 3 ? fallback : `oidc_user`;
+}
+
+function uniqueUsername(db: Db, base: string): string {
+  let candidate = base;
+  let suffix = 1;
+  while (findUserByUsername(db, candidate)) {
+    suffix += 1;
+    candidate = `${base.slice(0, 28)}_${suffix}`;
+  }
+  return candidate;
+}
+
+/**
+ * JIT provision a local user from a trusted external identity (OIDC).
+ * 角色保持本地默认（调用方传入，**绝不**自动 super_admin）；口令哈希为随机值，
+ * 故无法经 password provider 登录。
+ */
+export function ensureExternalUser(
+  db: Db,
+  input: {
+    provider: string;
+    externalId: string;
+    username: string;
+    role: UserRow["role"];
+  },
+): UserRow {
+  const existing = findUserByExternalId(db, input.provider, input.externalId);
+  if (existing) {
+    return existing;
+  }
+
+  const now = Date.now();
+  const username = uniqueUsername(db, normalizeExternalUsername(input.username, input.externalId));
+  const info = db
+    .prepare(
+      `INSERT INTO users
+        (username, password_hash, role, status, must_change_password, created_at, updated_at, external_id, auth_provider)
+       VALUES (?, ?, ?, 'active', 0, ?, ?, ?, ?)`,
+    )
+    .run(
+      username,
+      randomBytes(32).toString("hex"),
+      input.role,
+      now,
+      now,
+      input.externalId,
+      input.provider,
+    );
+
+  return db.prepare("SELECT * FROM users WHERE id = ?").get(info.lastInsertRowid) as UserRow;
 }
 
 export function listUserProfiles(

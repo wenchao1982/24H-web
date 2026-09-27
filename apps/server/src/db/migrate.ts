@@ -82,6 +82,16 @@ export const MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_connections_default ON connections(is_default);
     `,
   },
+  {
+    version: 4,
+    name: "004_oidc",
+    sql: `
+      ALTER TABLE users ADD COLUMN external_id TEXT;
+      ALTER TABLE users ADD COLUMN auth_provider TEXT NOT NULL DEFAULT 'password';
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_users_external
+        ON users(auth_provider, external_id) WHERE external_id IS NOT NULL;
+    `,
+  },
 ];
 
 export function migrate(db: Db): number {
