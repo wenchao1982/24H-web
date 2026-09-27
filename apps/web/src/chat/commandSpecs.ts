@@ -86,6 +86,15 @@ export const SLASH_COMMAND_SPECS: SlashCommandSpec[] = [
       { id: "list", labelKey: "plan.action.list", args: "list" },
     ],
   },
+  {
+    command: "review",
+    titleKey: "review.title",
+    inputKey: "review.input",
+    actions: [
+      { id: "run", labelKey: "review.action.run", args: "run", kind: "primary" },
+      { id: "status", labelKey: "review.action.status", args: "status" },
+    ],
+  },
 ];
 
 export function specForCommand(command: string): SlashCommandSpec | undefined {

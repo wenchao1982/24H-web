@@ -75,3 +75,16 @@ describe("CommandPanel T20.4 计划", () => {
     expect(await screen.findByLabelText("执行结果")).toHaveTextContent("计划：1. 读取 2. 修改 3. 验证");
   });
 });
+
+describe("CommandPanel T20.5 评审", () => {
+  it("dispatches /review and shows the result", async () => {
+    const gateway = renderPanel(() => ({ message: "评审完成：发现 0 个问题" }));
+    const user = userEvent.setup();
+
+    await user.selectOptions(screen.getByLabelText("选择命令"), "review");
+    await user.click(screen.getByRole("button", { name: "发起评审" }));
+
+    expect(gateway.paramsOf("slash.exec")).toEqual([{ command: "/review", args: "run" }]);
+    expect(await screen.findByLabelText("执行结果")).toHaveTextContent("评审完成");
+  });
+});

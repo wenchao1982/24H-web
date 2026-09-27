@@ -496,6 +496,11 @@ export const zh = {
   "plan.action.run": "生成计划",
   "plan.action.status": "查看状态",
   "plan.action.list": "列出计划",
+
+  "review.title": "代码评审",
+  "review.input": "评审范围（可选）",
+  "review.action.run": "发起评审",
+  "review.action.status": "查看状态",
 } as const;
 
 export type TranslationKey = keyof typeof zh;
