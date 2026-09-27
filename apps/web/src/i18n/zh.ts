@@ -388,6 +388,16 @@ export const zh = {
   "billing.portalPlan": "门户套餐概览",
   "billing.error.load": "加载计费信息失败",
 
+  "advanced.tab.learning": "学习",
+  "learning.title": "学习 / 策展",
+  "learning.hint": "查看学习策展条目与学习旅程。",
+  "learning.loading": "加载学习数据中…",
+  "learning.curatorTitle": "策展条目",
+  "learning.graphTitle": "学习旅程",
+  "learning.empty": "暂无策展条目。",
+  "learning.graphEmpty": "暂无学习旅程数据。",
+  "learning.error.load": "加载学习数据失败",
+
   "notifications.title": "通知",
   "notifications.empty": "暂无通知。",
   "notifications.markAllRead": "全部已读",
