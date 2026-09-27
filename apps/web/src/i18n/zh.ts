@@ -92,6 +92,23 @@ export const zh = {
   "channels.error.load": "加载渠道失败",
   "channels.error.save": "保存渠道失败",
 
+  "settings.section.integrations": "集成",
+  "integrations.tabsAria": "集成子分区",
+  "integrations.tab.memory": "记忆",
+
+  "memory.title": "记忆",
+  "memory.hint": "选择记忆提供方并查看存储占用；重置将清除全部记忆。",
+  "memory.loading": "加载记忆中…",
+  "memory.provider": "记忆提供方",
+  "memory.selectProvider": "选择提供方",
+  "memory.saved": "已保存",
+  "memory.sizes": "存储占用",
+  "memory.empty": "无记忆数据。",
+  "memory.reset": "重置记忆",
+  "memory.error.load": "加载记忆失败",
+  "memory.error.provider": "切换提供方失败",
+  "memory.error.reset": "重置记忆失败",
+
   "projects.title": "项目",
   "projects.hint": "项目是可切换的具名多文件夹工作区。",
   "projects.empty": "暂无项目。",

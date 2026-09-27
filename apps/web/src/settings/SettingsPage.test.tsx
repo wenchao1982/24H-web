@@ -367,3 +367,27 @@ describe("SettingsPage T10.3 监控", () => {
     expect(screen.getByLabelText("版本")).toHaveTextContent("v0.21.3");
   });
 });
+
+describe("SettingsPage T17.3 集成 → 记忆", () => {
+  it("opens the integrations section and renders the memory panel", async () => {
+    vi.stubGlobal(
+      "fetch",
+      stubFetch([
+        { path: "/api/hermes/env", method: "GET", status: 200, body: { keys: [] } },
+        {
+          path: "/api/hermes/memory",
+          method: "GET",
+          status: 200,
+          body: { provider: "sqlite", providers: ["sqlite"], sizes: { entries: 5 } },
+        },
+      ]),
+    );
+    const user = userEvent.setup();
+
+    render(<SettingsPage />);
+    await user.click(screen.getByRole("button", { name: "集成" }));
+
+    expect(await screen.findByRole("heading", { name: "记忆" })).toBeInTheDocument();
+    expect(await screen.findByLabelText("选择提供方")).toHaveValue("sqlite");
+  });
+});
