@@ -644,6 +644,8 @@ export const zh = {
   "model.subtab.pools": "凭证池",
   "providerRouting.title": "Provider 路由",
   "providerRouting.hint": "配置 provider_routing：排序 / 白名单 / 黑名单 / 参数要求。",
+  "fallback.title": "回退 Provider",
+  "fallback.hint": "配置 fallback：主备降级链 + 辅助任务独立降级。",
 } as const;
 
 export type TranslationKey = keyof typeof zh;

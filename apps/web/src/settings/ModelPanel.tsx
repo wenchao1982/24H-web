@@ -3,6 +3,7 @@ import { api } from "../api/client";
 import { t, type TranslationKey } from "../i18n";
 import { normalizeMoa, normalizeModelInfo, normalizeModelOptions, type MoaState } from "./model";
 import ProviderRoutingPanel from "./ProviderRoutingPanel";
+import FallbackProviderPanel from "./FallbackProviderPanel";
 
 interface SubTab {
   id: string;
@@ -12,6 +13,7 @@ interface SubTab {
 const SUB_TABS: SubTab[] = [
   { id: "current", labelKey: "model.subtab.current" },
   { id: "routing", labelKey: "model.subtab.routing" },
+  { id: "fallback", labelKey: "model.subtab.fallback" },
 ];
 
 /** 设置 → 模型：当前模型 / 可选模型切换 / MoA / Provider 路由。 */
@@ -104,6 +106,7 @@ export default function ModelPanel() {
       </nav>
 
       {tab === "routing" ? <ProviderRoutingPanel /> : null}
+      {tab === "fallback" ? <FallbackProviderPanel /> : null}
 
       {tab === "current" ? (
         <>
