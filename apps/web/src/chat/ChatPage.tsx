@@ -10,6 +10,7 @@ import StatusBar from "./StatusBar";
 import ServerRequestCard from "./ServerRequestCard";
 import SubagentsPanel from "./SubagentsPanel";
 import ImageGenAction from "./ImageGenAction";
+import CommandPanel from "./CommandPanel";
 import {
   normalizeCatalog,
   normalizeCompletions,
@@ -71,6 +72,7 @@ export default function ChatPage() {
   const [workspace, setWorkspace] = useState("");
   const [subagentsOpen, setSubagentsOpen] = useState(false);
   const [imageOpen, setImageOpen] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
   const [commands, setCommands] = useState<SlashCommand[]>([]);
 
   const activeIdRef = useRef<string | null>(null);
@@ -644,6 +646,14 @@ export default function ChatPage() {
               >
                 {t("chat.image")}
               </button>
+              <button
+                type="button"
+                className="ghost"
+                aria-pressed={commandOpen}
+                onClick={() => setCommandOpen((value) => !value)}
+              >
+                {t("cmd.open")}
+              </button>
               <select
                 className="chat-workspace"
                 aria-label="工作区"
@@ -663,6 +673,17 @@ export default function ChatPage() {
               <SubagentsPanel sessionId={activeId} onClose={() => setSubagentsOpen(false)} />
             ) : null}
             {imageOpen ? <ImageGenAction onClose={() => setImageOpen(false)} /> : null}
+            {commandOpen ? (
+              <CommandPanel
+                onClose={() => setCommandOpen(false)}
+                onResult={(text) =>
+                  setItems((current) => [
+                    ...current,
+                    { kind: "notice", id: nextId(), level: "done", text },
+                  ])
+                }
+              />
+            ) : null}
             <Transcript items={items} />
             {pending.length > 0 ? (
               <div className="pending-requests">

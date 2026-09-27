@@ -454,6 +454,27 @@ export const zh = {
   "slash.run": "执行",
   "slash.argsPlaceholder": "参数（可选）",
   "slash.select": "选择一个命令",
+
+  "cmd.panel": "命令面板",
+  "cmd.close": "收起命令面板",
+  "cmd.select": "选择命令",
+  "cmd.run": "执行",
+  "cmd.result": "执行结果",
+  "cmd.error": "命令执行失败",
+  "cmd.open": "命令",
+
+  "goal.title": "持久目标",
+  "goal.input": "目标内容",
+  "goal.action.set": "设置目标",
+  "goal.action.status": "查看状态",
+  "goal.action.pause": "暂停",
+  "goal.action.resume": "继续",
+  "goal.action.clear": "清除",
+  "subgoal.title": "子目标",
+  "subgoal.input": "子目标内容",
+  "subgoal.action.add": "添加子目标",
+  "subgoal.action.status": "查看状态",
+  "subgoal.action.clear": "清除",
 } as const;
 
 export type TranslationKey = keyof typeof zh;

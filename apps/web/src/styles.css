@@ -840,6 +840,61 @@ button {
   padding: var(--ds-space-1) var(--ds-space-2);
 }
 
+/* T20.2+ 命令面板 */
+.command-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+}
+
+.command-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-2);
+}
+
+.command-panel-head h3 {
+  margin: 0;
+}
+
+.command-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+}
+
+.command-row select {
+  flex: 1;
+  min-width: 0;
+  padding: var(--ds-space-2);
+  border: var(--ds-border-1) solid var(--ds-border-l2);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-l1);
+  color: var(--ds-label-primary);
+  font: inherit;
+}
+
+.command-actions {
+  display: flex;
+  gap: var(--ds-space-2);
+  flex-wrap: wrap;
+}
+
+.command-result {
+  margin: 0;
+  padding: var(--ds-space-2);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-l2);
+  color: var(--ds-label-secondary);
+  font-family: var(--ds-font-mono);
+  font-size: var(--ds-font-size-xs);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 240px;
+  overflow: auto;
+}
+
 .subagents-panel {
   display: flex;
   flex-direction: column;
