@@ -490,6 +490,12 @@ export const zh = {
   "heartbeat.action.pause": "暂停",
   "heartbeat.action.resume": "继续",
   "heartbeat.action.stop": "停止",
+
+  "plan.title": "计划",
+  "plan.input": "计划目标",
+  "plan.action.run": "生成计划",
+  "plan.action.status": "查看状态",
+  "plan.action.list": "列出计划",
 } as const;
 
 export type TranslationKey = keyof typeof zh;

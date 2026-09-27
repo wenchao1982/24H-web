@@ -61,3 +61,17 @@ describe("CommandPanel T20.3 循环/心跳", () => {
     ]);
   });
 });
+
+describe("CommandPanel T20.4 计划", () => {
+  it("runs /plan and shows the produced plan", async () => {
+    const gateway = renderPanel(() => ({ message: "计划：1. 读取 2. 修改 3. 验证" }));
+    const user = userEvent.setup();
+
+    await user.selectOptions(screen.getByLabelText("选择命令"), "plan");
+    await user.type(screen.getByLabelText("计划目标"), "实现 M15");
+    await user.click(screen.getByRole("button", { name: "生成计划" }));
+
+    expect(gateway.paramsOf("slash.exec")).toEqual([{ command: "/plan", args: "run 实现 M15" }]);
+    expect(await screen.findByLabelText("执行结果")).toHaveTextContent("计划：1. 读取 2. 修改 3. 验证");
+  });
+});
