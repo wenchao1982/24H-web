@@ -10,6 +10,7 @@ import MonitorPanel from "./MonitorPanel";
 import ProjectsPanel from "./ProjectsPanel";
 import ChannelsPanel from "./ChannelsPanel";
 import IntegrationsPanel from "./IntegrationsPanel";
+import AdvancedSettingsPanel from "./AdvancedSettingsPanel";
 import { t, type TranslationKey } from "../i18n";
 
 interface SectionDef {
@@ -28,6 +29,7 @@ const SECTIONS: SectionDef[] = [
   { id: "monitor", labelKey: "settings.section.monitor" },
   { id: "channels", labelKey: "settings.section.channels" },
   { id: "integrations", labelKey: "settings.section.integrations" },
+  { id: "advanced", labelKey: "settings.section.advanced" },
   { id: "projects", labelKey: "settings.section.projects" },
 ];
 
@@ -62,6 +64,7 @@ export default function SettingsPage() {
         {section === "monitor" ? <MonitorPanel /> : null}
         {section === "channels" ? <ChannelsPanel /> : null}
         {section === "integrations" ? <IntegrationsPanel /> : null}
+        {section === "advanced" ? <AdvancedSettingsPanel /> : null}
         {section === "projects" ? <ProjectsPanel /> : null}
       </div>
     </div>
