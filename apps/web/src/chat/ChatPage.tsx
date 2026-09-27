@@ -11,6 +11,12 @@ import ServerRequestCard from "./ServerRequestCard";
 import SubagentsPanel from "./SubagentsPanel";
 import ImageGenAction from "./ImageGenAction";
 import {
+  normalizeCatalog,
+  normalizeCompletions,
+  slashResultText,
+  type SlashCommand,
+} from "./slash";
+import {
   appendDelta,
   completeAssistant,
   deltaText,
@@ -65,6 +71,7 @@ export default function ChatPage() {
   const [workspace, setWorkspace] = useState("");
   const [subagentsOpen, setSubagentsOpen] = useState(false);
   const [imageOpen, setImageOpen] = useState(false);
+  const [commands, setCommands] = useState<SlashCommand[]>([]);
 
   const activeIdRef = useRef<string | null>(null);
   const respondersRef = useRef(new Map<string, (result: Record<string, unknown>) => void>());
@@ -99,6 +106,35 @@ export default function ChatPage() {
         if (alive) {
           setError("无法加载会话列表");
         }
+      }
+    };
+    void load();
+    return () => {
+      alive = false;
+    };
+  }, [gateway]);
+
+  // T20.1 命令目录：优先 `commands.catalog`，为空时回退 `complete.slash`。
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        await gateway.connect().catch(() => undefined);
+        const catalog = normalizeCatalog(await gateway.request("commands.catalog", {}));
+        if (catalog.length > 0) {
+          if (alive) {
+            setCommands(catalog);
+          }
+          return;
+        }
+        const completions = normalizeCompletions(
+          await gateway.request("complete.slash", { prefix: "/" }),
+        );
+        if (alive) {
+          setCommands(completions);
+        }
+      } catch {
+        // 命令目录不可用时静默降级（输入框仍可发送普通消息）
       }
     };
     void load();
@@ -359,6 +395,29 @@ export default function ChatPage() {
       })
       .finally(() => setRunning(false));
   }, [gateway]);
+
+  // T20.1 执行 slash 命令：`slash.exec {command, args}`，结果作为完成提示追加到 transcript。
+  const handleSlash = useCallback(
+    (command: string, args: string) => {
+      const label = args ? `/${command} ${args}` : `/${command}`;
+      setItems((current) => [
+        ...current,
+        { kind: "message", id: nextId(), role: "user", text: label },
+      ]);
+      setError(null);
+      gateway
+        .request("slash.exec", { command: `/${command}`, args })
+        .then((result) => {
+          const text = slashResultText(result) || t("slash.done", { command: `/${command}` });
+          setItems((current) => [
+            ...current,
+            { kind: "notice", id: nextId(), level: "done", text },
+          ]);
+        })
+        .catch(() => setError(t("slash.error")));
+    },
+    [gateway, nextId],
+  );
 
   const handleAttach = useCallback(
     (files: File[]) => {
@@ -623,6 +682,8 @@ export default function ChatPage() {
               attachments={attachments}
               onAttach={handleAttach}
               onRemoveAttachment={removeAttachment}
+              commands={commands}
+              onSlash={handleSlash}
             />
             <StatusBar status={status} />
           </>

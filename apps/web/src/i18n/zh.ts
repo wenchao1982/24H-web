@@ -443,6 +443,17 @@ export const zh = {
   "notifications.prefs.sound": "提示音",
   "notifications.prefs.dnd": "免打扰",
   "notifications.disabled": "通知已关闭。",
+
+  "slash.menu": "命令菜单",
+  "slash.empty": "无匹配命令",
+  "slash.hint": "输入消息，Enter 发送；输入 / 唤起命令",
+  "slash.done": "已执行 {{command}}",
+  "slash.error": "命令执行失败",
+  "slash.commands": "命令",
+  "slash.close": "收起命令面板",
+  "slash.run": "执行",
+  "slash.argsPlaceholder": "参数（可选）",
+  "slash.select": "选择一个命令",
 } as const;
 
 export type TranslationKey = keyof typeof zh;

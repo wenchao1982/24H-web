@@ -541,3 +541,38 @@ describe("ChatPage T17.5 子代理观测", () => {
     expect(gateway.paramsOf("subagent.list")).toEqual([{ session_id: "s1" }]);
   });
 });
+
+describe("ChatPage T20.1 Slash 命令菜单", () => {
+  it("filters commands while typing and executes slash.exec on select", async () => {
+    const gateway = createFakeGateway((method) => {
+      if (method === "session.list") {
+        return { sessions: [{ id: "s1", title: "会话一" }] };
+      }
+      if (method === "commands.catalog") {
+        return {
+          commands: [
+            { name: "goal", description: "持久目标" },
+            { name: "review", description: "代码评审" },
+          ],
+        };
+      }
+      if (method === "slash.exec") {
+        return { message: "已设置目标" };
+      }
+      return {};
+    });
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+
+    await user.type(screen.getByLabelText("消息"), "/go");
+
+    expect(await screen.findByText("/goal")).toBeInTheDocument();
+    expect(screen.queryByText("/review")).not.toBeInTheDocument();
+
+    await user.click(screen.getByText("/goal"));
+
+    expect(gateway.paramsOf("slash.exec")).toEqual([{ command: "/goal", args: "" }]);
+    expect(await screen.findByText("已设置目标")).toBeInTheDocument();
+  });
+});

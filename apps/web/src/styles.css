@@ -787,6 +787,59 @@ button {
   outline: none;
 }
 
+/* T20.1 Slash 命令菜单 */
+.composer-slash {
+  flex-basis: 100%;
+}
+
+.slash-menu {
+  list-style: none;
+  margin: 0;
+  padding: var(--ds-space-1);
+  max-height: 240px;
+  overflow-y: auto;
+  border: var(--ds-border-1) solid var(--ds-border-l2);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-l2);
+}
+
+.slash-item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ds-space-2);
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-radius: var(--ds-radius-sm);
+  background: transparent;
+  color: var(--ds-label-primary);
+  padding: var(--ds-space-2);
+  min-height: var(--ds-row-h);
+}
+
+.slash-item[data-active="true"] {
+  background: var(--ds-surface-l3);
+}
+
+.slash-name {
+  font-family: var(--ds-font-mono);
+  font-size: var(--ds-font-size-sm);
+  color: var(--ds-accent-strong);
+  white-space: nowrap;
+}
+
+.slash-desc {
+  font-size: var(--ds-font-size-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slash-empty {
+  font-size: var(--ds-font-size-xs);
+  padding: var(--ds-space-1) var(--ds-space-2);
+}
+
 .subagents-panel {
   display: flex;
   flex-direction: column;
