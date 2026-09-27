@@ -289,6 +289,15 @@ button {
   padding: var(--ds-space-4);
 }
 
+.route-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  color: var(--ds-label-tertiary);
+  font-size: var(--ds-font-size-sm);
+}
+
 .icon-btn {
   display: inline-flex;
   align-items: center;

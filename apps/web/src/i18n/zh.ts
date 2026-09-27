@@ -7,6 +7,8 @@
 export const zh = {
   "app.name": "24H",
 
+  "common.loading": "加载中…",
+
   "nav.chat": "对话",
   "nav.agents": "智能体",
   "nav.groups": "群聊",
