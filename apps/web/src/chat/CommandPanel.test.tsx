@@ -165,3 +165,24 @@ describe("CommandPanel T20.9 状态快照", () => {
     ]);
   });
 });
+
+describe("CommandPanel T20.10 后台/旁问", () => {
+  it("runs /bg in the background and asks /btw", async () => {
+    const gateway = renderPanel(() => ({ output: "后台已启动" }));
+    const user = userEvent.setup();
+
+    await user.selectOptions(screen.getByLabelText("选择命令"), "bg");
+    await user.type(screen.getByLabelText("后台任务"), "跑测试");
+    await user.click(screen.getByRole("button", { name: "后台运行" }));
+    expect(await screen.findByLabelText("执行结果")).toHaveTextContent("后台已启动");
+
+    await user.selectOptions(screen.getByLabelText("选择命令"), "btw");
+    await user.type(screen.getByLabelText("旁问内容"), "这个用法对吗");
+    await user.click(screen.getByRole("button", { name: "发起旁问" }));
+
+    expect(gateway.paramsOf("slash.exec")).toEqual([
+      { command: "/bg", args: "run 跑测试" },
+      { command: "/btw", args: "ask 这个用法对吗" },
+    ]);
+  });
+});

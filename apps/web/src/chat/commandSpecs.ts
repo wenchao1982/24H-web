@@ -160,6 +160,24 @@ export const SLASH_COMMAND_SPECS: SlashCommandSpec[] = [
       { id: "list", labelKey: "snapshot.action.list", args: "list" },
     ],
   },
+  {
+    command: "bg",
+    titleKey: "bg.title",
+    inputKey: "bg.input",
+    actions: [
+      { id: "run", labelKey: "bg.action.run", args: "run", kind: "primary", withInput: true },
+      { id: "status", labelKey: "bg.action.status", args: "status" },
+    ],
+  },
+  {
+    command: "btw",
+    titleKey: "btw.title",
+    inputKey: "btw.input",
+    actions: [
+      { id: "ask", labelKey: "btw.action.ask", args: "ask", kind: "primary", withInput: true },
+      { id: "status", labelKey: "btw.action.status", args: "status" },
+    ],
+  },
 ];
 
 export function specForCommand(command: string): SlashCommandSpec | undefined {

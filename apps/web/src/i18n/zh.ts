@@ -527,6 +527,15 @@ export const zh = {
   "snapshot.action.restore": "恢复快照",
   "snapshot.action.prune": "清理快照",
   "snapshot.action.list": "列出快照",
+
+  "bg.title": "后台会话",
+  "bg.input": "后台任务",
+  "bg.action.run": "后台运行",
+  "bg.action.status": "查看状态",
+  "btw.title": "旁问",
+  "btw.input": "旁问内容",
+  "btw.action.ask": "发起旁问",
+  "btw.action.status": "查看状态",
 } as const;
 
 export type TranslationKey = keyof typeof zh;
