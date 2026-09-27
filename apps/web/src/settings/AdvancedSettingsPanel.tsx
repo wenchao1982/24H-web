@@ -9,6 +9,7 @@ import ExecPanel from "./ExecPanel";
 import QuickCompletePanel from "./QuickCompletePanel";
 import ProjectFactsPanel from "./ProjectFactsPanel";
 import HandoffPanel from "./HandoffPanel";
+import ForeignSessionPanel from "./ForeignSessionPanel";
 import { t, type TranslationKey } from "../i18n";
 
 interface TabDef {
@@ -27,6 +28,7 @@ const TABS: TabDef[] = [
   { id: "oneshot", labelKey: "advanced.tab.oneshot" },
   { id: "facts", labelKey: "advanced.tab.facts" },
   { id: "handoff", labelKey: "advanced.tab.handoff" },
+  { id: "foreign", labelKey: "advanced.tab.foreign" },
 ];
 
 /** 设置 → 高级：本地模型 / 配对 / 运维 / 网关工具等子分区。 */
@@ -59,6 +61,7 @@ export default function AdvancedSettingsPanel() {
       {tab === "oneshot" ? <QuickCompletePanel /> : null}
       {tab === "facts" ? <ProjectFactsPanel /> : null}
       {tab === "handoff" ? <HandoffPanel /> : null}
+      {tab === "foreign" ? <ForeignSessionPanel /> : null}
     </div>
   );
 }
