@@ -1,0 +1,9 @@
+[
+  {
+    "agentId": "mul4mbkhuoqu",
+    "taskId": "mul4kqa5hctq",
+    "claimedAt": "2026-09-28T10:50:29.777Z",
+    "status": "done",
+    "result": "技能界面沙箱预览页改造完成。改 4 文件 + 截图，未改任何测试。npm run check 全绿（server 131 + web 280）。截图 docs/refs/impl-skillhost.png。"
+  }
+]

@@ -3045,3 +3045,117 @@ mark {
   flex-direction: column;
   gap: var(--ds-space-2);
 }
+
+/* ---------- 技能界面（沙箱预览） ---------- */
+
+.skill-host-workbench,
+.skill-host-loading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-3);
+}
+
+.skill-host-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ds-space-2);
+}
+
+.skill-host-toolbar .ds-select {
+  width: auto;
+  flex: 0 1 280px;
+  min-width: 180px;
+}
+
+.skill-sandbox {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  border: var(--ds-border-1) solid var(--ds-border-l2);
+  border-radius: var(--ds-radius-md);
+  overflow: hidden;
+  background: var(--ds-surface-l2);
+}
+
+.skill-host-frame {
+  display: block;
+  max-width: 100%;
+  border: none;
+  background: var(--ds-surface-l1);
+}
+
+.skill-sandbox-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ds-space-2);
+  background: var(--ds-overlay);
+  color: var(--ds-accent-contrast);
+  font-size: var(--ds-font-size-sm);
+  text-align: center;
+}
+
+.skill-sandbox-spinner {
+  width: 24px;
+  height: 24px;
+  border: var(--ds-border-1) solid var(--ds-border-l2);
+  border-top-color: var(--ds-accent);
+  border-radius: var(--ds-radius-pill);
+  animation: skill-sandbox-spin 0.8s linear infinite;
+}
+
+@keyframes skill-sandbox-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skill-sandbox-spinner {
+    animation: none;
+  }
+}
+
+.skill-log {
+  max-height: 200px;
+  overflow: auto;
+  padding: var(--ds-space-2);
+  border: var(--ds-border-1) solid var(--ds-border-l1);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-l2);
+  font-family: var(--ds-font-mono);
+  font-size: var(--ds-font-size-xs);
+}
+
+.skill-log-empty {
+  margin: 0;
+  color: var(--ds-label-tertiary);
+}
+
+.skill-log-entry {
+  display: flex;
+  gap: var(--ds-space-2);
+  padding: 2px 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.skill-log-entry[data-dir="in"] {
+  color: var(--ds-info);
+}
+
+.skill-log-entry[data-dir="out"] {
+  color: var(--ds-success);
+}
+
+.skill-log-dir {
+  flex: none;
+}
+
+.skill-host-security {
+  margin: 0;
+}
