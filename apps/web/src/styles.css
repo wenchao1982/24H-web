@@ -2705,3 +2705,32 @@ mark {
 }
 
 
+/* ---------- 面板拖拽缩放（dsh 让步链） ---------- */
+.app-shell { position: relative; }
+.resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  z-index: 25;
+  cursor: col-resize;
+  touch-action: none;
+}
+.resize-handle--sidebar { left: var(--ds-sidebar-width); transform: translateX(-50%); }
+.resize-handle--details { right: var(--ds-details-width); transform: translateX(50%); }
+.resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 3px;
+  height: 36px;
+  border-radius: 2px;
+  background: var(--ds-border-l2);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.resize-handle:hover::after,
+.resize-handle[data-dragging="true"]::after { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .resize-handle::after { transition: none; } }
