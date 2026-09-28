@@ -45,6 +45,9 @@ export interface UsageSummary {
   messages: number;
   tokens: number;
   cost: number;
+  /** 上游提供时才有；缺失为 `null`（前端据此决定是否渲染拆分指标）。 */
+  inputTokens?: number | null;
+  outputTokens?: number | null;
 }
 
 /** 会话/消息统计：兼容顶层与 `{totals}` 嵌套。 */
@@ -56,7 +59,40 @@ export function normalizeUsage(payload: unknown): UsageSummary {
     messages: readNumber(source, "messages", "message_count", "total_messages") ?? 0,
     tokens: readNumber(source, "tokens", "total_tokens", "token_count") ?? 0,
     cost: readNumber(source, "cost", "total_cost", "cost_usd") ?? 0,
+    inputTokens: readNumber(source, "input_tokens", "prompt_tokens", "input"),
+    outputTokens: readNumber(source, "output_tokens", "completion_tokens", "output"),
   };
+}
+
+/** 单个日期的令牌用量（趋势图）。 */
+export interface UsagePoint {
+  date: string;
+  tokens: number;
+}
+
+/** 令牌趋势序列：兼容 `{daily|series|trend:[{date|day, tokens|value}]}` 与顶层数组。 */
+export function normalizeUsageSeries(payload: unknown): UsagePoint[] {
+  const root = asRecord(payload);
+  const list = Array.isArray(payload)
+    ? payload
+    : Array.isArray(root.daily)
+      ? root.daily
+      : Array.isArray(root.series)
+        ? root.series
+        : Array.isArray(root.trend)
+          ? root.trend
+          : [];
+  const out: UsagePoint[] = [];
+  for (const item of list) {
+    const source = asRecord(item);
+    const date = readString(source, "date", "day", "timestamp");
+    const tokens = readNumber(source, "tokens", "value", "total_tokens");
+    if (!date || tokens == null) {
+      continue;
+    }
+    out.push({ date, tokens });
+  }
+  return out;
 }
 
 export interface UsageByModel {

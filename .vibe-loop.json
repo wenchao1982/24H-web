@@ -293,12 +293,84 @@
       "description": "C1 移除 AppShell 全局 main-header 后，/settings、/agents 等页面缺少页面级 h1/主 landmark，属真实 a11y 缺陷（每路由应有可导航标题）。建议给 ShellLayout 或各页补一个页面标题（可用 visually-hidden h1 从 active nav 派生，避免与页面已有 h2 冲突；注意 e2e smoke 现用 searchbox/nav 断言，补标题后可再固化）。范围：settings/agents/tasks/usage/groups/chat 等主路由。",
       "priority": "low",
       "status": "pending"
+    },
+    {
+      "id": "mul0p6nkyqn0",
+      "createdAt": "2026-09-28T09:00:44.912Z",
+      "updatedAt": "2026-09-28T09:11:37.291Z",
+      "title": "用量页改造（时间范围/趋势/系统状态/表格能力）",
+      "description": "对齐用户 UI/UX 方案「用量统计」：时间范围选择器(今日/7/30/自定义)、费用 USD/CNY、Token 趋势(有 series 才渲染)、系统状态补 CPU/内存/磁盘/进程 + 健康着色、模型表排序/搜索/CSV/查看明细、术语与口径注释。约束：可加性改造，UsagePage.test 的既有 label 与原始数字串(gpt-4o/1000/0.25, days=30)必须保持。数据缺口：输入/输出 token、日序列、代理连通/队列后端未提供，缺失时优雅隐藏/—。",
+      "priority": "medium",
+      "status": "completed",
+      "completedAt": "2026-09-28T09:11:37.291Z"
+    },
+    {
+      "id": "mul0u5urrih5",
+      "createdAt": "2026-09-28T09:04:37.155Z",
+      "updatedAt": "2026-09-28T09:05:44.853Z",
+      "title": "扩展 analytics.ts：输入/输出 token + 用量序列",
+      "description": "UsageSummary 增可选 inputTokens/outputTokens；新增 UsagePoint 与 normalizeUsageSeries（兼容 daily/series/trend），保持现有导出签名。",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-28T09:05:44.853Z"
+    },
+    {
+      "id": "mul0u65v653d",
+      "createdAt": "2026-09-28T09:04:37.555Z",
+      "updatedAt": "2026-09-28T09:05:44.976Z",
+      "title": "改造 UsagePage.tsx 对齐用量统计 UI",
+      "description": "时间范围/币种/搜索/排序/CSV/明细 Modal/趋势图/系统指标，保留全部既有 aria-label 与 days=30 默认。",
+      "priority": "high",
+      "status": "completed",
+      "dependsOn": [
+        "1"
+      ],
+      "completedAt": "2026-09-28T09:05:44.976Z"
+    },
+    {
+      "id": "mul0u6d18hhw",
+      "createdAt": "2026-09-28T09:04:37.813Z",
+      "updatedAt": "2026-09-28T09:06:07.476Z",
+      "title": "styles.css 追加用量页样式",
+      "description": ".usage-toolbar/.usage-chart/.usage-note/排序表头等，全部引用 --ds-*。",
+      "priority": "medium",
+      "status": "completed",
+      "dependsOn": [
+        "2"
+      ],
+      "completedAt": "2026-09-28T09:06:07.476Z"
+    },
+    {
+      "id": "mul0u6l9eyaj",
+      "createdAt": "2026-09-28T09:04:38.109Z",
+      "updatedAt": "2026-09-28T09:11:26.934Z",
+      "title": "npm run check 全绿 + 确认测试未改",
+      "description": "npm run check 通过（server 131 + web 280）；git status --porcelain 确认 UsagePage.test.tsx 未改。",
+      "priority": "high",
+      "status": "completed",
+      "dependsOn": [
+        "3"
+      ],
+      "completedAt": "2026-09-28T09:11:26.934Z"
+    },
+    {
+      "id": "mul0u6tozqo2",
+      "createdAt": "2026-09-28T09:04:38.412Z",
+      "updatedAt": "2026-09-28T09:11:27.103Z",
+      "title": "可选截图 docs/refs/impl-usage.png",
+      "description": "临时 e2e spec stub analytics/system，登录后进 /usage 截图，成功后删除 spec。",
+      "priority": "low",
+      "status": "completed",
+      "dependsOn": [
+        "4"
+      ],
+      "completedAt": "2026-09-28T09:11:27.103Z"
     }
   ],
   "lastVerification": {
-    "timestamp": "2026-09-28T08:49:43.575Z",
+    "timestamp": "2026-09-28T09:11:25.747Z",
     "command": "npm run typecheck && npm run test",
     "success": true,
-    "output": "> 24h-web@0.1.0 typecheck\n> npm -w @24h/web run typecheck && npm -w @24h/server run typecheck && npm -w @24h/shared run typecheck\n\n\n> @24h/web@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/server@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/shared@0.1.0 typecheck\n> tsc --noEmit\n\n\n> 24h-web@0.1.0 test\n> npm -w @24h/server run test && npm -w @24h/web run test\n\n\n> @24h/server@0.1.0 test\n> vitest run\n\n\n RUN  v3.2.7 /vol1/@apphome/trim.openclaw/data/home/24h-web/apps/server\n\n ✓ src/session/role.test.ts (3 tests) 690ms\n ✓ src/routes/github.test.ts (5 tests) 728ms\n ✓ src/routes/change-password.test.ts (3 tests) 815ms\n   ✓ POST /api/auth/change-password > rejects a wrong old password with 400 and keeps the flag  338ms\n   ✓ POST /api/auth/change-password > changes the password and clears must_change_password  340ms\n ✓ src/http/csrf.test.ts (5 tests) 858ms\n ✓ src/routes/profile.test.ts (4 tests) 876ms\n   ✓ PATCH /api/auth/profile > renames the current user  337ms\n ✓ src/hermes/proxy.test.ts (3 tests) 1012ms\n   ✓ GET /api/hermes/ws > authenticates with the session cookie and pipes frames both ways  363ms\n   ✓ GET /api/hermes/ws > forwards a client frame sent before the upstream connects (cold-start race)  524ms\n ✓ src/routes/auth.test.ts (7 tests) 1092ms\n   ✓ POST /api/auth/login > logs in with correct credentials and sets an HttpOnly session cookie  312ms\n ✓ src/routes/adminConnections.test.ts (5 tests) 1087ms\n   ✓ admin connections CRUD > creates, lists, updates and deletes a connection without exposing the token  321ms\n ✓ src/routes/avatar.test.ts (7 tests) 1138ms\n ✓ src/routes/system.test.ts (6 tests) 1129ms\n   ✓ GET /api/system/version > returns the core version from Hermes and the web build version  333ms\n ✓ src/routes/rate-limit.test.ts (3 tests) 1154ms\n   ✓ login rate limiting > locks after 5 consecutive failures and returns 429  435ms\n   ✓ login rate limiting > rejects the correct password while locked  318ms\n   ✓ login rate limiting > resets the counter after a successful login"
+    "output": "> 24h-web@0.1.0 typecheck\n> npm -w @24h/web run typecheck && npm -w @24h/server run typecheck && npm -w @24h/shared run typecheck\n\n\n> @24h/web@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/server@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/shared@0.1.0 typecheck\n> tsc --noEmit\n\n\n> 24h-web@0.1.0 test\n> npm -w @24h/server run test && npm -w @24h/web run test\n\n\n> @24h/server@0.1.0 test\n> vitest run\n\n\n RUN  v3.2.7 /vol1/@apphome/trim.openclaw/data/home/24h-web/apps/server\n\n ✓ src/session/role.test.ts (3 tests) 574ms\n ✓ src/routes/github.test.ts (5 tests) 706ms\n ✓ src/routes/change-password.test.ts (3 tests) 736ms\n   ✓ POST /api/auth/change-password > rejects a wrong old password with 400 and keeps the flag  300ms\n   ✓ POST /api/auth/change-password > changes the password and clears must_change_password  311ms\n ✓ src/http/csrf.test.ts (5 tests) 808ms\n ✓ src/routes/profile.test.ts (4 tests) 882ms\n   ✓ PATCH /api/auth/profile > renames the current user  323ms\n ✓ src/hermes/proxy.test.ts (3 tests) 951ms\n   ✓ GET /api/hermes/ws > authenticates with the session cookie and pipes frames both ways  311ms\n   ✓ GET /api/hermes/ws > forwards a client frame sent before the upstream connects (cold-start race)  524ms\n ✓ src/routes/auth.test.ts (7 tests) 1078ms\n ✓ src/routes/system.test.ts (6 tests) 1090ms\n   ✓ GET /api/system/version > returns the core version from Hermes and the web build version  353ms\n ✓ src/routes/avatar.test.ts (7 tests) 1130ms\n ✓ src/routes/adminConnections.test.ts (5 tests) 1124ms\n   ✓ admin connections CRUD > creates, lists, updates and deletes a connection without exposing the token  300ms\n ✓ src/routes/rate-limit.test.ts (3 tests) 1177ms\n   ✓ login rate limiting > locks after 5 consecutive failures and returns 429  438ms\n   ✓ login rate limiting > resets the counter after a successful login  442ms\n ✓ src/paths.test.ts (6 tests) 9ms\n ✓ src/hermes/client.test.ts (6 tests) 73ms\n ✓ src/routes/skillUi.test.ts (11 tests) 1568ms\n ✓ src/routes/oidc.test.ts (5 tests) 1771ms\n  "
   }
 }

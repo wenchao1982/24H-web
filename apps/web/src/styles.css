@@ -2763,3 +2763,84 @@ mark {
 .agent-overview > summary::-webkit-details-marker { display: none; }
 .agent-overview > summary::before { content: "▸ "; color: var(--ds-label-tertiary); }
 .agent-overview[open] > summary::before { content: "▾ "; }
+
+/* ---------- 用量页 ---------- */
+.usage-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--ds-space-3);
+}
+
+.usage-toolbar .ds-input[type="date"],
+.usage-toolbar .ds-select {
+  width: auto;
+}
+
+.usage-toolbar .ds-input[type="search"] {
+  flex: 1 1 220px;
+  width: auto;
+}
+
+.usage-chart {
+  width: 100%;
+  color: var(--ds-accent);
+}
+
+.usage-chart svg {
+  display: block;
+  width: 100%;
+}
+
+.usage-note {
+  margin: var(--ds-space-3) 0 0;
+  color: var(--ds-label-tertiary);
+  font-size: var(--ds-font-size-xs);
+}
+
+.usage-health {
+  color: var(--ds-label-secondary);
+}
+
+.usage-health[data-tone="success"] {
+  color: var(--ds-success);
+}
+
+.usage-health[data-tone="danger"] {
+  color: var(--ds-danger);
+}
+
+.usage-health[data-tone="neutral"] {
+  color: var(--ds-label-secondary);
+}
+
+.table th[data-sortable] {
+  cursor: pointer;
+  user-select: none;
+}
+
+.table th[data-sortable]:hover {
+  color: var(--ds-label-primary);
+}
+
+.table th[data-sortable] .th-sort {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+
+.table th[data-sortable][aria-sort="ascending"] .th-sort::after {
+  content: " ▲";
+  font-size: var(--ds-font-size-xs);
+  color: var(--ds-accent);
+}
+
+.table th[data-sortable][aria-sort="descending"] .th-sort::after {
+  content: " ▼";
+  font-size: var(--ds-font-size-xs);
+  color: var(--ds-accent);
+}
