@@ -2734,3 +2734,32 @@ mark {
 .resize-handle:hover::after,
 .resize-handle[data-dragging="true"]::after { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .resize-handle::after { transition: none; } }
+
+/* ---------- 智能体页 Phase A ---------- */
+.agent-item { position: relative; }
+.agent-item[data-active="true"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 18px;
+  border-radius: 2px;
+  background: var(--ds-accent);
+}
+.agent-overview {
+  margin: var(--ds-space-3) 0;
+  border: var(--ds-hairline) solid var(--ds-border-l1);
+  border-radius: var(--ds-radius-sm);
+  padding: var(--ds-space-2) var(--ds-space-3);
+}
+.agent-overview > summary {
+  cursor: pointer;
+  color: var(--ds-label-secondary);
+  font-size: var(--ds-font-size-sm);
+  list-style: none;
+}
+.agent-overview > summary::-webkit-details-marker { display: none; }
+.agent-overview > summary::before { content: "▸ "; color: var(--ds-label-tertiary); }
+.agent-overview[open] > summary::before { content: "▾ "; }

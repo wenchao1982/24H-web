@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { api } from "../api/client";
 import { withProfile } from "./agents";
 import { normalizeMcpServers, type McpServerEntry } from "./mcp";
+import { Button, EmptyState } from "../ui";
 
 export interface McpPanelProps {
   /** 作用到该 profile（省略则为全局默认 profile）。 */
@@ -18,6 +19,7 @@ export default function McpPanel({ profile }: McpPanelProps) {
   const [name, setName] = useState("");
   const [command, setCommand] = useState("");
   const [catalogName, setCatalogName] = useState("");
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -97,6 +99,15 @@ export default function McpPanel({ profile }: McpPanelProps) {
     }).finally(() => setBusy(null));
   };
 
+  const focusAddForm = useCallback(() => {
+    const input = nameInputRef.current;
+    if (!input) {
+      return;
+    }
+    input.scrollIntoView?.({ behavior: "smooth", block: "center" });
+    input.focus();
+  }, []);
+
   return (
     <div className="mcp">
       {error ? <p className="err">{error}</p> : null}
@@ -107,6 +118,7 @@ export default function McpPanel({ profile }: McpPanelProps) {
           <input
             aria-label="MCP 名称"
             placeholder="名称"
+            ref={nameInputRef}
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
@@ -142,7 +154,16 @@ export default function McpPanel({ profile }: McpPanelProps) {
         {loading ? (
           <p className="empty">加载中…</p>
         ) : servers.length === 0 ? (
-          <p className="empty">暂无 MCP 服务。</p>
+          <EmptyState
+            icon="info"
+            title="暂无 MCP 服务"
+            description="添加外部服务以扩展智能体能力"
+            action={
+              <Button variant="primary" onClick={focusAddForm}>
+                添加 MCP 服务
+              </Button>
+            }
+          />
         ) : (
           <ul className="toolset-list">
             {servers.map((server) => (

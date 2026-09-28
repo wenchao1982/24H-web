@@ -73,6 +73,9 @@ export default function AgentList({
                     <span className="agent-name">{agent.displayName}</span>
                     <span className="agent-model muted">{agent.model || "—"}</span>
                   </span>
+                  {agent.skillCount ? (
+                    <span className="agent-skill-count muted">{agent.skillCount} 技能</span>
+                  ) : null}
                   {agent.isDefault ? <span className="agent-badge">默认</span> : null}
                   <i
                     className="dot"

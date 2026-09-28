@@ -15,6 +15,7 @@ import AgentDetail from "./AgentDetail";
 import AgentCreatePanel, { type CreateProfileParams } from "./AgentCreatePanel";
 import AgentEditPanel, { type ConfigureProfileParams } from "./AgentEditPanel";
 import AgentImportPanel, { type ImportProfileParams } from "./AgentImportPanel";
+import { ConfirmDialog } from "../ui";
 import SkillsPanel from "./SkillsPanel";
 import ToolsetsPanel from "./ToolsetsPanel";
 import McpPanel from "./McpPanel";
@@ -64,7 +65,7 @@ export default function AgentsPage() {
   const [importOpen, setImportOpen] = useState(false);
   const [importBusy, setImportBusy] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
-  const [deleteArmed, setDeleteArmed] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [opMessage, setOpMessage] = useState<string | null>(null);
 
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -313,7 +314,7 @@ export default function AgentsPage() {
         await api(withProfile(`/api/hermes/profiles/${encodeURIComponent(name)}`, name), {
           method: "DELETE",
         });
-        setDeleteArmed(false);
+        setDeleteTarget(null);
         setEditing(false);
         setSelected(null);
         setDetail(null);
@@ -364,7 +365,7 @@ export default function AgentsPage() {
               onSelect={(name) => {
                 setSelected(name);
                 setEditing(false);
-                setDeleteArmed(false);
+                setDeleteTarget(null);
                 setOpMessage(null);
               }}
               onCreate={() => openCreate("new")}
@@ -444,28 +445,13 @@ export default function AgentsPage() {
                     <button type="button" onClick={() => void exportProfile(detail.name)}>
                       导出
                     </button>
-                    {deleteArmed ? (
-                      <>
-                        <button
-                          type="button"
-                          className="danger"
-                          onClick={() => void deleteProfile(detail.name)}
-                        >
-                          确认删除
-                        </button>
-                        <button type="button" className="ghost" onClick={() => setDeleteArmed(false)}>
-                          取消
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        type="button"
-                        className="danger"
-                        onClick={() => setDeleteArmed(true)}
-                      >
-                        删除
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      className="danger"
+                      onClick={() => setDeleteTarget(detail.name)}
+                    >
+                      删除
+                    </button>
                   </>
                 ) : null
               }
@@ -478,21 +464,6 @@ export default function AgentsPage() {
             </p>
           ) : null}
           {opMessage ? <p className="muted agent-op-message">{opMessage}</p> : null}
-
-          <form className="card learn-action" onSubmit={runLearn}>
-            <div className="row">
-              <input
-                aria-label="学习来源"
-                placeholder="从经验/来源生成技能（/learn）"
-                value={learnArgs}
-                onChange={(event) => setLearnArgs(event.target.value)}
-              />
-              <button className="primary" type="submit" disabled={learnBusy}>
-                生成技能
-              </button>
-            </div>
-            {learnMsg ? <p className="muted">{learnMsg}</p> : null}
-          </form>
 
           <div className="tabs" role="tablist" aria-label="智能体功能">
             {TABS.map((item) => (
@@ -509,7 +480,25 @@ export default function AgentsPage() {
             ))}
           </div>
           <div className="tab-panel">
-            {tab === "skills" ? <SkillsPanel profile={selected ?? undefined} /> : null}
+            {tab === "skills" ? (
+              <>
+                <form className="card learn-action" onSubmit={runLearn}>
+                  <div className="row">
+                    <input
+                      aria-label="学习来源"
+                      placeholder="从经验/来源生成技能（/learn）"
+                      value={learnArgs}
+                      onChange={(event) => setLearnArgs(event.target.value)}
+                    />
+                    <button className="primary" type="submit" disabled={learnBusy}>
+                      生成技能
+                    </button>
+                  </div>
+                  {learnMsg ? <p className="muted">{learnMsg}</p> : null}
+                </form>
+                <SkillsPanel profile={selected ?? undefined} />
+              </>
+            ) : null}
             {tab === "toolsets" ? <ToolsetsPanel profile={selected ?? undefined} /> : null}
             {tab === "mcp" ? <McpPanel profile={selected ?? undefined} /> : null}
             {tab === "plugins" ? <PluginsPanel /> : null}
@@ -517,6 +506,20 @@ export default function AgentsPage() {
           </div>
         </section>
       </div>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="删除智能体"
+        message={`确认删除智能体「${deleteTarget ?? ""}」？`}
+        confirmLabel="确认删除"
+        danger
+        onConfirm={() => {
+          if (deleteTarget) {
+            void deleteProfile(deleteTarget);
+          }
+        }}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

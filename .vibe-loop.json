@@ -210,12 +210,85 @@
       "priority": "high",
       "status": "completed",
       "completedAt": "2026-09-28T07:17:12.937Z"
+    },
+    {
+      "id": "mukzk32i26ge",
+      "createdAt": "2026-09-28T08:28:47.370Z",
+      "updatedAt": "2026-09-28T08:37:41.584Z",
+      "title": "智能体页改造 Phase A（详情分层/入口归位/空态/确认）",
+      "description": "零测试改动优先。AgentList 选中蓝条+信息增强；AgentDetail 技能/MCP 只读 chips 收进折叠 details（SOUL 保留）；/learn 移入技能 Tab；McpPanel 空态加引导按钮；AgentsPage 删除改 ConfirmDialog（确认删除）。Phase B 待办：SOUL 独立 Tab、高级模式开关、技能/工具/MCP/插件统一「卡片+详情+可选源码」、列表 hover 快捷操作、批量与概览网格。风险：AgentsPage.test 约 20 用例锁死可访问名，Phase B 需刻意更新测试。",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-28T08:37:41.584Z"
+    },
+    {
+      "id": "mukzlf5r51cr",
+      "createdAt": "2026-09-28T08:29:49.695Z",
+      "updatedAt": "2026-09-28T08:30:34.275Z",
+      "title": "改造 AgentDetail：SOUL 保留，技能/MCP 收进 details，模型信息结构化",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-28T08:30:34.275Z"
+    },
+    {
+      "id": "mukzlf9pffgo",
+      "createdAt": "2026-09-28T08:29:49.837Z",
+      "updatedAt": "2026-09-28T08:31:11.672Z",
+      "title": "改造 AgentsPage：/learn 移入技能 Tab，删除改用 ConfirmDialog",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-28T08:31:11.672Z"
+    },
+    {
+      "id": "mukzlfg3ghoq",
+      "createdAt": "2026-09-28T08:29:50.067Z",
+      "updatedAt": "2026-09-28T08:31:43.110Z",
+      "title": "改造 McpPanel：空态用 EmptyState + 聚焦按钮",
+      "priority": "medium",
+      "status": "completed",
+      "completedAt": "2026-09-28T08:31:43.110Z"
+    },
+    {
+      "id": "mukzlfilgk7c",
+      "createdAt": "2026-09-28T08:29:50.157Z",
+      "updatedAt": "2026-09-28T08:32:11.423Z",
+      "title": "增强 AgentList 视觉（skillCount 只读信息）",
+      "priority": "low",
+      "status": "completed",
+      "completedAt": "2026-09-28T08:32:11.423Z"
+    },
+    {
+      "id": "mukzlfm6y5an",
+      "createdAt": "2026-09-28T08:29:50.286Z",
+      "updatedAt": "2026-09-28T08:32:53.522Z",
+      "title": "styles.css 追加 Phase A 样式",
+      "priority": "medium",
+      "status": "completed",
+      "completedAt": "2026-09-28T08:32:53.522Z"
+    },
+    {
+      "id": "mukzlfqkgqah",
+      "createdAt": "2026-09-28T08:29:50.444Z",
+      "updatedAt": "2026-09-28T08:37:29.882Z",
+      "title": "运行 npm run check 全绿并确认未改测试",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-28T08:37:29.882Z"
+    },
+    {
+      "id": "mukzvk01ozlj",
+      "createdAt": "2026-09-28T08:37:42.529Z",
+      "updatedAt": "2026-09-28T08:37:42.529Z",
+      "title": "修复 e2e harness 滞后（StubSocket 常量 + C1 后 heading 断言）",
+      "description": "两个问题：(1) e2e/smoke.spec.ts 的 StubSocket 缺 static OPEN/CONNECTING/CLOSING/CLOSED 常量，导致 GatewayClient.request 走 reject、session.list 失败（本机 npm run test:e2e 不可信）。(2) C1 移除了全局顶栏后，smoke 里 getByRole(\"heading\", { name: \"智能体\"/\"设置\" }) 依赖的 main-header h1 已不存在，需改为断言页面自身内容（如 searchbox \"搜索智能体\" / 设置页真实标题）。修完跑 npm run test:e2e 验证。",
+      "priority": "medium",
+      "status": "pending"
     }
   ],
   "lastVerification": {
-    "timestamp": "2026-09-28T07:18:44.281Z",
+    "timestamp": "2026-09-28T08:37:28.565Z",
     "command": "npm run typecheck && npm run test",
     "success": true,
-    "output": "> 24h-web@0.1.0 typecheck\n> npm -w @24h/web run typecheck && npm -w @24h/server run typecheck && npm -w @24h/shared run typecheck\n\n\n> @24h/web@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/server@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/shared@0.1.0 typecheck\n> tsc --noEmit\n\n\n> 24h-web@0.1.0 test\n> npm -w @24h/server run test && npm -w @24h/web run test\n\n\n> @24h/server@0.1.0 test\n> vitest run\n\n\n RUN  v3.2.7 /vol1/@apphome/trim.openclaw/data/home/24h-web/apps/server\n\n ✓ src/session/role.test.ts (3 tests) 617ms\n ✓ src/routes/github.test.ts (5 tests) 733ms\n ✓ src/routes/change-password.test.ts (3 tests) 738ms\n   ✓ POST /api/auth/change-password > rejects a wrong old password with 400 and keeps the flag  306ms\n ✓ src/http/csrf.test.ts (5 tests) 827ms\n ✓ src/routes/profile.test.ts (4 tests) 851ms\n   ✓ PATCH /api/auth/profile > renames the current user  335ms\n ✓ src/routes/adminConnections.test.ts (5 tests) 1018ms\n ✓ src/hermes/proxy.test.ts (3 tests) 1023ms\n   ✓ GET /api/hermes/ws > authenticates with the session cookie and pipes frames both ways  389ms\n   ✓ GET /api/hermes/ws > forwards a client frame sent before the upstream connects (cold-start race)  498ms\n ✓ src/routes/auth.test.ts (7 tests) 1039ms\n ✓ src/routes/system.test.ts (6 tests) 1106ms\n   ✓ GET /api/system/version > returns the core version from Hermes and the web build version  383ms\n ✓ src/routes/avatar.test.ts (7 tests) 1190ms\n ✓ src/routes/rate-limit.test.ts (3 tests) 1200ms\n   ✓ login rate limiting > locks after 5 consecutive failures and returns 429  429ms\n   ✓ login rate limiting > rejects the correct password while locked  365ms\n   ✓ login rate limiting > resets the counter after a successful login  405ms\n ✓ src/paths.test.ts (6 tests) 8ms\n ✓ src/hermes/client.test.ts (6 tests) 82ms\n ✓ src/routes/skillUi.test.ts (11 tests) 1571ms\n ✓ src/routes/logout.test.ts (3 tests) 402ms\n ✓ src/http/cookie.test.ts (1 test) 156ms\n ✓ src/http/errors.test.ts (2 tests) 261ms\n ✓ src/session/middleware.test.ts (3 tests) 416ms\n"
+    "output": "> 24h-web@0.1.0 typecheck\n> npm -w @24h/web run typecheck && npm -w @24h/server run typecheck && npm -w @24h/shared run typecheck\n\n\n> @24h/web@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/server@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/shared@0.1.0 typecheck\n> tsc --noEmit\n\n\n> 24h-web@0.1.0 test\n> npm -w @24h/server run test && npm -w @24h/web run test\n\n\n> @24h/server@0.1.0 test\n> vitest run\n\n\n RUN  v3.2.7 /vol1/@apphome/trim.openclaw/data/home/24h-web/apps/server\n\n ✓ src/session/role.test.ts (3 tests) 682ms\n   ✓ requireSuperAdmin > allows a super_admin  314ms\n ✓ src/routes/github.test.ts (5 tests) 725ms\n   ✓ GET /api/integrations/github > reports the gh auth status without exposing a token  304ms\n ✓ src/http/csrf.test.ts (5 tests) 825ms\n ✓ src/routes/change-password.test.ts (3 tests) 841ms\n   ✓ POST /api/auth/change-password > rejects a wrong old password with 400 and keeps the flag  318ms\n   ✓ POST /api/auth/change-password > changes the password and clears must_change_password  364ms\n ✓ src/routes/profile.test.ts (4 tests) 888ms\n   ✓ PATCH /api/auth/profile > renames the current user  318ms\n ✓ src/hermes/proxy.test.ts (3 tests) 1039ms\n   ✓ GET /api/hermes/ws > authenticates with the session cookie and pipes frames both ways  343ms\n   ✓ GET /api/hermes/ws > forwards a client frame sent before the upstream connects (cold-start race)  542ms\n ✓ src/routes/system.test.ts (6 tests) 1075ms\n   ✓ GET /api/system/version > returns the core version from Hermes and the web build version  315ms\n ✓ src/routes/adminConnections.test.ts (5 tests) 1086ms\n ✓ src/routes/auth.test.ts (7 tests) 1154ms\n   ✓ POST /api/auth/login > logs in with correct credentials and sets an HttpOnly session cookie  313ms\n ✓ src/routes/avatar.test.ts (7 tests) 1156ms\n ✓ src/routes/rate-limit.test.ts (3 tests) 1215ms\n   ✓ login rate limiting > locks after 5 consecutive failures and returns 429  432ms\n   ✓ login rate limiting > rejects the correct password while locked  322ms\n   ✓ login rate limiting > resets t"
   }
 }
