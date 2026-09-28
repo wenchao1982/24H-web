@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api } from "../api/client";
 import { t, type TranslationKey } from "../i18n";
+import { ConfirmDialog } from "../ui";
 import { buildOpsBody, normalizeOpsResult, OPS_ACTIONS, type OpsAction } from "./ops";
 
 const OPS_PATH = "/api/hermes/ops";
@@ -15,11 +16,9 @@ export default function OpsPanel() {
   const [importPath, setImportPath] = useState("");
   const [busy, setBusy] = useState<OpsAction | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<OpsAction | null>(null);
 
-  const run = (action: OpsAction) => {
-    if (!window.confirm(t("ops.confirm", { name: t(actionLabelKey(action)) }))) {
-      return;
-    }
+  const execute = (action: OpsAction) => {
     setBusy(action);
     setError(null);
     void (async () => {
@@ -64,7 +63,7 @@ export default function OpsPanel() {
               className="ghost"
               disabled={busy !== null}
               aria-label={t("ops.runAria", { name: t(actionLabelKey(action)) })}
-              onClick={() => run(action)}
+              onClick={() => setPending(action)}
             >
               {t(actionLabelKey(action))}
             </button>
@@ -79,6 +78,21 @@ export default function OpsPanel() {
           ) : null,
         )}
       </div>
+
+      <ConfirmDialog
+        open={pending !== null}
+        message={pending ? t("ops.confirm", { name: t(actionLabelKey(pending)) }) : ""}
+        confirmLabel="确认执行"
+        danger
+        onConfirm={() => {
+          const action = pending;
+          setPending(null);
+          if (action) {
+            execute(action);
+          }
+        }}
+        onCancel={() => setPending(null)}
+      />
     </div>
   );
 }

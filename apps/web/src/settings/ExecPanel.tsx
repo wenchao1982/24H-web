@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useGateway } from "../chat/GatewayProvider";
 import { t } from "../i18n";
+import { ConfirmDialog } from "../ui";
 import { execMethod, execParams, normalizeExecOutput, type ExecKind } from "./exec";
 
 /** 设置 → 高级 → 命令执行：L1 `cli.exec` / `shell.exec`（执行前确认）。 */
@@ -11,15 +12,17 @@ export default function ExecPanel() {
   const [output, setOutput] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<string | null>(null);
 
   const run = () => {
     const value = command.trim();
     if (!value) {
       return;
     }
-    if (!window.confirm(t("exec.confirm", { command: value }))) {
-      return;
-    }
+    setPending(value);
+  };
+
+  const execute = (value: string) => {
     setBusy(true);
     setError(null);
     void (async () => {
@@ -89,6 +92,21 @@ export default function ExecPanel() {
         </div>
         {output !== null ? <pre className="toolset-config exec-output">{output}</pre> : null}
       </div>
+
+      <ConfirmDialog
+        open={pending !== null}
+        message={pending !== null ? t("exec.confirm", { command: pending }) : ""}
+        confirmLabel="确认执行"
+        danger
+        onConfirm={() => {
+          const value = pending;
+          setPending(null);
+          if (value !== null) {
+            execute(value);
+          }
+        }}
+        onCancel={() => setPending(null)}
+      />
     </div>
   );
 }

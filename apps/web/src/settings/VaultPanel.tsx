@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useGateway } from "../chat/GatewayProvider";
 import { t, type TranslationKey } from "../i18n";
+import { ConfirmDialog } from "../ui";
 import {
   normalizeConnectors,
   normalizeVaultEntries,
@@ -30,6 +31,7 @@ export default function VaultPanel() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<VaultEntry | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -72,8 +74,10 @@ export default function VaultPanel() {
     })();
   };
 
-  const remove = (entry: VaultEntry) => {
-    if (!window.confirm(t("vault.confirm", { name: entry.name }))) {
+  const confirmRemove = () => {
+    const entry = pending;
+    setPending(null);
+    if (!entry) {
       return;
     }
     setBusy(true);
@@ -120,7 +124,7 @@ export default function VaultPanel() {
                   className="danger"
                   disabled={busy}
                   aria-label={t("vault.removeAria", { name: entry.name })}
-                  onClick={() => remove(entry)}
+                  onClick={() => setPending(entry)}
                 >
                   {t("vault.remove")}
                 </button>
@@ -170,6 +174,15 @@ export default function VaultPanel() {
           </ul>
         )}
       </div>
+
+      <ConfirmDialog
+        open={pending !== null}
+        message={pending ? t("vault.confirm", { name: pending.name }) : ""}
+        confirmLabel="确认删除"
+        danger
+        onConfirm={confirmRemove}
+        onCancel={() => setPending(null)}
+      />
     </div>
   );
 }

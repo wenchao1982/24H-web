@@ -48,7 +48,6 @@ describe("VaultPanel T18.13 密钥库/连接器", () => {
 
   it("adds and removes a vault entry", async () => {
     const gateway = createFakeGateway(impl);
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     renderPanel(gateway);
     await screen.findByText("OPENAI_API_KEY");
     const user = userEvent.setup();
@@ -63,6 +62,8 @@ describe("VaultPanel T18.13 密钥库/连接器", () => {
     });
 
     await user.click(screen.getByRole("button", { name: "删除密钥 OPENAI_API_KEY" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "确认删除" }));
     await waitFor(() => {
       expect(gateway.paramsOf("vault.remove")).toEqual([{ name: "OPENAI_API_KEY" }]);
     });

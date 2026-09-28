@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useGateway } from "../chat/GatewayProvider";
 import { t } from "../i18n";
+import { ConfirmDialog } from "../ui";
 import { handoffFailParams, normalizeHandoff, type HandoffState } from "./handoff";
 
 /** 设置 → 高级 → 交接：查看交接状态，必要时标记失败。 */
@@ -11,6 +12,7 @@ export default function HandoffPanel() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -28,10 +30,8 @@ export default function HandoffPanel() {
     void load();
   }, [load]);
 
-  const fail = () => {
-    if (!window.confirm(t("handoff.confirm"))) {
-      return;
-    }
+  const confirmFail = () => {
+    setConfirming(false);
     setBusy(true);
     void (async () => {
       try {
@@ -79,12 +79,21 @@ export default function HandoffPanel() {
             className="danger"
             disabled={busy || state?.active !== true}
             aria-label={t("handoff.fail")}
-            onClick={fail}
+            onClick={() => setConfirming(true)}
           >
             {t("handoff.fail")}
           </button>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirming}
+        message={t("handoff.confirm")}
+        confirmLabel="确认标记失败"
+        danger
+        onConfirm={confirmFail}
+        onCancel={() => setConfirming(false)}
+      />
     </div>
   );
 }

@@ -24,13 +24,15 @@ describe("ExecPanel T18.8 命令执行", () => {
     const gateway = createFakeGateway((method) =>
       method === "shell.exec" ? { stdout: "hello\n" } : {},
     );
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     renderPanel(gateway);
     const user = userEvent.setup();
 
     await user.click(screen.getByRole("button", { name: "Shell" }));
     await user.type(screen.getByLabelText("命令"), "echo hello");
     await user.click(screen.getByRole("button", { name: "执行" }));
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "确认执行" }));
 
     await waitFor(() => {
       expect(gateway.paramsOf("shell.exec")).toEqual([{ command: "echo hello" }]);
@@ -40,12 +42,13 @@ describe("ExecPanel T18.8 命令执行", () => {
 
   it("does not execute when the confirmation is dismissed", async () => {
     const gateway = createFakeGateway(() => ({}));
-    vi.spyOn(window, "confirm").mockReturnValue(false);
     renderPanel(gateway);
     const user = userEvent.setup();
 
     await user.type(screen.getByLabelText("命令"), "rm -rf /");
     await user.click(screen.getByRole("button", { name: "执行" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "取消" }));
     expect(gateway.requests).toHaveLength(0);
   });
 

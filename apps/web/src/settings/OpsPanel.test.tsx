@@ -47,11 +47,13 @@ describe("OpsPanel T18.4 运维", () => {
       },
     ]);
     vi.stubGlobal("fetch", fetchMock);
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     const user = userEvent.setup();
 
     render(<OpsPanel />);
     await user.click(screen.getByRole("button", { name: "运行系统诊断" }));
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "确认执行" }));
 
     await waitFor(() => {
       const call = fetchMock.mock.calls.find(
@@ -67,11 +69,12 @@ describe("OpsPanel T18.4 运维", () => {
   it("does not call the endpoint when the confirmation is dismissed", async () => {
     const fetchMock = stubFetch([]);
     vi.stubGlobal("fetch", fetchMock);
-    vi.spyOn(window, "confirm").mockReturnValue(false);
     const user = userEvent.setup();
 
     render(<OpsPanel />);
     await user.click(screen.getByRole("button", { name: "运行备份" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "取消" }));
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

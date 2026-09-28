@@ -123,12 +123,14 @@ describe("AdminUsersPage", () => {
       { path: "/api/admin/users/2", method: "DELETE", status: 200, body: { ok: true } },
     ]);
     vi.stubGlobal("fetch", fetchMock);
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     const user = userEvent.setup();
     renderPage();
 
     const row = (await screen.findByText("alice")).closest("tr") as HTMLTableRowElement;
     await user.click(within(row).getByRole("button", { name: "删除" }));
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "确认删除" }));
 
     const deleteCall = fetchMock.mock.calls.find(
       (call) => (call[1] as RequestInit | undefined)?.method === "DELETE",

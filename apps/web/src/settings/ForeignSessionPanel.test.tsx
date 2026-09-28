@@ -36,7 +36,6 @@ afterEach(() => {
 describe("ForeignSessionPanel T18.12 外部会话导入", () => {
   it("lists, previews and imports an external session", async () => {
     const gateway = createFakeGateway(impl);
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     renderPanel(gateway);
 
     const item = await screen.findByRole("button", { name: "预览外部会话 旧会话" });
@@ -48,6 +47,8 @@ describe("ForeignSessionPanel T18.12 外部会话导入", () => {
     expect(gateway.paramsOf("session.foreign.preview")).toEqual([{ id: "f1" }]);
 
     await user.click(screen.getByRole("button", { name: "导入外部会话 旧会话" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "确认导入" }));
     await waitFor(() => {
       expect(gateway.paramsOf("session.foreign.import")).toEqual([{ id: "f1" }]);
     });

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api } from "../api/client";
+import { ConfirmDialog } from "../ui";
 import { useToast } from "../ui/Toast";
 
 interface AdminUser {
@@ -23,6 +24,7 @@ export default function AdminUsersPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<NewRole>("admin");
+  const [pendingDelete, setPendingDelete] = useState<AdminUser | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -126,8 +128,10 @@ export default function AdminUsersPage() {
     );
   };
 
-  const remove = (user: AdminUser) => {
-    if (!window.confirm(`确认删除用户 ${user.username}？`)) {
+  const confirmRemove = () => {
+    const user = pendingDelete;
+    setPendingDelete(null);
+    if (!user) {
       return;
     }
     void run(
@@ -212,7 +216,7 @@ export default function AdminUsersPage() {
                   <button type="button" onClick={() => resetPassword(user)}>
                     重置密码
                   </button>
-                  <button type="button" className="danger" onClick={() => remove(user)}>
+                  <button type="button" className="danger" onClick={() => setPendingDelete(user)}>
                     删除
                   </button>
                 </td>
@@ -222,6 +226,15 @@ export default function AdminUsersPage() {
         </table>
         {!loading && users.length === 0 ? <p className="empty">暂无用户。</p> : null}
       </div>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        message={pendingDelete ? `确认删除用户 ${pendingDelete.username}？` : ""}
+        confirmLabel="确认删除"
+        danger
+        onConfirm={confirmRemove}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   );
 }

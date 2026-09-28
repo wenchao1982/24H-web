@@ -24,7 +24,6 @@ describe("HandoffPanel T18.11 交接", () => {
     const gateway = createFakeGateway((method) =>
       method === "handoff.state" ? { status: "active", next_agent: "reviewer" } : {},
     );
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     renderPanel(gateway);
 
     expect(await screen.findByLabelText("交接状态")).toHaveTextContent("交接进行中");
@@ -33,6 +32,9 @@ describe("HandoffPanel T18.11 交接", () => {
     const user = userEvent.setup();
     await user.type(screen.getByLabelText("失败原因（可选）"), "依赖不可用");
     await user.click(screen.getByRole("button", { name: "标记失败" }));
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "确认标记失败" }));
 
     await waitFor(() => {
       expect(gateway.paramsOf("handoff.fail")).toEqual([{ reason: "依赖不可用" }]);

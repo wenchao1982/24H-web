@@ -119,17 +119,28 @@
     {
       "id": "mukvdncxhkft",
       "createdAt": "2026-09-28T06:31:48.609Z",
-      "updatedAt": "2026-09-28T06:31:48.609Z",
+      "updatedAt": "2026-09-28T06:44:29.442Z",
       "title": "Phase 1 · 危险操作统一 ConfirmDialog（替换 window.confirm）",
       "description": "全局规范要求危险操作二次确认。现 6 处用原生 window.confirm：AdminUsersPage.tsx:130、settings/{OpsPanel,VaultPanel,HandoffPanel,ExecPanel,ForeignSessionPanel}。统一改为 ui 的 ConfirmDialog（模态）。注意这些文件都有对应 .test.tsx 目前 mock window.confirm，需要一并按新交互更新测试。会话列表已由 C2 完成。",
       "priority": "medium",
-      "status": "pending"
+      "status": "completed",
+      "completedAt": "2026-09-28T06:44:29.442Z"
+    },
+    {
+      "id": "mukvpo445jhr",
+      "createdAt": "2026-09-28T06:41:09.460Z",
+      "updatedAt": "2026-09-28T06:44:18.325Z",
+      "title": "D2: Replace window.confirm with ConfirmDialog (6 components + tests)",
+      "description": "AdminUsersPage, OpsPanel, VaultPanel, HandoffPanel, ExecPanel, ForeignSessionPanel + matching tests. Verify npm run check green and grep window.confirm empty.",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-28T06:44:18.325Z"
     }
   ],
   "lastVerification": {
-    "timestamp": "2026-09-28T06:39:04.069Z",
+    "timestamp": "2026-09-28T06:44:17.149Z",
     "command": "npm run typecheck && npm run test",
     "success": true,
-    "output": "> 24h-web@0.1.0 typecheck\n> npm -w @24h/web run typecheck && npm -w @24h/server run typecheck && npm -w @24h/shared run typecheck\n\n\n> @24h/web@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/server@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/shared@0.1.0 typecheck\n> tsc --noEmit\n\n\n> 24h-web@0.1.0 test\n> npm -w @24h/server run test && npm -w @24h/web run test\n\n\n> @24h/server@0.1.0 test\n> vitest run\n\n\n RUN  v3.2.7 /vol1/@apphome/trim.openclaw/data/home/24h-web/apps/server\n\n ✓ src/session/role.test.ts (3 tests) 671ms\n ✓ src/routes/github.test.ts (5 tests) 717ms\n ✓ src/routes/change-password.test.ts (3 tests) 735ms\n   ✓ POST /api/auth/change-password > rejects a wrong old password with 400 and keeps the flag  316ms\n   ✓ POST /api/auth/change-password > changes the password and clears must_change_password  303ms\n ✓ src/http/csrf.test.ts (5 tests) 832ms\n ✓ src/routes/profile.test.ts (4 tests) 871ms\n   ✓ PATCH /api/auth/profile > renames the current user  315ms\n ✓ src/hermes/proxy.test.ts (3 tests) 961ms\n   ✓ GET /api/hermes/ws > authenticates with the session cookie and pipes frames both ways  304ms\n   ✓ GET /api/hermes/ws > forwards a client frame sent before the upstream connects (cold-start race)  534ms\n ✓ src/routes/adminConnections.test.ts (5 tests) 1080ms\n   ✓ admin connections CRUD > creates, lists, updates and deletes a connection without exposing the token  310ms\n ✓ src/routes/avatar.test.ts (7 tests) 1092ms\n ✓ src/routes/system.test.ts (6 tests) 1102ms\n   ✓ GET /api/system/version > returns the core version from Hermes and the web build version  330ms\n ✓ src/routes/auth.test.ts (7 tests) 1122ms\n   ✓ POST /api/auth/login > logs in with correct credentials and sets an HttpOnly session cookie  310ms\n ✓ src/routes/rate-limit.test.ts (3 tests) 1157ms\n   ✓ login rate limiting > locks after 5 consecutive failures and returns 429  400ms\n   ✓ login rate limiting > rejects the correct password while locked  355ms\n   ✓ login rate limiting > resets the counter after a successful login "
+    "output": "> 24h-web@0.1.0 typecheck\n> npm -w @24h/web run typecheck && npm -w @24h/server run typecheck && npm -w @24h/shared run typecheck\n\n\n> @24h/web@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/server@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/shared@0.1.0 typecheck\n> tsc --noEmit\n\n\n> 24h-web@0.1.0 test\n> npm -w @24h/server run test && npm -w @24h/web run test\n\n\n> @24h/server@0.1.0 test\n> vitest run\n\n\n RUN  v3.2.7 /vol1/@apphome/trim.openclaw/data/home/24h-web/apps/server\n\n ✓ src/session/role.test.ts (3 tests) 610ms\n ✓ src/routes/github.test.ts (5 tests) 749ms\n ✓ src/routes/change-password.test.ts (3 tests) 781ms\n   ✓ POST /api/auth/change-password > rejects a wrong old password with 400 and keeps the flag  316ms\n   ✓ POST /api/auth/change-password > changes the password and clears must_change_password  320ms\n ✓ src/http/csrf.test.ts (5 tests) 833ms\n ✓ src/routes/profile.test.ts (4 tests) 845ms\n   ✓ PATCH /api/auth/profile > renames the current user  318ms\n ✓ src/hermes/proxy.test.ts (3 tests) 980ms\n   ✓ GET /api/hermes/ws > authenticates with the session cookie and pipes frames both ways  334ms\n   ✓ GET /api/hermes/ws > forwards a client frame sent before the upstream connects (cold-start race)  503ms\n ✓ src/routes/system.test.ts (6 tests) 1036ms\n   ✓ GET /api/system/version > returns the core version from Hermes and the web build version  304ms\n ✓ src/routes/adminConnections.test.ts (5 tests) 1081ms\n ✓ src/routes/auth.test.ts (7 tests) 1107ms\n ✓ src/routes/rate-limit.test.ts (3 tests) 1143ms\n   ✓ login rate limiting > locks after 5 consecutive failures and returns 429  423ms\n   ✓ login rate limiting > rejects the correct password while locked  316ms\n   ✓ login rate limiting > resets the counter after a successful login  403ms\n ✓ src/routes/avatar.test.ts (7 tests) 1144ms\n ✓ src/paths.test.ts (6 tests) 8ms\n ✓ src/hermes/client.test.ts (6 tests) 82ms\n ✓ src/routes/skillUi.test.ts (11 tests) 1513ms\n ✓ src/routes/oidc.test.ts (5 tests) 1734ms\n   ✓ OIDC provider > is listed only whe"
   }
 }

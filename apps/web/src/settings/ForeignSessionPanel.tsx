@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useGateway } from "../chat/GatewayProvider";
 import { t } from "../i18n";
+import { ConfirmDialog } from "../ui";
 import {
   foreignParams,
   normalizeForeignPreview,
@@ -18,6 +19,7 @@ export default function ForeignSessionPanel() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<ForeignSession | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -50,8 +52,10 @@ export default function ForeignSessionPanel() {
     }
   };
 
-  const importSession = async (session: ForeignSession) => {
-    if (!window.confirm(t("foreign.confirm", { title: session.title }))) {
+  const confirmImport = async () => {
+    const session = pending;
+    setPending(null);
+    if (!session) {
       return;
     }
     setBusy(true);
@@ -102,7 +106,7 @@ export default function ForeignSessionPanel() {
                   className="primary"
                   disabled={busy}
                   aria-label={t("foreign.importAria", { title: session.title })}
-                  onClick={() => void importSession(session)}
+                  onClick={() => setPending(session)}
                 >
                   {t("foreign.import")}
                 </button>
@@ -114,6 +118,15 @@ export default function ForeignSessionPanel() {
           <pre className="toolset-config foreign-preview">{preview || t("foreign.noPreview")}</pre>
         ) : null}
       </div>
+
+      <ConfirmDialog
+        open={pending !== null}
+        message={pending ? t("foreign.confirm", { title: pending.title }) : ""}
+        confirmLabel="确认导入"
+        danger={false}
+        onConfirm={() => void confirmImport()}
+        onCancel={() => setPending(null)}
+      />
     </div>
   );
 }
