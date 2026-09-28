@@ -26,6 +26,11 @@ async function installGatewayStub(page: Page): Promise<void> {
     type Listener = ((event: unknown) => void) & { once?: boolean };
 
     class StubSocket {
+      static readonly CONNECTING = 0;
+      static readonly OPEN = 1;
+      static readonly CLOSING = 2;
+      static readonly CLOSED = 3;
+
       url: string;
       readyState = 0;
       private listeners: Record<string, Listener[]> = {};
@@ -128,10 +133,10 @@ test("login → shell → settings/agents render without errors", async ({ page 
   await expect(page.getByRole("textbox", { name: "消息" })).toBeVisible();
 
   await page.goto("/settings");
-  await expect(page.getByRole("heading", { name: "设置", exact: true })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "设置分区" })).toBeVisible();
 
   await page.goto("/agents");
-  await expect(page.getByRole("heading", { name: "智能体", exact: true })).toBeVisible();
+  await expect(page.getByRole("searchbox", { name: "搜索智能体" })).toBeVisible();
 
   expect(pageErrors).toEqual([]);
 });

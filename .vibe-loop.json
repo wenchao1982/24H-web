@@ -278,17 +278,27 @@
     {
       "id": "mukzvk01ozlj",
       "createdAt": "2026-09-28T08:37:42.529Z",
-      "updatedAt": "2026-09-28T08:37:42.529Z",
+      "updatedAt": "2026-09-28T08:49:51.502Z",
       "title": "修复 e2e harness 滞后（StubSocket 常量 + C1 后 heading 断言）",
       "description": "两个问题：(1) e2e/smoke.spec.ts 的 StubSocket 缺 static OPEN/CONNECTING/CLOSING/CLOSED 常量，导致 GatewayClient.request 走 reject、session.list 失败（本机 npm run test:e2e 不可信）。(2) C1 移除了全局顶栏后，smoke 里 getByRole(\"heading\", { name: \"智能体\"/\"设置\" }) 依赖的 main-header h1 已不存在，需改为断言页面自身内容（如 searchbox \"搜索智能体\" / 设置页真实标题）。修完跑 npm run test:e2e 验证。",
       "priority": "medium",
+      "status": "completed",
+      "completedAt": "2026-09-28T08:49:51.502Z"
+    },
+    {
+      "id": "mul0b75kkoi0",
+      "createdAt": "2026-09-28T08:49:52.376Z",
+      "updatedAt": "2026-09-28T08:49:52.376Z",
+      "title": "为各页面补页面级主标题/landmark（C1 移除顶栏后）",
+      "description": "C1 移除 AppShell 全局 main-header 后，/settings、/agents 等页面缺少页面级 h1/主 landmark，属真实 a11y 缺陷（每路由应有可导航标题）。建议给 ShellLayout 或各页补一个页面标题（可用 visually-hidden h1 从 active nav 派生，避免与页面已有 h2 冲突；注意 e2e smoke 现用 searchbox/nav 断言，补标题后可再固化）。范围：settings/agents/tasks/usage/groups/chat 等主路由。",
+      "priority": "low",
       "status": "pending"
     }
   ],
   "lastVerification": {
-    "timestamp": "2026-09-28T08:37:28.565Z",
+    "timestamp": "2026-09-28T08:49:43.575Z",
     "command": "npm run typecheck && npm run test",
     "success": true,
-    "output": "> 24h-web@0.1.0 typecheck\n> npm -w @24h/web run typecheck && npm -w @24h/server run typecheck && npm -w @24h/shared run typecheck\n\n\n> @24h/web@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/server@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/shared@0.1.0 typecheck\n> tsc --noEmit\n\n\n> 24h-web@0.1.0 test\n> npm -w @24h/server run test && npm -w @24h/web run test\n\n\n> @24h/server@0.1.0 test\n> vitest run\n\n\n RUN  v3.2.7 /vol1/@apphome/trim.openclaw/data/home/24h-web/apps/server\n\n ✓ src/session/role.test.ts (3 tests) 682ms\n   ✓ requireSuperAdmin > allows a super_admin  314ms\n ✓ src/routes/github.test.ts (5 tests) 725ms\n   ✓ GET /api/integrations/github > reports the gh auth status without exposing a token  304ms\n ✓ src/http/csrf.test.ts (5 tests) 825ms\n ✓ src/routes/change-password.test.ts (3 tests) 841ms\n   ✓ POST /api/auth/change-password > rejects a wrong old password with 400 and keeps the flag  318ms\n   ✓ POST /api/auth/change-password > changes the password and clears must_change_password  364ms\n ✓ src/routes/profile.test.ts (4 tests) 888ms\n   ✓ PATCH /api/auth/profile > renames the current user  318ms\n ✓ src/hermes/proxy.test.ts (3 tests) 1039ms\n   ✓ GET /api/hermes/ws > authenticates with the session cookie and pipes frames both ways  343ms\n   ✓ GET /api/hermes/ws > forwards a client frame sent before the upstream connects (cold-start race)  542ms\n ✓ src/routes/system.test.ts (6 tests) 1075ms\n   ✓ GET /api/system/version > returns the core version from Hermes and the web build version  315ms\n ✓ src/routes/adminConnections.test.ts (5 tests) 1086ms\n ✓ src/routes/auth.test.ts (7 tests) 1154ms\n   ✓ POST /api/auth/login > logs in with correct credentials and sets an HttpOnly session cookie  313ms\n ✓ src/routes/avatar.test.ts (7 tests) 1156ms\n ✓ src/routes/rate-limit.test.ts (3 tests) 1215ms\n   ✓ login rate limiting > locks after 5 consecutive failures and returns 429  432ms\n   ✓ login rate limiting > rejects the correct password while locked  322ms\n   ✓ login rate limiting > resets t"
+    "output": "> 24h-web@0.1.0 typecheck\n> npm -w @24h/web run typecheck && npm -w @24h/server run typecheck && npm -w @24h/shared run typecheck\n\n\n> @24h/web@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/server@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/shared@0.1.0 typecheck\n> tsc --noEmit\n\n\n> 24h-web@0.1.0 test\n> npm -w @24h/server run test && npm -w @24h/web run test\n\n\n> @24h/server@0.1.0 test\n> vitest run\n\n\n RUN  v3.2.7 /vol1/@apphome/trim.openclaw/data/home/24h-web/apps/server\n\n ✓ src/session/role.test.ts (3 tests) 690ms\n ✓ src/routes/github.test.ts (5 tests) 728ms\n ✓ src/routes/change-password.test.ts (3 tests) 815ms\n   ✓ POST /api/auth/change-password > rejects a wrong old password with 400 and keeps the flag  338ms\n   ✓ POST /api/auth/change-password > changes the password and clears must_change_password  340ms\n ✓ src/http/csrf.test.ts (5 tests) 858ms\n ✓ src/routes/profile.test.ts (4 tests) 876ms\n   ✓ PATCH /api/auth/profile > renames the current user  337ms\n ✓ src/hermes/proxy.test.ts (3 tests) 1012ms\n   ✓ GET /api/hermes/ws > authenticates with the session cookie and pipes frames both ways  363ms\n   ✓ GET /api/hermes/ws > forwards a client frame sent before the upstream connects (cold-start race)  524ms\n ✓ src/routes/auth.test.ts (7 tests) 1092ms\n   ✓ POST /api/auth/login > logs in with correct credentials and sets an HttpOnly session cookie  312ms\n ✓ src/routes/adminConnections.test.ts (5 tests) 1087ms\n   ✓ admin connections CRUD > creates, lists, updates and deletes a connection without exposing the token  321ms\n ✓ src/routes/avatar.test.ts (7 tests) 1138ms\n ✓ src/routes/system.test.ts (6 tests) 1129ms\n   ✓ GET /api/system/version > returns the core version from Hermes and the web build version  333ms\n ✓ src/routes/rate-limit.test.ts (3 tests) 1154ms\n   ✓ login rate limiting > locks after 5 consecutive failures and returns 429  435ms\n   ✓ login rate limiting > rejects the correct password while locked  318ms\n   ✓ login rate limiting > resets the counter after a successful login"
   }
 }
