@@ -260,7 +260,7 @@ export default function AppShell({
               <Icon name={drawerOpen ? "close" : "menu"} />
             </button>
           ) : null}
-          <div className="main-body">{children}</div>
+          <main className="main-body">{children}</main>
         </div>
 
         {detailsOpen ? (

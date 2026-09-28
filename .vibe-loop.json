@@ -288,11 +288,12 @@
     {
       "id": "mul0b75kkoi0",
       "createdAt": "2026-09-28T08:49:52.376Z",
-      "updatedAt": "2026-09-28T08:49:52.376Z",
+      "updatedAt": "2026-09-28T14:28:24.654Z",
       "title": "为各页面补页面级主标题/landmark（C1 移除顶栏后）",
       "description": "C1 移除 AppShell 全局 main-header 后，/settings、/agents 等页面缺少页面级 h1/主 landmark，属真实 a11y 缺陷（每路由应有可导航标题）。建议给 ShellLayout 或各页补一个页面标题（可用 visually-hidden h1 从 active nav 派生，避免与页面已有 h2 冲突；注意 e2e smoke 现用 searchbox/nav 断言，补标题后可再固化）。范围：settings/agents/tasks/usage/groups/chat 等主路由。",
       "priority": "low",
-      "status": "pending"
+      "status": "completed",
+      "completedAt": "2026-09-28T14:28:24.654Z"
     },
     {
       "id": "mul0p6nkyqn0",
@@ -534,9 +535,9 @@
     }
   ],
   "lastVerification": {
-    "timestamp": "2026-09-28T13:14:37.753Z",
+    "timestamp": "2026-09-28T14:28:16.803Z",
     "command": "npm run typecheck && npm run test",
     "success": true,
-    "output": "> 24h-web@0.1.0 typecheck\n> npm -w @24h/web run typecheck && npm -w @24h/server run typecheck && npm -w @24h/shared run typecheck\n\n\n> @24h/web@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/server@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/shared@0.1.0 typecheck\n> tsc --noEmit\n\n\n> 24h-web@0.1.0 test\n> npm -w @24h/server run test && npm -w @24h/web run test\n\n\n> @24h/server@0.1.0 test\n> vitest run\n\n\n RUN  v3.2.7 /vol1/@apphome/trim.openclaw/data/home/24h-web/apps/server\n\n ✓ src/session/role.test.ts (3 tests) 581ms\n ✓ src/routes/change-password.test.ts (3 tests) 753ms\n   ✓ POST /api/auth/change-password > rejects a wrong old password with 400 and keeps the flag  316ms\n ✓ src/routes/github.test.ts (5 tests) 784ms\n   ✓ GET /api/integrations/github > reports the gh auth status without exposing a token  314ms\n ✓ src/http/csrf.test.ts (5 tests) 810ms\n ✓ src/routes/profile.test.ts (4 tests) 853ms\n   ✓ PATCH /api/auth/profile > renames the current user  316ms\n ✓ src/hermes/proxy.test.ts (3 tests) 936ms\n   ✓ GET /api/hermes/ws > authenticates with the session cookie and pipes frames both ways  306ms\n   ✓ GET /api/hermes/ws > forwards a client frame sent before the upstream connects (cold-start race)  516ms\n ✓ src/routes/system.test.ts (6 tests) 1024ms\n   ✓ GET /api/system/version > returns the core version from Hermes and the web build version  315ms\n ✓ src/routes/adminConnections.test.ts (5 tests) 1031ms\n ✓ src/routes/auth.test.ts (7 tests) 1119ms\n ✓ src/routes/avatar.test.ts (7 tests) 1137ms\n ✓ src/routes/rate-limit.test.ts (3 tests) 1187ms\n   ✓ login rate limiting > locks after 5 consecutive failures and returns 429  434ms\n   ✓ login rate limiting > rejects the correct password while locked  337ms\n   ✓ login rate limiting > resets the counter after a successful login  415ms\n ✓ src/paths.test.ts (6 tests) 10ms\n ✓ src/hermes/client.test.ts (6 tests) 79ms\n ✓ src/routes/skillUi.test.ts (11 tests) 1518ms\n ✓ src/routes/oidc.test.ts (5 tests) 1799ms\n   ✓ OIDC provider > is listed only when "
+    "output": "> 24h-web@0.1.0 typecheck\n> npm -w @24h/web run typecheck && npm -w @24h/server run typecheck && npm -w @24h/shared run typecheck\n\n\n> @24h/web@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/server@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/shared@0.1.0 typecheck\n> tsc --noEmit\n\n\n> 24h-web@0.1.0 test\n> npm -w @24h/server run test && npm -w @24h/web run test\n\n\n> @24h/server@0.1.0 test\n> vitest run\n\n\n RUN  v3.2.7 /vol1/@apphome/trim.openclaw/data/home/24h-web/apps/server\n\n ✓ src/session/role.test.ts (3 tests) 654ms\n   ✓ requireSuperAdmin > allows a super_admin  301ms\n ✓ src/routes/github.test.ts (5 tests) 759ms\n ✓ src/routes/change-password.test.ts (3 tests) 794ms\n   ✓ POST /api/auth/change-password > rejects a wrong old password with 400 and keeps the flag  313ms\n   ✓ POST /api/auth/change-password > changes the password and clears must_change_password  324ms\n ✓ src/http/csrf.test.ts (5 tests) 835ms\n ✓ src/routes/profile.test.ts (4 tests) 880ms\n   ✓ PATCH /api/auth/profile > renames the current user  331ms\n ✓ src/hermes/proxy.test.ts (3 tests) 990ms\n   ✓ GET /api/hermes/ws > authenticates with the session cookie and pipes frames both ways  335ms\n   ✓ GET /api/hermes/ws > forwards a client frame sent before the upstream connects (cold-start race)  524ms\n ✓ src/routes/system.test.ts (6 tests) 1018ms\n   ✓ GET /api/system/version > returns the core version from Hermes and the web build version  303ms\n ✓ src/routes/auth.test.ts (7 tests) 1064ms\n ✓ src/routes/adminConnections.test.ts (5 tests) 1060ms\n ✓ src/routes/avatar.test.ts (7 tests) 1144ms\n ✓ src/routes/rate-limit.test.ts (3 tests) 1218ms\n   ✓ login rate limiting > locks after 5 consecutive failures and returns 429  454ms\n   ✓ login rate limiting > rejects the correct password while locked  326ms\n   ✓ login rate limiting > resets the counter after a successful login  437ms\n ✓ src/paths.test.ts (6 tests) 11ms\n ✓ src/routes/oidc.test.ts (5 tests) 1472ms\n   ✓ OIDC provider > is listed only when OIDC is configured  312ms\n   ✓ OIDC "
   }
 }

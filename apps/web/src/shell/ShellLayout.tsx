@@ -48,6 +48,7 @@ export default function ShellLayout() {
         navigate(sessionId ? `/chat?session=${encodeURIComponent(sessionId)}` : "/notifications")
       }
     >
+      <h1 className="sr-only">{t(LABELS[active] ?? "app.name")}</h1>
       <Outlet />
     </AppShell>
   );
