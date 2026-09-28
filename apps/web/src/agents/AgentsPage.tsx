@@ -338,6 +338,36 @@ export default function AgentsPage() {
     [loadAgents],
   );
 
+  const bulkDelete = useCallback(
+    async (names: string[]) => {
+      setOpMessage(null);
+      try {
+        for (const name of names) {
+          await api(withProfile(`/api/hermes/profiles/${encodeURIComponent(name)}`, name), {
+            method: "DELETE",
+          });
+        }
+        setDeleteTarget(null);
+        setEditing(false);
+        setSelected(null);
+        setDetail(null);
+        await loadAgents();
+      } catch (err) {
+        setOpMessage(err instanceof Error ? err.message : "删除智能体失败");
+      }
+    },
+    [loadAgents],
+  );
+
+  const bulkExport = useCallback(
+    async (names: string[]) => {
+      for (const name of names) {
+        await exportProfile(name);
+      }
+    },
+    [exportProfile],
+  );
+
   const runLearn = async (event: FormEvent) => {
     event.preventDefault();
     const args = learnArgs.trim();
@@ -382,6 +412,11 @@ export default function AgentsPage() {
               }}
               onCreate={() => openCreate("new")}
               onImport={openImport}
+              onClone={(name) => openCreate("clone", name)}
+              onExport={(name) => void exportProfile(name)}
+              onDelete={(name) => setDeleteTarget(name)}
+              onBulkDelete={(names) => void bulkDelete(names)}
+              onBulkExport={(names) => void bulkExport(names)}
               avatars={avatarUrl && selected ? { [selected]: avatarUrl } : undefined}
             />
           )}
