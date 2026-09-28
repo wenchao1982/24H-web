@@ -3159,3 +3159,22 @@ mark {
 .skill-host-security {
   margin: 0;
 }
+
+/* ---------- 智能体：Tab 模块说明 / 高级模式 ---------- */
+
+.agents-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--ds-space-2);
+}
+
+.tab-intro {
+  margin: 0 0 var(--ds-space-3);
+  color: var(--ds-label-tertiary);
+  font-size: var(--ds-font-size-xs);
+}
+
+.tab-note {
+  margin: var(--ds-space-2) 0 0;
+  font-size: var(--ds-font-size-xs);
+}

@@ -57,11 +57,6 @@ export default function AgentDetail({
         {actions ? <div className="agent-actions">{actions}</div> : null}
       </header>
 
-      <section className="agent-section">
-        <h3>SOUL</h3>
-        <pre className="agent-soul">{agent.soul || "（未设置）"}</pre>
-      </section>
-
       <details className="agent-overview">
         <summary>技能与 MCP 概览</summary>
 

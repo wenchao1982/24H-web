@@ -815,6 +815,17 @@ export const zh = {
   "personality.current": "当前人格：{{name}}",
   "personality.error.list": "加载人格预设失败",
   "personality.error.set": "应用人格失败",
+
+  "agents.tab.soul": "SOUL",
+  "agents.tab.soul.intro": "智能体的角色系统提示词，定义其身份与行为准则。",
+  "agents.tab.soul.hint": "SOUL 是智能体角色系统提示词；编辑请用右上角「编辑」。",
+  "agents.tab.soul.empty": "请选择一个智能体查看 SOUL",
+  "agents.tab.skills.intro": "可复用的高层任务能力包。",
+  "agents.tab.toolsets.intro": "底层原子调用能力。",
+  "agents.tab.mcp.intro": "连接外部服务以扩展能力。",
+  "agents.tab.plugins.intro": "Hermes 底层系统扩展。",
+  "agents.tab.botScreen.intro": "Bot 屏幕相关能力（边缘功能）。",
+  "agents.advanced": "高级模式",
 } as const;
 
 export type TranslationKey = keyof typeof zh;

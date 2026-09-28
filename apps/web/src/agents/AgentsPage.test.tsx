@@ -414,6 +414,7 @@ describe("AgentsPage T16.1 Agent 列表/详情", () => {
     await waitFor(() => {
       expect(gateway.paramsOf("profiles.describe")).toEqual([{ name: "writer" }]);
     });
+    await user.click(screen.getByRole("tab", { name: "SOUL" }));
     expect(await screen.findByText("你是写作助手")).toBeInTheDocument();
     expect(screen.getByText("文案助手")).toBeInTheDocument();
     expect(screen.getByText("filesystem")).toBeInTheDocument();

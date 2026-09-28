@@ -431,12 +431,32 @@
       "priority": "medium",
       "status": "completed",
       "completedAt": "2026-09-28T11:00:49.312Z"
+    },
+    {
+      "id": "mul6gyuenyui",
+      "createdAt": "2026-09-28T11:42:19.238Z",
+      "updatedAt": "2026-09-28T11:49:03.500Z",
+      "title": "智能体页 Phase B1（SOUL Tab/模块说明/高级模式开关）",
+      "description": "Tab 增加 SOUL(置于首位，默认仍激活 skills 以减少测试改动)；每个 Tab 面板上方加模块说明小字；新增\"高级模式\"开关(aria-label，默认开)控制技能源码编辑器显示。AgentDetail 移除只读 SOUL 区块(移入 SOUL Tab)，保留折叠的技能/MCP 概览以维持 T16.1 的 filesystem。刻意更新 AgentsPage.test T16.1 第二用例：选中智能体后先点 SOUL Tab 再断言 SOUL 文本。B2 待办：技能/工具/MCP/插件统一卡片+详情+状态可视化+分组折叠；B3：列表 hover 快捷操作/批量/概览网格。",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-28T11:49:03.500Z"
+    },
+    {
+      "id": "mul6ip3u1ahv",
+      "createdAt": "2026-09-28T11:43:39.930Z",
+      "updatedAt": "2026-09-28T11:48:52.940Z",
+      "title": "AgentsPage Phase B1: SOUL Tab + intros + advanced toggle",
+      "description": "Modify AgentsPage/AgentDetail/SkillsPanel/i18n/styles + T16.1 second case; run npm run check",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-28T11:48:52.940Z"
     }
   ],
   "lastVerification": {
-    "timestamp": "2026-09-28T11:00:36.189Z",
+    "timestamp": "2026-09-28T11:48:50.050Z",
     "command": "npm run typecheck && npm run test",
     "success": true,
-    "output": "> 24h-web@0.1.0 typecheck\n> npm -w @24h/web run typecheck && npm -w @24h/server run typecheck && npm -w @24h/shared run typecheck\n\n\n> @24h/web@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/server@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/shared@0.1.0 typecheck\n> tsc --noEmit\n\n\n> 24h-web@0.1.0 test\n> npm -w @24h/server run test && npm -w @24h/web run test\n\n\n> @24h/server@0.1.0 test\n> vitest run\n\n\n RUN  v3.2.7 /vol1/@apphome/trim.openclaw/data/home/24h-web/apps/server\n\n ✓ src/session/role.test.ts (3 tests) 658ms\n   ✓ requireSuperAdmin > allows a super_admin  315ms\n ✓ src/routes/github.test.ts (5 tests) 765ms\n   ✓ GET /api/integrations/github > reports the gh auth status without exposing a token  307ms\n ✓ src/routes/change-password.test.ts (3 tests) 826ms\n   ✓ POST /api/auth/change-password > rejects a wrong old password with 400 and keeps the flag  352ms\n   ✓ POST /api/auth/change-password > changes the password and clears must_change_password  329ms\n ✓ src/routes/profile.test.ts (4 tests) 897ms\n   ✓ PATCH /api/auth/profile > renames the current user  350ms\n ✓ src/http/csrf.test.ts (5 tests) 898ms\n ✓ src/hermes/proxy.test.ts (3 tests) 978ms\n   ✓ GET /api/hermes/ws > authenticates with the session cookie and pipes frames both ways  345ms\n   ✓ GET /api/hermes/ws > forwards a client frame sent before the upstream connects (cold-start race)  510ms\n ✓ src/routes/auth.test.ts (7 tests) 1117ms\n   ✓ POST /api/auth/login > logs in with correct credentials and sets an HttpOnly session cookie  315ms\n ✓ src/routes/system.test.ts (6 tests) 1122ms\n   ✓ GET /api/system/version > returns the core version from Hermes and the web build version  339ms\n ✓ src/routes/adminConnections.test.ts (5 tests) 1134ms\n   ✓ admin connections CRUD > creates, lists, updates and deletes a connection without exposing the token  334ms\n ✓ src/routes/avatar.test.ts (7 tests) 1156ms\n ✓ src/routes/rate-limit.test.ts (3 tests) 1198ms\n   ✓ login rate limiting > locks after 5 consecutive failures and returns 429  454ms"
+    "output": "> 24h-web@0.1.0 typecheck\n> npm -w @24h/web run typecheck && npm -w @24h/server run typecheck && npm -w @24h/shared run typecheck\n\n\n> @24h/web@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/server@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/shared@0.1.0 typecheck\n> tsc --noEmit\n\n\n> 24h-web@0.1.0 test\n> npm -w @24h/server run test && npm -w @24h/web run test\n\n\n> @24h/server@0.1.0 test\n> vitest run\n\n\n RUN  v3.2.7 /vol1/@apphome/trim.openclaw/data/home/24h-web/apps/server\n\n ✓ src/session/role.test.ts (3 tests) 594ms\n ✓ src/routes/change-password.test.ts (3 tests) 810ms\n   ✓ POST /api/auth/change-password > rejects a wrong old password with 400 and keeps the flag  313ms\n   ✓ POST /api/auth/change-password > changes the password and clears must_change_password  321ms\n ✓ src/routes/github.test.ts (5 tests) 816ms\n   ✓ GET /api/integrations/github > reports the gh auth status without exposing a token  308ms\n ✓ src/http/csrf.test.ts (5 tests) 830ms\n ✓ src/routes/profile.test.ts (4 tests) 848ms\n   ✓ PATCH /api/auth/profile > renames the current user  324ms\n ✓ src/hermes/proxy.test.ts (3 tests) 1013ms\n   ✓ GET /api/hermes/ws > authenticates with the session cookie and pipes frames both ways  323ms\n   ✓ GET /api/hermes/ws > forwards a client frame sent before the upstream connects (cold-start race)  512ms\n ✓ src/routes/system.test.ts (6 tests) 1057ms\n   ✓ GET /api/system/version > returns the core version from Hermes and the web build version  321ms\n ✓ src/routes/adminConnections.test.ts (5 tests) 1072ms\n   ✓ admin connections CRUD > creates, lists, updates and deletes a connection without exposing the token  301ms\n ✓ src/routes/auth.test.ts (7 tests) 1082ms\n ✓ src/routes/avatar.test.ts (7 tests) 1113ms\n ✓ src/routes/rate-limit.test.ts (3 tests) 1210ms\n   ✓ login rate limiting > locks after 5 consecutive failures and returns 429  450ms\n   ✓ login rate limiting > rejects the correct password while locked  346ms\n   ✓ login rate limiting > resets the counter after a successful login  413ms\n "
   }
 }

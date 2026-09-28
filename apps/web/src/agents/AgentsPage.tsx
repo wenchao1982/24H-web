@@ -15,7 +15,8 @@ import AgentDetail from "./AgentDetail";
 import AgentCreatePanel, { type CreateProfileParams } from "./AgentCreatePanel";
 import AgentEditPanel, { type ConfigureProfileParams } from "./AgentEditPanel";
 import AgentImportPanel, { type ImportProfileParams } from "./AgentImportPanel";
-import { ConfirmDialog } from "../ui";
+import { Button, ConfirmDialog } from "../ui";
+import { t, type TranslationKey } from "../i18n";
 import SkillsPanel from "./SkillsPanel";
 import ToolsetsPanel from "./ToolsetsPanel";
 import McpPanel from "./McpPanel";
@@ -28,12 +29,22 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
+  { id: "soul", label: "SOUL" },
   { id: "skills", label: "技能" },
   { id: "toolsets", label: "工具" },
   { id: "mcp", label: "MCP" },
   { id: "plugins", label: "插件" },
   { id: "bot-screen", label: "Bot 屏幕" },
 ];
+
+const TAB_INTRO: Record<string, TranslationKey> = {
+  soul: "agents.tab.soul.intro",
+  skills: "agents.tab.skills.intro",
+  toolsets: "agents.tab.toolsets.intro",
+  mcp: "agents.tab.mcp.intro",
+  plugins: "agents.tab.plugins.intro",
+  "bot-screen": "agents.tab.botScreen.intro",
+};
 
 /** 智能体页：agent 列表 + 详情 + 技能/工具/MCP/插件 子面板 + 经验→Skill（/learn）。 */
 export default function AgentsPage() {
@@ -48,6 +59,7 @@ export default function AgentsPage() {
   const [detailError, setDetailError] = useState<string | null>(null);
 
   const [tab, setTab] = useState<string>("skills");
+  const [advanced, setAdvanced] = useState(true);
   const [learnArgs, setLearnArgs] = useState("");
   const [learnBusy, setLearnBusy] = useState(false);
   const [learnMsg, setLearnMsg] = useState<string | null>(null);
@@ -465,6 +477,17 @@ export default function AgentsPage() {
           ) : null}
           {opMessage ? <p className="muted agent-op-message">{opMessage}</p> : null}
 
+          <div className="agents-toolbar">
+            <Button
+              variant={advanced ? "primary" : "outline"}
+              className="advanced-toggle"
+              aria-label={t("agents.advanced")}
+              aria-pressed={advanced}
+              onClick={() => setAdvanced((value) => !value)}
+            >
+              {t("agents.advanced")}
+            </Button>
+          </div>
           <div className="tabs" role="tablist" aria-label="智能体功能">
             {TABS.map((item) => (
               <button
@@ -480,6 +503,17 @@ export default function AgentsPage() {
             ))}
           </div>
           <div className="tab-panel">
+            <p className="tab-intro">{t(TAB_INTRO[tab])}</p>
+            {tab === "soul" ? (
+              detail ? (
+                <section className="agent-section">
+                  <pre className="agent-soul">{detail.soul || "（未设置）"}</pre>
+                  <p className="muted tab-note">{t("agents.tab.soul.hint")}</p>
+                </section>
+              ) : (
+                <p className="empty">{t("agents.tab.soul.empty")}</p>
+              )
+            ) : null}
             {tab === "skills" ? (
               <>
                 <form className="card learn-action" onSubmit={runLearn}>
@@ -496,7 +530,7 @@ export default function AgentsPage() {
                   </div>
                   {learnMsg ? <p className="muted">{learnMsg}</p> : null}
                 </form>
-                <SkillsPanel profile={selected ?? undefined} />
+                <SkillsPanel profile={selected ?? undefined} advanced={advanced} />
               </>
             ) : null}
             {tab === "toolsets" ? <ToolsetsPanel profile={selected ?? undefined} /> : null}

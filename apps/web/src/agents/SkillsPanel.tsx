@@ -13,10 +13,12 @@ import {
 export interface SkillsPanelProps {
   /** 作用到该 profile（省略则为全局默认 profile）。 */
   profile?: string;
+  /** 高级模式：关闭时隐藏技能内容编辑入口。 */
+  advanced?: boolean;
 }
 
 /** 智能体页「技能」面板：按类别分组展示 + hub 安装。 */
-export default function SkillsPanel({ profile }: SkillsPanelProps) {
+export default function SkillsPanel({ profile, advanced = true }: SkillsPanelProps) {
   const [skills, setSkills] = useState<SkillEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -220,15 +222,17 @@ export default function SkillsPanel({ profile }: SkillsPanelProps) {
                   {skill.description ? (
                     <span className="skill-desc muted">{skill.description}</span>
                   ) : null}
-                  <button
-                    type="button"
-                    className="ghost"
-                    aria-label={`编辑 ${skill.name}`}
-                    disabled={contentBusy && editing !== skill.name}
-                    onClick={() => void openEditor(skill)}
-                  >
-                    {editing === skill.name ? "收起" : "编辑"}
-                  </button>
+                  {advanced ? (
+                    <button
+                      type="button"
+                      className="ghost"
+                      aria-label={`编辑 ${skill.name}`}
+                      disabled={contentBusy && editing !== skill.name}
+                      onClick={() => void openEditor(skill)}
+                    >
+                      {editing === skill.name ? "收起" : "编辑"}
+                    </button>
+                  ) : null}
                   {editing === skill.name ? (
                     <div className="skill-editor">
                       <textarea
