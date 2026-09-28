@@ -204,11 +204,13 @@ export default function SkillsPanel({ profile, advanced = true }: SkillsPanelPro
         <p className="empty">暂无技能。</p>
       ) : (
         groupByCategory(skills).map((group) => (
-          <section className="skill-group" key={group.category}>
-            <h3 className="skill-group-title">{group.category}</h3>
+          <details className="skill-group" open key={group.category}>
+            <summary>
+              <h3 className="skill-group-title">{group.category}</h3>
+            </summary>
             <ul className="skill-list">
               {group.skills.map((skill) => (
-                <li className="skill-item" key={skill.name}>
+                <li className="skill-item ds-card-row" key={skill.name}>
                   <label className="skill-toggle">
                     <input
                       type="checkbox"
@@ -254,7 +256,7 @@ export default function SkillsPanel({ profile, advanced = true }: SkillsPanelPro
                 </li>
               ))}
             </ul>
-          </section>
+          </details>
         ))
       )}
     </div>

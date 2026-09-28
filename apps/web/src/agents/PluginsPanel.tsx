@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useGateway } from "../chat/GatewayProvider";
+import { Modal } from "../ui";
 import { normalizePlugins, type PluginEntry } from "./plugins";
 
 /** 智能体页「插件」面板：经 L1 网关 `plugins.manage` 列表/启停。 */
@@ -9,6 +10,7 @@ export default function PluginsPanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [detail, setDetail] = useState<PluginEntry | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -64,7 +66,7 @@ export default function PluginsPanel() {
       ) : (
         <ul className="toolset-list">
           {plugins.map((plugin) => (
-            <li className="toolset-item" key={plugin.name}>
+            <li className="toolset-item ds-card-row" key={plugin.name}>
               <label className="skill-toggle">
                 <input
                   type="checkbox"
@@ -78,10 +80,35 @@ export default function PluginsPanel() {
               {plugin.version ? (
                 <span className="skill-desc muted">{plugin.version}</span>
               ) : null}
+              <button
+                type="button"
+                className="ghost"
+                aria-label={`详情 ${plugin.name}`}
+                onClick={() => setDetail(plugin)}
+              >
+                详情
+              </button>
             </li>
           ))}
         </ul>
       )}
+
+      <Modal
+        open={detail !== null}
+        title={detail ? `插件详情：${detail.name}` : undefined}
+        onClose={() => setDetail(null)}
+      >
+        {detail ? (
+          <dl className="plugin-detail">
+            <dt>名称</dt>
+            <dd>{detail.name}</dd>
+            <dt>版本</dt>
+            <dd>{detail.version || "（未知）"}</dd>
+            <dt>状态</dt>
+            <dd>{detail.enabled ? "已启用" : "已停用"}</dd>
+          </dl>
+        ) : null}
+      </Modal>
     </div>
   );
 }

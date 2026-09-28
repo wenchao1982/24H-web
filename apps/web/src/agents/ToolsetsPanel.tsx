@@ -99,7 +99,7 @@ export default function ToolsetsPanel({ profile }: ToolsetsPanelProps) {
       ) : (
         <ul className="toolset-list">
           {toolsets.map((toolset) => (
-            <li className="toolset-item" key={toolset.name}>
+            <li className="toolset-item ds-card-row" key={toolset.name}>
               <label className="skill-toggle">
                 <input
                   type="checkbox"

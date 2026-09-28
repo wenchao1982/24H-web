@@ -167,7 +167,7 @@ export default function McpPanel({ profile }: McpPanelProps) {
         ) : (
           <ul className="toolset-list">
             {servers.map((server) => (
-              <li className="toolset-item" key={server.name}>
+              <li className="toolset-item ds-card-row" key={server.name}>
                 <label className="skill-toggle">
                   <input
                     type="checkbox"

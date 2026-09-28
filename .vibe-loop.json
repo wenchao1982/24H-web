@@ -451,12 +451,82 @@
       "priority": "high",
       "status": "completed",
       "completedAt": "2026-09-28T11:48:52.940Z"
+    },
+    {
+      "id": "mul7mdabelyb",
+      "createdAt": "2026-09-28T12:14:30.851Z",
+      "updatedAt": "2026-09-28T12:21:02.928Z",
+      "title": "智能体页 Phase B2a（面板统一卡片/技能分组折叠/插件详情）",
+      "description": "零测试改动。技能/工具/MCP/插件条目统一卡片外观；技能分组改可折叠(details open，默认展开，h3 保留在 summary 内以维持 T7.1 的 heading 断言)；插件条目加\"详情 <name>\"按钮弹 Modal；工具/插件若类型含状态字段则渲染 Tag(needs_auth/active)否则跳过。严禁改可访问名(启用 X/配置/编辑 X/技能内容 X/保存/安装/搜索/启用工具集 X/启用插件 X/启用 MCP X)。B2b 待办：配置→详情统一、源码编辑器统一收起、Tab 概念说明强化。",
+      "priority": "medium",
+      "status": "completed",
+      "completedAt": "2026-09-28T12:21:02.928Z"
+    },
+    {
+      "id": "mul7n4senmk0",
+      "createdAt": "2026-09-28T12:15:06.494Z",
+      "updatedAt": "2026-09-28T12:15:31.783Z",
+      "title": "SkillsPanel 折叠分组 + 卡片",
+      "description": "details/summary 折叠分组，默认 open，标题保持 h3 heading；技能条目加 ds-card-row",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-28T12:15:31.783Z"
+    },
+    {
+      "id": "mul7n4xy9nop",
+      "createdAt": "2026-09-28T12:15:06.694Z",
+      "updatedAt": "2026-09-28T12:15:52.719Z",
+      "title": "ToolsetsPanel 卡片",
+      "description": "条目加 ds-card-row；无状态字段则跳过 Tag",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-28T12:15:52.719Z"
+    },
+    {
+      "id": "mul7n5448ngt",
+      "createdAt": "2026-09-28T12:15:06.916Z",
+      "updatedAt": "2026-09-28T12:16:19.864Z",
+      "title": "PluginsPanel 详情 Modal",
+      "description": "条目加 ds-card-row；新增详情按钮打开 Modal 展示 name/version",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-28T12:16:19.864Z"
+    },
+    {
+      "id": "mul7n5a329s5",
+      "createdAt": "2026-09-28T12:15:07.131Z",
+      "updatedAt": "2026-09-28T12:16:41.120Z",
+      "title": "McpPanel 卡片",
+      "description": "MCP 列表项加 ds-card-row",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-28T12:16:41.120Z"
+    },
+    {
+      "id": "mul7n5dwzhj3",
+      "createdAt": "2026-09-28T12:15:07.268Z",
+      "updatedAt": "2026-09-28T12:17:49.419Z",
+      "title": "styles.css 追加卡片/折叠样式",
+      "description": ".ds-card-row / .skill-group > summary 等",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-28T12:17:49.419Z"
+    },
+    {
+      "id": "mul7n5jyxdvp",
+      "createdAt": "2026-09-28T12:15:07.486Z",
+      "updatedAt": "2026-09-28T12:20:53.473Z",
+      "title": "npm run check 验证",
+      "description": "全绿且未改测试；确认 git status 无测试文件",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-28T12:20:53.473Z"
     }
   ],
   "lastVerification": {
-    "timestamp": "2026-09-28T11:48:50.050Z",
+    "timestamp": "2026-09-28T12:20:50.853Z",
     "command": "npm run typecheck && npm run test",
     "success": true,
-    "output": "> 24h-web@0.1.0 typecheck\n> npm -w @24h/web run typecheck && npm -w @24h/server run typecheck && npm -w @24h/shared run typecheck\n\n\n> @24h/web@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/server@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/shared@0.1.0 typecheck\n> tsc --noEmit\n\n\n> 24h-web@0.1.0 test\n> npm -w @24h/server run test && npm -w @24h/web run test\n\n\n> @24h/server@0.1.0 test\n> vitest run\n\n\n RUN  v3.2.7 /vol1/@apphome/trim.openclaw/data/home/24h-web/apps/server\n\n ✓ src/session/role.test.ts (3 tests) 594ms\n ✓ src/routes/change-password.test.ts (3 tests) 810ms\n   ✓ POST /api/auth/change-password > rejects a wrong old password with 400 and keeps the flag  313ms\n   ✓ POST /api/auth/change-password > changes the password and clears must_change_password  321ms\n ✓ src/routes/github.test.ts (5 tests) 816ms\n   ✓ GET /api/integrations/github > reports the gh auth status without exposing a token  308ms\n ✓ src/http/csrf.test.ts (5 tests) 830ms\n ✓ src/routes/profile.test.ts (4 tests) 848ms\n   ✓ PATCH /api/auth/profile > renames the current user  324ms\n ✓ src/hermes/proxy.test.ts (3 tests) 1013ms\n   ✓ GET /api/hermes/ws > authenticates with the session cookie and pipes frames both ways  323ms\n   ✓ GET /api/hermes/ws > forwards a client frame sent before the upstream connects (cold-start race)  512ms\n ✓ src/routes/system.test.ts (6 tests) 1057ms\n   ✓ GET /api/system/version > returns the core version from Hermes and the web build version  321ms\n ✓ src/routes/adminConnections.test.ts (5 tests) 1072ms\n   ✓ admin connections CRUD > creates, lists, updates and deletes a connection without exposing the token  301ms\n ✓ src/routes/auth.test.ts (7 tests) 1082ms\n ✓ src/routes/avatar.test.ts (7 tests) 1113ms\n ✓ src/routes/rate-limit.test.ts (3 tests) 1210ms\n   ✓ login rate limiting > locks after 5 consecutive failures and returns 429  450ms\n   ✓ login rate limiting > rejects the correct password while locked  346ms\n   ✓ login rate limiting > resets the counter after a successful login  413ms\n "
+    "output": "> 24h-web@0.1.0 typecheck\n> npm -w @24h/web run typecheck && npm -w @24h/server run typecheck && npm -w @24h/shared run typecheck\n\n\n> @24h/web@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/server@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/shared@0.1.0 typecheck\n> tsc --noEmit\n\n\n> 24h-web@0.1.0 test\n> npm -w @24h/server run test && npm -w @24h/web run test\n\n\n> @24h/server@0.1.0 test\n> vitest run\n\n\n RUN  v3.2.7 /vol1/@apphome/trim.openclaw/data/home/24h-web/apps/server\n\n ✓ src/session/role.test.ts (3 tests) 638ms\n ✓ src/routes/github.test.ts (5 tests) 716ms\n ✓ src/routes/change-password.test.ts (3 tests) 796ms\n   ✓ POST /api/auth/change-password > rejects a wrong old password with 400 and keeps the flag  324ms\n   ✓ POST /api/auth/change-password > changes the password and clears must_change_password  301ms\n ✓ src/http/csrf.test.ts (5 tests) 828ms\n ✓ src/routes/profile.test.ts (4 tests) 856ms\n   ✓ PATCH /api/auth/profile > renames the current user  319ms\n ✓ src/hermes/proxy.test.ts (3 tests) 964ms\n   ✓ GET /api/hermes/ws > authenticates with the session cookie and pipes frames both ways  351ms\n   ✓ GET /api/hermes/ws > forwards a client frame sent before the upstream connects (cold-start race)  503ms\n ✓ src/routes/adminConnections.test.ts (5 tests) 1066ms\n   ✓ admin connections CRUD > creates, lists, updates and deletes a connection without exposing the token  310ms\n ✓ src/routes/system.test.ts (6 tests) 1098ms\n ✓ src/routes/auth.test.ts (7 tests) 1112ms\n ✓ src/routes/avatar.test.ts (7 tests) 1195ms\n ✓ src/routes/rate-limit.test.ts (3 tests) 1221ms\n   ✓ login rate limiting > locks after 5 consecutive failures and returns 429  430ms\n   ✓ login rate limiting > rejects the correct password while locked  371ms\n   ✓ login rate limiting > resets the counter after a successful login  419ms\n ✓ src/paths.test.ts (6 tests) 9ms\n ✓ src/routes/skillUi.test.ts (11 tests) 1513ms\n ✓ src/hermes/client.test.ts (6 tests) 98ms\n ✓ src/routes/oidc.test.ts (5 tests) 1723ms\n   ✓ OIDC provider > is lis"
   }
 }

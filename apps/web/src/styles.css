@@ -3178,3 +3178,58 @@ mark {
   margin: var(--ds-space-2) 0 0;
   font-size: var(--ds-font-size-xs);
 }
+
+/* ---------- 智能体 Phase B2a：统一条目卡片 / 技能分组折叠 ---------- */
+
+.ds-card-row {
+  border: var(--ds-hairline) solid var(--ds-border-l1);
+  border-radius: var(--ds-radius-sm);
+  padding: var(--ds-space-2) var(--ds-space-3);
+  background: var(--ds-surface-l1);
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.ds-card-row:hover {
+  background: var(--ds-surface-l2);
+}
+
+.skill-group > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+}
+
+.skill-group > summary::-webkit-details-marker {
+  display: none;
+}
+
+.skill-group > summary::marker {
+  content: "";
+}
+
+.skill-group > summary > .skill-group-title {
+  display: inline-block;
+  margin: 0;
+}
+
+.skill-group[open] > summary {
+  color: var(--ds-label-secondary);
+}
+
+.plugin-detail {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--ds-space-2) var(--ds-space-3);
+  margin: 0;
+}
+
+.plugin-detail dt {
+  color: var(--ds-label-tertiary);
+  font-size: var(--ds-font-size-sm);
+}
+
+.plugin-detail dd {
+  margin: 0;
+  word-break: break-word;
+}
