@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { useSession } from "../auth/SessionProvider";
+import { Button, Field, Input, Stack } from "../ui";
 
 type Step = "login" | "change";
 
@@ -70,61 +71,61 @@ export default function LoginPage() {
 
         {step === "login" ? (
           <form onSubmit={submitLogin}>
-            <h1>登录</h1>
-            <div className="row">
-              <label htmlFor="login-username">用户名</label>
-              <input
-                id="login-username"
-                name="username"
-                autoComplete="username"
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-              />
-            </div>
-            <div className="row">
-              <label htmlFor="login-password">密码</label>
-              <input
-                id="login-password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-              />
-            </div>
-            {error ? <p className="err">{error}</p> : null}
-            <button className="primary" type="submit" disabled={busy}>
-              {busy ? "登录中…" : "登录"}
-            </button>
+            <Stack gap={12}>
+              <h1>登录</h1>
+              <Field label="用户名" htmlFor="login-username">
+                <Input
+                  id="login-username"
+                  name="username"
+                  autoComplete="username"
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                />
+              </Field>
+              <Field label="密码" htmlFor="login-password">
+                <Input
+                  id="login-password"
+                  name="password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+              </Field>
+              {error ? <p className="err">{error}</p> : null}
+              <Button variant="primary" block type="submit" disabled={busy}>
+                {busy ? "登录中…" : "登录"}
+              </Button>
+            </Stack>
           </form>
         ) : (
           <form onSubmit={submitChange}>
-            <h1>修改密码</h1>
-            <p className="muted">首次登录需要设置新密码。</p>
-            <div className="row">
-              <label htmlFor="change-old">当前密码</label>
-              <input
-                id="change-old"
-                type="password"
-                autoComplete="current-password"
-                value={oldPassword}
-                onChange={(event) => setOldPassword(event.target.value)}
-              />
-            </div>
-            <div className="row">
-              <label htmlFor="change-new">新密码</label>
-              <input
-                id="change-new"
-                type="password"
-                autoComplete="new-password"
-                value={newPassword}
-                onChange={(event) => setNewPassword(event.target.value)}
-              />
-            </div>
-            {error ? <p className="err">{error}</p> : null}
-            <button className="primary" type="submit" disabled={busy}>
-              {busy ? "提交中…" : "修改密码"}
-            </button>
+            <Stack gap={12}>
+              <h1>修改密码</h1>
+              <p className="muted">首次登录需要设置新密码。</p>
+              <Field label="当前密码" htmlFor="change-old">
+                <Input
+                  id="change-old"
+                  type="password"
+                  autoComplete="current-password"
+                  value={oldPassword}
+                  onChange={(event) => setOldPassword(event.target.value)}
+                />
+              </Field>
+              <Field label="新密码" htmlFor="change-new">
+                <Input
+                  id="change-new"
+                  type="password"
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(event) => setNewPassword(event.target.value)}
+                />
+              </Field>
+              {error ? <p className="err">{error}</p> : null}
+              <Button variant="primary" block type="submit" disabled={busy}>
+                {busy ? "提交中…" : "修改密码"}
+              </Button>
+            </Stack>
           </form>
         )}
       </div>

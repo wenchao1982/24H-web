@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { t } from "../i18n";
+import { Icon } from "../ui/icons";
 import { useNotifications } from "./NotificationsProvider";
 import {
   badgeVisible,
@@ -80,7 +81,7 @@ export default function NotificationsBell({ onSelect }: NotificationsBellProps) 
         onClick={() => setOpen((value) => !value)}
       >
         <span className="nav-icon" aria-hidden="true">
-          🔔
+          <Icon name="bell" size={18} />
         </span>
         <span className="nav-label">{t("nav.notifications")}</span>
         {showBadge ? (

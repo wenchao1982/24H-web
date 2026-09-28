@@ -1,0 +1,135 @@
+{
+  "version": 2,
+  "tasks": [
+    {
+      "id": "mukospub7q60",
+      "createdAt": "2026-09-28T03:27:34.355Z",
+      "updatedAt": "2026-09-28T05:58:56.521Z",
+      "title": "还原 dsh 首页三栏骨架观感（AppShell）",
+      "description": "基准：docs/refs/dsh-home.png。已完成：(1) 侧栏重构（见 impl-sidebar.png）；(2) 移除 AppShell 全局 main-header，详情开关迁入对话区会话头（见 impl-shell-nobar.png），窄屏浮动菜单按钮 sidebar-fab。剩余：(3) 面板可拖拽缩放；(4) 让步链（现为 max-width:900px 硬切 AppShell.tsx）。备注：详情开关现由 shell/details-context.tsx 提供，非对话页暂无该开关入口。",
+      "priority": "high",
+      "status": "pending"
+    },
+    {
+      "id": "mukskxqwvpeo",
+      "createdAt": "2026-09-28T05:13:29.816Z",
+      "updatedAt": "2026-09-28T05:45:41.133Z",
+      "title": "对齐 Ekko 侧栏一级导航菜单观感（Sidebar）",
+      "description": "基准：docs/refs/ekko-menu.png（Ekko Studio v0.7.18 官方截图）。目标：侧栏菜单布局/行高/图标/激活态/分组(section header 12px tertiary + 行内 icon 按钮)/底部固定 Settings。现 Sidebar.tsx 用 unicode 图标(▤◈❏◷◉▣⚙🛡👤) + nav.ts，需换 SVG；styles.css 的 .nav-btn/.brand/.sidebar-* 需按截图重排。与 dsh 任务同属\"参考对齐轮\"，一次只做一屏，先出差异清单评审。",
+      "priority": "high",
+      "status": "completed",
+      "dependsOn": [
+        "mukospub7q60"
+      ],
+      "completedAt": "2026-09-28T05:45:41.133Z"
+    },
+    {
+      "id": "mukss513d7p4",
+      "createdAt": "2026-09-28T05:19:05.847Z",
+      "updatedAt": "2026-09-28T05:37:52.979Z",
+      "title": "Phase 0 地基：UI 原语层 + SVG 图标集 + token 补齐",
+      "description": "落地 UI/UX 方案的前置依赖。现状 apps/web/src/ui/ 仅有 Toast.tsx，导致方案中\"模态弹窗/二次确认/状态标签/空状态/骨架屏/表单校验\"只能各页手写。任务：(1) 建 SVG icon set 替换 shell/nav.ts 的 unicode 图标；(2) ui/ 原语 Button/IconButton/Input/Field/Select/Modal/ConfirmDialog/Tag/EmptyState/Skeleton/Card/Stack；(3) token 补齐状态色语义与字号/间距阶梯；(4) 用原语重写登录页 + 侧栏作样板，截图对照 docs/refs/dsh-home.png 与 ekko-menu.png。约束：遵守 AGENTS.md §8「不引 UI 库、手写 CSS + --ds-*」；遵循 UI.md「无全局顶栏」。验收：npm run check 通过 + 截图评审。",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-28T05:37:52.979Z"
+    },
+    {
+      "id": "mukt379l8upf",
+      "createdAt": "2026-09-28T05:27:41.961Z",
+      "updatedAt": "2026-09-28T05:28:10.442Z",
+      "title": "Append design-system tokens + primitives CSS to styles.css",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-28T05:28:10.442Z"
+    },
+    {
+      "id": "mukt37dwvduk",
+      "createdAt": "2026-09-28T05:27:42.116Z",
+      "updatedAt": "2026-09-28T05:28:44.209Z",
+      "title": "Create ui/icons.tsx with Icon component",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-28T05:28:44.209Z"
+    },
+    {
+      "id": "mukt37lcyt4a",
+      "createdAt": "2026-09-28T05:27:42.384Z",
+      "updatedAt": "2026-09-28T05:32:52.436Z",
+      "title": "Create ui primitives + barrel (Button/Input/Field/Select/Tag/EmptyState/Skeleton/Card/Stack/Modal/ConfirmDialog/IconButton)",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-28T05:32:52.436Z"
+    },
+    {
+      "id": "mukt37o361rv",
+      "createdAt": "2026-09-28T05:27:42.483Z",
+      "updatedAt": "2026-09-28T05:34:36.829Z",
+      "title": "Update nav.ts + Sidebar.tsx to use Icon",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-28T05:34:36.829Z"
+    },
+    {
+      "id": "mukt37rumxdp",
+      "createdAt": "2026-09-28T05:27:42.618Z",
+      "updatedAt": "2026-09-28T05:35:02.623Z",
+      "title": "Rewrite LoginPage.tsx with primitives",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-28T05:35:02.623Z"
+    },
+    {
+      "id": "mukt37v5zn4w",
+      "createdAt": "2026-09-28T05:27:42.737Z",
+      "updatedAt": "2026-09-28T05:37:38.358Z",
+      "title": "Run npm run check and screenshot login",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-28T05:37:38.358Z"
+    },
+    {
+      "id": "muktv4dyoiha",
+      "createdAt": "2026-09-28T05:49:24.598Z",
+      "updatedAt": "2026-09-28T05:58:40.591Z",
+      "title": "C1: 移除全局 main-header，详情开关迁至会话头",
+      "description": "新建 details-context；改 AppShell/ChatPage/AppShell.test/styles.css；跑 npm run check + e2e 截图",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-28T05:58:40.591Z"
+    },
+    {
+      "id": "mukv67ufo221",
+      "createdAt": "2026-09-28T06:26:01.911Z",
+      "updatedAt": "2026-09-28T06:31:34.891Z",
+      "title": "C2: 对话页会话列表 Phase 1 改造",
+      "description": "重构 SessionList.tsx（更多菜单/批量模式/ConfirmDialog/行内快捷操作/EmptyState）、ChatPage.tsx 空态引导卡片、styles.css 追加、更新 T6.9/T6.14 测试。npm run check 全绿 + e2e 截图。",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-28T06:31:34.891Z"
+    },
+    {
+      "id": "mukvdmww75t3",
+      "createdAt": "2026-09-28T06:31:48.032Z",
+      "updatedAt": "2026-09-28T06:31:48.032Z",
+      "title": "Phase 1 · 日志面板（级别着色/结构化/搜索）",
+      "description": "基准：用户 UI/UX 方案「工作区-日志面板」。现 LogsPanel.tsx 把 entries.join(\"\\n\") 塞进 <pre>，无级别着色、无搜索、无结构化、无自动滚动/暂停/清空/导出。改：Tab 更名\"任务日志\"、级别色彩、结构化渲染(时间戳/级别/模块)、关键词搜索+高亮、自动滚动/暂停/清空(二次确认)/导出、长行折叠、hover 复制、仅管理员可见。用 Tag/Button/EmptyState 原语 + ConfirmDialog。",
+      "priority": "medium",
+      "status": "pending"
+    },
+    {
+      "id": "mukvdncxhkft",
+      "createdAt": "2026-09-28T06:31:48.609Z",
+      "updatedAt": "2026-09-28T06:31:48.609Z",
+      "title": "Phase 1 · 危险操作统一 ConfirmDialog（替换 window.confirm）",
+      "description": "全局规范要求危险操作二次确认。现 6 处用原生 window.confirm：AdminUsersPage.tsx:130、settings/{OpsPanel,VaultPanel,HandoffPanel,ExecPanel,ForeignSessionPanel}。统一改为 ui 的 ConfirmDialog（模态）。注意这些文件都有对应 .test.tsx 目前 mock window.confirm，需要一并按新交互更新测试。会话列表已由 C2 完成。",
+      "priority": "medium",
+      "status": "pending"
+    }
+  ],
+  "lastVerification": {
+    "timestamp": "2026-09-28T06:39:04.069Z",
+    "command": "npm run typecheck && npm run test",
+    "success": true,
+    "output": "> 24h-web@0.1.0 typecheck\n> npm -w @24h/web run typecheck && npm -w @24h/server run typecheck && npm -w @24h/shared run typecheck\n\n\n> @24h/web@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/server@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/shared@0.1.0 typecheck\n> tsc --noEmit\n\n\n> 24h-web@0.1.0 test\n> npm -w @24h/server run test && npm -w @24h/web run test\n\n\n> @24h/server@0.1.0 test\n> vitest run\n\n\n RUN  v3.2.7 /vol1/@apphome/trim.openclaw/data/home/24h-web/apps/server\n\n ✓ src/session/role.test.ts (3 tests) 671ms\n ✓ src/routes/github.test.ts (5 tests) 717ms\n ✓ src/routes/change-password.test.ts (3 tests) 735ms\n   ✓ POST /api/auth/change-password > rejects a wrong old password with 400 and keeps the flag  316ms\n   ✓ POST /api/auth/change-password > changes the password and clears must_change_password  303ms\n ✓ src/http/csrf.test.ts (5 tests) 832ms\n ✓ src/routes/profile.test.ts (4 tests) 871ms\n   ✓ PATCH /api/auth/profile > renames the current user  315ms\n ✓ src/hermes/proxy.test.ts (3 tests) 961ms\n   ✓ GET /api/hermes/ws > authenticates with the session cookie and pipes frames both ways  304ms\n   ✓ GET /api/hermes/ws > forwards a client frame sent before the upstream connects (cold-start race)  534ms\n ✓ src/routes/adminConnections.test.ts (5 tests) 1080ms\n   ✓ admin connections CRUD > creates, lists, updates and deletes a connection without exposing the token  310ms\n ✓ src/routes/avatar.test.ts (7 tests) 1092ms\n ✓ src/routes/system.test.ts (6 tests) 1102ms\n   ✓ GET /api/system/version > returns the core version from Hermes and the web build version  330ms\n ✓ src/routes/auth.test.ts (7 tests) 1122ms\n   ✓ POST /api/auth/login > logs in with correct credentials and sets an HttpOnly session cookie  310ms\n ✓ src/routes/rate-limit.test.ts (3 tests) 1157ms\n   ✓ login rate limiting > locks after 5 consecutive failures and returns 429  400ms\n   ✓ login rate limiting > rejects the correct password while locked  355ms\n   ✓ login rate limiting > resets the counter after a successful login "
+  }
+}

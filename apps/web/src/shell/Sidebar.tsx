@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { t } from "../i18n";
 import NotificationsBell from "../notifications/NotificationsBell";
+import { Icon } from "../ui/icons";
 import { BOTTOM_NAV, PRIMARY_NAV, type NavItem } from "./nav";
 
 export interface SidebarProps {
@@ -81,12 +82,12 @@ export default function Sidebar({
             aria-label={collapsed ? t("sidebar.expand") : t("sidebar.collapse")}
             onClick={onToggleCollapse}
           >
-            {collapsed ? "»" : "«"}
+            <Icon name={collapsed ? "chevronRight" : "chevronLeft"} />
           </button>
         )}
       </div>
 
-      <ul className="nav-primary">
+      <ul className="nav-primary" aria-label={t("sidebar.nav.primary")}>
         {PRIMARY_NAV.map((item) => (
           <li key={item.id}>
             <button
@@ -97,7 +98,7 @@ export default function Sidebar({
               onClick={() => onNavigate?.(item.id)}
             >
               <span className="nav-icon" aria-hidden="true">
-                {item.icon}
+                <Icon name={item.icon} size={18} />
               </span>
               <span className="nav-label">{t(item.labelKey)}</span>
             </button>
@@ -107,7 +108,7 @@ export default function Sidebar({
 
       <div className="sidebar-list">{children}</div>
 
-      <div className="sidebar-footer">
+      <div className="sidebar-footer" role="group" aria-label={t("sidebar.nav.system")}>
         {visibleBottom(isSuperAdmin).map((item) => (
           <button
             key={item.id}
@@ -118,7 +119,7 @@ export default function Sidebar({
             onClick={() => onNavigate?.(item.id)}
           >
             <span className="nav-icon" aria-hidden="true">
-              {item.icon}
+              <Icon name={item.icon} size={18} />
             </span>
             <span className="nav-label">{t(item.labelKey)}</span>
           </button>
@@ -131,7 +132,7 @@ export default function Sidebar({
           onClick={onToggleTheme}
         >
           <span className="nav-icon" aria-hidden="true">
-            {theme === "dark" ? "☾" : "☀"}
+            <Icon name={theme === "dark" ? "moon" : "sun"} size={18} />
           </span>
           <span className="nav-label">
             {theme === "dark" ? t("sidebar.theme.dark") : t("sidebar.theme.light")}

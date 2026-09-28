@@ -2,6 +2,12 @@ import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import AppShell from "./AppShell";
+import { useDetails } from "./details-context";
+
+function DetailsToggle() {
+  const { open, toggle } = useDetails();
+  return <button type="button" onClick={toggle}>{open ? "关闭详情面板" : "打开详情面板"}</button>;
+}
 
 describe("AppShell", () => {
   it("renders the primary and bottom navigation items", () => {
@@ -31,6 +37,7 @@ describe("AppShell", () => {
     const user = userEvent.setup();
     render(
       <AppShell title="对话">
+        <DetailsToggle />
         <div>主区内容</div>
       </AppShell>,
     );
@@ -43,7 +50,7 @@ describe("AppShell", () => {
     expect(panel).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "文件" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "收起详情面板" }));
+    await user.click(screen.getByRole("button", { name: "关闭详情面板" }));
     expect(screen.queryByRole("complementary", { name: "详情面板" })).not.toBeInTheDocument();
   });
 });

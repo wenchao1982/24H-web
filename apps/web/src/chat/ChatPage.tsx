@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGateway } from "./GatewayProvider";
 import { api } from "../api/client";
 import { useMediaQuery } from "../shell/useMediaQuery";
+import { useDetails } from "../shell/details-context";
+import { Icon } from "../ui/icons";
+import { Button, EmptyState } from "../ui";
 import { t } from "../i18n";
 import SessionList from "./SessionList";
 import Transcript from "./Transcript";
@@ -57,6 +60,7 @@ function readFileText(file: File): Promise<string> {
 
 export default function ChatPage() {
   const gateway = useGateway();
+  const details = useDetails();
   const narrow = useMediaQuery("(max-width: 900px)");
   const [view, setView] = useState<"list" | "chat">("list");
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
@@ -608,7 +612,20 @@ export default function ChatPage() {
           </button>
         ) : null}
         {error ? <p className="err chat-error">{error}</p> : null}
-        <h2 className="chat-title">{active ? active.title : "对话"}</h2>
+        <div className="chat-header">
+          <h2 className="chat-title">{active ? active.title : "对话"}</h2>
+          <div className="chat-header-actions">
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label={details.open ? t("shell.closeDetails") : t("shell.openDetails")}
+              aria-pressed={details.open}
+              onClick={details.toggle}
+            >
+              <Icon name="panel" />
+            </button>
+          </div>
+        </div>
         {active ? (
           <>
             <div className="chat-toolbar">
@@ -733,7 +750,15 @@ export default function ChatPage() {
             <StatusBar status={status} />
           </>
         ) : (
-          <p className="empty chat-hint">选择或新建一个会话开始对话。</p>
+          <EmptyState
+            title="开始你的对话"
+            description="选择左侧已有会话，或新建会话与智能体开始对话。"
+            action={
+              <Button variant="primary" onClick={createSession}>
+                新建会话
+              </Button>
+            }
+          />
         )}
       </section>
     </div>

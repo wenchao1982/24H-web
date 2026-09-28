@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Sidebar from "./Sidebar";
 import DetailsPanel, { type DetailsTab } from "./DetailsPanel";
+import { DetailsProvider } from "./details-context";
 import { useMediaQuery } from "./useMediaQuery";
 import { t } from "../i18n";
+import { Icon } from "../ui/icons";
 
 export interface AppShellProps {
   active?: string;
@@ -37,7 +39,6 @@ export default function AppShell({
   version,
   coreOnline = true,
   channelOnline = true,
-  title,
   list,
   onOpenNotifications,
   onOpenSystem,
@@ -76,68 +77,65 @@ export default function AppShell({
     }
   }, [narrow]);
 
+  const detailsValue = useMemo(
+    () => ({
+      open: detailsOpen,
+      toggle: () => setDetailsOpen((value) => !value),
+      close: () => setDetailsOpen(false),
+    }),
+    [detailsOpen],
+  );
+
   return (
-    <div className="app-shell" data-narrow={narrow}>
-      {narrow && drawerOpen ? (
-        <div
-          className="sidebar-backdrop"
-          role="presentation"
-          aria-hidden="true"
-          onClick={() => setDrawerOpen(false)}
-        />
-      ) : null}
+    <DetailsProvider value={detailsValue}>
+      <div className="app-shell" data-narrow={narrow}>
+        {narrow && drawerOpen ? (
+          <div
+            className="sidebar-backdrop"
+            role="presentation"
+            aria-hidden="true"
+            onClick={() => setDrawerOpen(false)}
+          />
+        ) : null}
 
-      <Sidebar
-        active={active}
-        onNavigate={onNavigate}
-        collapsed={collapsed}
-        onToggleCollapse={toggleSidebar}
-        mobile={narrow}
-        drawerOpen={drawerOpen}
-        isSuperAdmin={isSuperAdmin}
-        version={version}
-        coreOnline={coreOnline}
-        channelOnline={channelOnline}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-        onOpenNotifications={onOpenNotifications}
-        onOpenSystem={onOpenSystem}
-      >
-        {list}
-      </Sidebar>
+        <Sidebar
+          active={active}
+          onNavigate={onNavigate}
+          collapsed={collapsed}
+          onToggleCollapse={toggleSidebar}
+          mobile={narrow}
+          drawerOpen={drawerOpen}
+          isSuperAdmin={isSuperAdmin}
+          version={version}
+          coreOnline={coreOnline}
+          channelOnline={channelOnline}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          onOpenNotifications={onOpenNotifications}
+          onOpenSystem={onOpenSystem}
+        >
+          {list}
+        </Sidebar>
 
-      <div className="main">
-        <header className="main-header">
+        <div className="main">
           {narrow ? (
             <button
               type="button"
-              className="icon-btn"
+              className="icon-btn sidebar-fab"
               aria-label={drawerOpen ? t("sidebar.closeNav") : t("sidebar.openNav")}
               aria-expanded={drawerOpen}
               onClick={toggleSidebar}
             >
-              ☰
+              <Icon name={drawerOpen ? "close" : "menu"} />
             </button>
           ) : null}
-          <h1 className="main-title">{title}</h1>
-          <div className="main-actions">
-            <button
-              type="button"
-              className="icon-btn"
-              aria-label={detailsOpen ? t("shell.closeDetails") : t("shell.openDetails")}
-              aria-pressed={detailsOpen}
-              onClick={() => setDetailsOpen((value) => !value)}
-            >
-              ◧
-            </button>
-          </div>
-        </header>
-        <div className="main-body">{children}</div>
-      </div>
+          <div className="main-body">{children}</div>
+        </div>
 
-      {detailsOpen ? (
-        <DetailsPanel tab={detailsTab} onTabChange={setDetailsTab} onClose={() => setDetailsOpen(false)} />
-      ) : null}
-    </div>
+        {detailsOpen ? (
+          <DetailsPanel tab={detailsTab} onTabChange={setDetailsTab} onClose={() => setDetailsOpen(false)} />
+        ) : null}
+      </div>
+    </DetailsProvider>
   );
 }

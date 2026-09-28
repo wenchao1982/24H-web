@@ -31,6 +31,8 @@ export const zh = {
   "skillhost.error.load": "加载技能界面失败",
 
   "sidebar.aria": "主导航",
+  "sidebar.nav.primary": "业务导航",
+  "sidebar.nav.system": "系统导航",
   "sidebar.brand": "24H",
   "sidebar.core": "核心",
   "sidebar.channel": "渠道",

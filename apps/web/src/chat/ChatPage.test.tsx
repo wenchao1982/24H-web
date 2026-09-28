@@ -317,6 +317,7 @@ describe("ChatPage T6.9 会话管理", () => {
 
     await user.click(screen.getByRole("button", { name: "会话操作 会话一" }));
     await user.click(screen.getByRole("menuitem", { name: "删除" }));
+    await user.click(screen.getByRole("button", { name: "确认删除" }));
 
     expect(gateway.paramsOf("session.delete")).toEqual([{ session_id: "s1" }]);
     expect(screen.queryByRole("button", { name: "会话一" })).not.toBeInTheDocument();
@@ -458,16 +459,20 @@ describe("ChatPage T6.14 清理", () => {
     const user = userEvent.setup();
     await screen.findByText("会话一");
 
-    await user.click(screen.getByRole("button", { name: "清理" }));
+    await user.click(screen.getByRole("button", { name: "更多" }));
     await user.click(screen.getByRole("button", { name: "清理旧会话" }));
+    await user.click(screen.getByRole("button", { name: "确认清理" }));
     await waitFor(() => {
       expect(
         fetchMock.mock.calls.some((call) => String(call[0]).endsWith("/api/hermes/sessions/prune")),
       ).toBe(true);
     });
 
+    await user.click(screen.getByRole("button", { name: "更多" }));
+    await user.click(screen.getByRole("button", { name: "批量选择" }));
     await user.click(screen.getByLabelText("选择 会话一"));
     await user.click(screen.getByRole("button", { name: /批量删除/ }));
+    await user.click(screen.getByRole("button", { name: "确认删除" }));
     await waitFor(() => {
       expect(
         fetchMock.mock.calls.some((call) =>
