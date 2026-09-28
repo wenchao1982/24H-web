@@ -87,7 +87,7 @@ export const zh = {
   "details.close": "收起详情面板",
   "details.tab.files": "文件",
   "details.tab.preview": "预览",
-  "details.tab.logs": "日志",
+  "details.tab.logs": "任务日志",
   "details.tab.git": "Git",
   "details.empty": "暂无内容",
 

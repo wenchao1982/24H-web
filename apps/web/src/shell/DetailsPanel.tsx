@@ -18,11 +18,22 @@ export interface DetailsPanelProps {
   tab: DetailsTab;
   onTabChange: (tab: DetailsTab) => void;
   onClose?: () => void;
+  /** 是否展示「任务日志」Tab（默认展示；按角色隐藏留待产品决定）。 */
+  canViewLogs?: boolean;
   children?: ReactNode;
 }
 
-export default function DetailsPanel({ tab, onTabChange, onClose, children }: DetailsPanelProps) {
+export default function DetailsPanel({
+  tab,
+  onTabChange,
+  onClose,
+  canViewLogs = true,
+  children,
+}: DetailsPanelProps) {
   const [previewPath, setPreviewPath] = useState<string | null>(null);
+  const tabs = canViewLogs
+    ? DETAILS_TABS
+    : DETAILS_TABS.filter((item) => item.id !== "logs");
 
   const renderTab = (): ReactNode => {
     switch (tab) {
@@ -42,7 +53,7 @@ export default function DetailsPanel({ tab, onTabChange, onClose, children }: De
   return (
     <aside className="details" aria-label={t("details.aria")}>
       <div className="details-tabs" role="tablist" aria-label={t("details.tabsAria")}>
-        {DETAILS_TABS.map((item) => (
+        {tabs.map((item) => (
           <button
             key={item.id}
             type="button"

@@ -110,11 +110,12 @@
     {
       "id": "mukvdmww75t3",
       "createdAt": "2026-09-28T06:31:48.032Z",
-      "updatedAt": "2026-09-28T06:31:48.032Z",
+      "updatedAt": "2026-09-28T06:59:54.054Z",
       "title": "Phase 1 · 日志面板（级别着色/结构化/搜索）",
       "description": "基准：用户 UI/UX 方案「工作区-日志面板」。现 LogsPanel.tsx 把 entries.join(\"\\n\") 塞进 <pre>，无级别着色、无搜索、无结构化、无自动滚动/暂停/清空/导出。改：Tab 更名\"任务日志\"、级别色彩、结构化渲染(时间戳/级别/模块)、关键词搜索+高亮、自动滚动/暂停/清空(二次确认)/导出、长行折叠、hover 复制、仅管理员可见。用 Tag/Button/EmptyState 原语 + ConfirmDialog。",
       "priority": "medium",
-      "status": "pending"
+      "status": "completed",
+      "completedAt": "2026-09-28T06:59:54.054Z"
     },
     {
       "id": "mukvdncxhkft",
@@ -135,12 +136,75 @@
       "priority": "high",
       "status": "completed",
       "completedAt": "2026-09-28T06:44:18.325Z"
+    },
+    {
+      "id": "mukw4xu541pc",
+      "createdAt": "2026-09-28T06:53:01.901Z",
+      "updatedAt": "2026-09-28T06:53:28.095Z",
+      "title": "logs.ts 新增 parseLogLine",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-28T06:53:28.095Z"
+    },
+    {
+      "id": "mukw4xz62705",
+      "createdAt": "2026-09-28T06:53:02.082Z",
+      "updatedAt": "2026-09-28T06:54:04.290Z",
+      "title": "重写 LogsPanel.tsx 为任务日志面板",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-28T06:54:04.290Z"
+    },
+    {
+      "id": "mukw4y2huo43",
+      "createdAt": "2026-09-28T06:53:02.201Z",
+      "updatedAt": "2026-09-28T06:54:30.658Z",
+      "title": "DetailsPanel 新增 canViewLogs",
+      "priority": "medium",
+      "status": "completed",
+      "completedAt": "2026-09-28T06:54:30.658Z"
+    },
+    {
+      "id": "mukw4y5wksgm",
+      "createdAt": "2026-09-28T06:53:02.324Z",
+      "updatedAt": "2026-09-28T06:55:14.834Z",
+      "title": "i18n details.tab.logs → 任务日志",
+      "priority": "medium",
+      "status": "completed",
+      "completedAt": "2026-09-28T06:55:14.834Z"
+    },
+    {
+      "id": "mukw4y94i6wt",
+      "createdAt": "2026-09-28T06:53:02.440Z",
+      "updatedAt": "2026-09-28T06:55:40.582Z",
+      "title": "styles.css 追加日志面板样式",
+      "priority": "medium",
+      "status": "completed",
+      "completedAt": "2026-09-28T06:55:40.582Z"
+    },
+    {
+      "id": "mukw4ycg99be",
+      "createdAt": "2026-09-28T06:53:02.560Z",
+      "updatedAt": "2026-09-28T06:57:00.898Z",
+      "title": "npm run check 全绿",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-28T06:57:00.898Z"
+    },
+    {
+      "id": "mukw4yg5obac",
+      "createdAt": "2026-09-28T06:53:02.693Z",
+      "updatedAt": "2026-09-28T06:59:44.378Z",
+      "title": "e2e 临时截图 任务日志",
+      "priority": "low",
+      "status": "completed",
+      "completedAt": "2026-09-28T06:59:44.378Z"
     }
   ],
   "lastVerification": {
-    "timestamp": "2026-09-28T06:44:17.149Z",
+    "timestamp": "2026-09-28T06:59:43.593Z",
     "command": "npm run typecheck && npm run test",
     "success": true,
-    "output": "> 24h-web@0.1.0 typecheck\n> npm -w @24h/web run typecheck && npm -w @24h/server run typecheck && npm -w @24h/shared run typecheck\n\n\n> @24h/web@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/server@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/shared@0.1.0 typecheck\n> tsc --noEmit\n\n\n> 24h-web@0.1.0 test\n> npm -w @24h/server run test && npm -w @24h/web run test\n\n\n> @24h/server@0.1.0 test\n> vitest run\n\n\n RUN  v3.2.7 /vol1/@apphome/trim.openclaw/data/home/24h-web/apps/server\n\n ✓ src/session/role.test.ts (3 tests) 610ms\n ✓ src/routes/github.test.ts (5 tests) 749ms\n ✓ src/routes/change-password.test.ts (3 tests) 781ms\n   ✓ POST /api/auth/change-password > rejects a wrong old password with 400 and keeps the flag  316ms\n   ✓ POST /api/auth/change-password > changes the password and clears must_change_password  320ms\n ✓ src/http/csrf.test.ts (5 tests) 833ms\n ✓ src/routes/profile.test.ts (4 tests) 845ms\n   ✓ PATCH /api/auth/profile > renames the current user  318ms\n ✓ src/hermes/proxy.test.ts (3 tests) 980ms\n   ✓ GET /api/hermes/ws > authenticates with the session cookie and pipes frames both ways  334ms\n   ✓ GET /api/hermes/ws > forwards a client frame sent before the upstream connects (cold-start race)  503ms\n ✓ src/routes/system.test.ts (6 tests) 1036ms\n   ✓ GET /api/system/version > returns the core version from Hermes and the web build version  304ms\n ✓ src/routes/adminConnections.test.ts (5 tests) 1081ms\n ✓ src/routes/auth.test.ts (7 tests) 1107ms\n ✓ src/routes/rate-limit.test.ts (3 tests) 1143ms\n   ✓ login rate limiting > locks after 5 consecutive failures and returns 429  423ms\n   ✓ login rate limiting > rejects the correct password while locked  316ms\n   ✓ login rate limiting > resets the counter after a successful login  403ms\n ✓ src/routes/avatar.test.ts (7 tests) 1144ms\n ✓ src/paths.test.ts (6 tests) 8ms\n ✓ src/hermes/client.test.ts (6 tests) 82ms\n ✓ src/routes/skillUi.test.ts (11 tests) 1513ms\n ✓ src/routes/oidc.test.ts (5 tests) 1734ms\n   ✓ OIDC provider > is listed only whe"
+    "output": "> 24h-web@0.1.0 typecheck\n> npm -w @24h/web run typecheck && npm -w @24h/server run typecheck && npm -w @24h/shared run typecheck\n\n\n> @24h/web@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/server@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/shared@0.1.0 typecheck\n> tsc --noEmit\n\n\n> 24h-web@0.1.0 test\n> npm -w @24h/server run test && npm -w @24h/web run test\n\n\n> @24h/server@0.1.0 test\n> vitest run\n\n\n RUN  v3.2.7 /vol1/@apphome/trim.openclaw/data/home/24h-web/apps/server\n\n ✓ src/session/role.test.ts (3 tests) 614ms\n ✓ src/routes/github.test.ts (5 tests) 740ms\n   ✓ GET /api/integrations/github > reports the gh auth status without exposing a token  303ms\n ✓ src/routes/change-password.test.ts (3 tests) 777ms\n   ✓ POST /api/auth/change-password > rejects a wrong old password with 400 and keeps the flag  354ms\n ✓ src/http/csrf.test.ts (5 tests) 874ms\n ✓ src/routes/profile.test.ts (4 tests) 900ms\n   ✓ PATCH /api/auth/profile > renames the current user  372ms\n ✓ src/hermes/proxy.test.ts (3 tests) 1041ms\n   ✓ GET /api/hermes/ws > authenticates with the session cookie and pipes frames both ways  385ms\n   ✓ GET /api/hermes/ws > forwards a client frame sent before the upstream connects (cold-start race)  515ms\n ✓ src/routes/system.test.ts (6 tests) 1081ms\n   ✓ GET /api/system/version > returns the core version from Hermes and the web build version  359ms\n ✓ src/routes/adminConnections.test.ts (5 tests) 1105ms\n   ✓ admin connections CRUD > creates, lists, updates and deletes a connection without exposing the token  332ms\n ✓ src/routes/auth.test.ts (7 tests) 1189ms\n   ✓ POST /api/auth/login > logs in with correct credentials and sets an HttpOnly session cookie  329ms\n ✓ src/routes/avatar.test.ts (7 tests) 1199ms\n ✓ src/routes/rate-limit.test.ts (3 tests) 1231ms\n   ✓ login rate limiting > locks after 5 consecutive failures and returns 429  438ms\n   ✓ login rate limiting > rejects the correct password while locked  351ms\n   ✓ login rate limiting > resets the counter after a successful login  4"
   }
 }
