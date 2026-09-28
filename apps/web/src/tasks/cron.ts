@@ -31,6 +31,133 @@ export interface CronJob {
   enabled: boolean;
 }
 
+/** 常用 cron 模板（label 用于按钮文案，expr 为标准 5 段表达式）。 */
+export const CRON_TEMPLATES: { label: string; expr: string }[] = [
+  { label: "每天早上 9 点", expr: "0 9 * * *" },
+  { label: "每小时", expr: "0 * * * *" },
+  { label: "每周一 9 点", expr: "0 9 * * 1" },
+  { label: "每分钟（测试）", expr: "* * * * *" },
+];
+
+/**
+ * 解析单个 cron 字段，返回允许取值集合；无法解析返回 null。
+ * 支持 `*`、纯数字、步长「星号斜杠 n」、`a-b`、`a-b/n` 与逗号列表。
+ */
+function parseCronField(field: string, min: number, max: number): Set<number> | null {
+  const values = new Set<number>();
+  for (const raw of field.split(",")) {
+    const token = raw.trim();
+    if (token === "") {
+      return null;
+    }
+    let step = 1;
+    let range = token;
+    const slash = token.indexOf("/");
+    if (slash >= 0) {
+      range = token.slice(0, slash);
+      const stepText = token.slice(slash + 1);
+      if (!/^\d+$/.test(stepText)) {
+        return null;
+      }
+      step = Number(stepText);
+      if (step < 1) {
+        return null;
+      }
+    }
+    let lo: number;
+    let hi: number;
+    if (range === "*") {
+      lo = min;
+      hi = max;
+    } else if (/^\d+$/.test(range)) {
+      lo = Number(range);
+      hi = slash >= 0 ? max : lo;
+    } else {
+      const match = /^(\d+)-(\d+)$/.exec(range);
+      if (!match) {
+        return null;
+      }
+      lo = Number(match[1]);
+      hi = Number(match[2]);
+      if (lo > hi) {
+        return null;
+      }
+    }
+    if (lo < min || hi > max) {
+      return null;
+    }
+    for (let value = lo; value <= hi; value += step) {
+      values.add(value);
+    }
+  }
+  return values.size > 0 ? values : null;
+}
+
+function cronDayMatches(
+  date: Date,
+  dom: Set<number>,
+  dow: Set<number>,
+  domRestricted: boolean,
+  dowRestricted: boolean,
+): boolean {
+  const domOk = dom.has(date.getDate());
+  const dowOk = dow.has(date.getDay());
+  if (domRestricted && dowRestricted) {
+    return domOk || dowOk;
+  }
+  if (domRestricted) {
+    return domOk;
+  }
+  if (dowRestricted) {
+    return dowOk;
+  }
+  return true;
+}
+
+/**
+ * 计算标准 5 段 cron（`分 时 日 月 周`）的下一个匹配时刻。
+ * 从 `from`（默认 now）之后的整分钟开始逐分钟查找，最多扫描 366 天；
+ * 无法解析或超时返回 null。
+ */
+export function nextCronRun(expr: string, from: Date = new Date()): Date | null {
+  const parts = expr.trim().split(/\s+/);
+  if (parts.length !== 5) {
+    return null;
+  }
+  const minutes = parseCronField(parts[0], 0, 59);
+  const hours = parseCronField(parts[1], 0, 23);
+  const dom = parseCronField(parts[2], 1, 31);
+  const months = parseCronField(parts[3], 1, 12);
+  const dowRaw = parseCronField(parts[4], 0, 7);
+  if (!minutes || !hours || !dom || !months || !dowRaw) {
+    return null;
+  }
+  const dow = new Set<number>();
+  for (const value of dowRaw) {
+    dow.add(value === 7 ? 0 : value);
+  }
+  const domRestricted = parts[2].trim() !== "*";
+  const dowRestricted = parts[4].trim() !== "*";
+
+  const current = new Date(from.getTime());
+  current.setSeconds(0, 0);
+  current.setMinutes(current.getMinutes() + 1);
+
+  const limit = 366 * 24 * 60;
+  for (let i = 0; i < limit; i += 1) {
+    if (
+      months.has(current.getMonth() + 1) &&
+      cronDayMatches(current, dom, dow, domRestricted, dowRestricted) &&
+      hours.has(current.getHours()) &&
+      minutes.has(current.getMinutes())
+    ) {
+      return new Date(current.getTime());
+    }
+    current.setMinutes(current.getMinutes() + 1);
+  }
+  return null;
+}
+
 /** 列表响应兼容 `[...]` / `{jobs:[...]}`；字段兼容 snake_case 与 camelCase。 */
 export function normalizeCronJobs(payload: unknown): CronJob[] {
   const raw = asRecord(payload);

@@ -375,12 +375,58 @@
       "priority": "medium",
       "status": "completed",
       "completedAt": "2026-09-28T10:06:13.682Z"
+    },
+    {
+      "id": "mul408z39azr",
+      "createdAt": "2026-09-28T10:33:19.983Z",
+      "updatedAt": "2026-09-28T10:41:45.273Z",
+      "title": "任务页改造 Phase A（Cron 辅助/状态着色/空态/确认）",
+      "description": "零测试改动。加 Cron 常用模板按钮(点填 任务计划)、Cron 术语注释与\"预计下次执行\"预览(新增本地解析工具)、上一状态/启停状态着色、列表说明文案、空态 EmptyState(标题严格\"暂无定时任务。\")、加载骨架、删除改 ConfirmDialog(确认删除)。严禁改 POST body({name,schedule})与表格裸值(next_run 不格式化、ok/已启用/已暂停 文本保持)。Phase B 待办：新建任务改模态弹窗(绑定智能体/执行指令/备注)、任务日志面板、启停开关——需刻意改测试与 payload。",
+      "priority": "medium",
+      "status": "completed",
+      "completedAt": "2026-09-28T10:41:45.273Z"
+    },
+    {
+      "id": "mul453h3ih0l",
+      "createdAt": "2026-09-28T10:37:06.135Z",
+      "updatedAt": "2026-09-28T10:37:35.705Z",
+      "title": "cron.ts: 新增 nextCronRun + CRON_TEMPLATES",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-28T10:37:35.705Z"
+    },
+    {
+      "id": "mul453m376zp",
+      "createdAt": "2026-09-28T10:37:06.315Z",
+      "updatedAt": "2026-09-28T10:38:01.197Z",
+      "title": "TasksPage.tsx: 表单增强/着色/空态/加载/删除确认",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-28T10:38:01.197Z"
+    },
+    {
+      "id": "mul453pozc45",
+      "createdAt": "2026-09-28T10:37:06.444Z",
+      "updatedAt": "2026-09-28T10:38:25.147Z",
+      "title": "styles.css 追加 tasks/cron 样式",
+      "priority": "medium",
+      "status": "completed",
+      "completedAt": "2026-09-28T10:38:25.147Z"
+    },
+    {
+      "id": "mul453sv9dq7",
+      "createdAt": "2026-09-28T10:37:06.559Z",
+      "updatedAt": "2026-09-28T10:41:36.000Z",
+      "title": "npm run check + 可选截图",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-28T10:41:36.000Z"
     }
   ],
   "lastVerification": {
-    "timestamp": "2026-09-28T10:05:55.697Z",
+    "timestamp": "2026-09-28T10:41:32.539Z",
     "command": "npm run typecheck && npm run test",
     "success": true,
-    "output": "> 24h-web@0.1.0 typecheck\n> npm -w @24h/web run typecheck && npm -w @24h/server run typecheck && npm -w @24h/shared run typecheck\n\n\n> @24h/web@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/server@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/shared@0.1.0 typecheck\n> tsc --noEmit\n\n\n> 24h-web@0.1.0 test\n> npm -w @24h/server run test && npm -w @24h/web run test\n\n\n> @24h/server@0.1.0 test\n> vitest run\n\n\n RUN  v3.2.7 /vol1/@apphome/trim.openclaw/data/home/24h-web/apps/server\n\n ✓ src/session/role.test.ts (3 tests) 627ms\n ✓ src/routes/github.test.ts (5 tests) 698ms\n ✓ src/routes/change-password.test.ts (3 tests) 781ms\n   ✓ POST /api/auth/change-password > rejects a wrong old password with 400 and keeps the flag  325ms\n ✓ src/http/csrf.test.ts (5 tests) 802ms\n ✓ src/routes/profile.test.ts (4 tests) 841ms\n   ✓ PATCH /api/auth/profile > renames the current user  326ms\n ✓ src/hermes/proxy.test.ts (3 tests) 971ms\n   ✓ GET /api/hermes/ws > authenticates with the session cookie and pipes frames both ways  331ms\n   ✓ GET /api/hermes/ws > forwards a client frame sent before the upstream connects (cold-start race)  501ms\n ✓ src/routes/auth.test.ts (7 tests) 1048ms\n ✓ src/routes/adminConnections.test.ts (5 tests) 1056ms\n   ✓ admin connections CRUD > creates, lists, updates and deletes a connection without exposing the token  302ms\n ✓ src/routes/system.test.ts (6 tests) 1059ms\n ✓ src/routes/avatar.test.ts (7 tests) 1150ms\n ✓ src/routes/rate-limit.test.ts (3 tests) 1230ms\n   ✓ login rate limiting > locks after 5 consecutive failures and returns 429  482ms\n   ✓ login rate limiting > rejects the correct password while locked  329ms\n   ✓ login rate limiting > resets the counter after a successful login  416ms\n ✓ src/paths.test.ts (6 tests) 11ms\n ✓ src/hermes/client.test.ts (6 tests) 102ms\n ✓ src/routes/skillUi.test.ts (11 tests) 1509ms\n ✓ src/routes/oidc.test.ts (5 tests) 1605ms\n   ✓ OIDC provider > is listed only when OIDC is configured  512ms\n   ✓ OIDC provider > JIT-provisions a local admin user a"
+    "output": "> 24h-web@0.1.0 typecheck\n> npm -w @24h/web run typecheck && npm -w @24h/server run typecheck && npm -w @24h/shared run typecheck\n\n\n> @24h/web@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/server@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/shared@0.1.0 typecheck\n> tsc --noEmit\n\n\n> 24h-web@0.1.0 test\n> npm -w @24h/server run test && npm -w @24h/web run test\n\n\n> @24h/server@0.1.0 test\n> vitest run\n\n\n RUN  v3.2.7 /vol1/@apphome/trim.openclaw/data/home/24h-web/apps/server\n\n ✓ src/session/role.test.ts (3 tests) 586ms\n ✓ src/routes/github.test.ts (5 tests) 713ms\n ✓ src/routes/change-password.test.ts (3 tests) 757ms\n   ✓ POST /api/auth/change-password > rejects a wrong old password with 400 and keeps the flag  310ms\n   ✓ POST /api/auth/change-password > changes the password and clears must_change_password  302ms\n ✓ src/http/csrf.test.ts (5 tests) 818ms\n ✓ src/routes/profile.test.ts (4 tests) 871ms\n   ✓ PATCH /api/auth/profile > renames the current user  316ms\n ✓ src/routes/system.test.ts (6 tests) 969ms\n ✓ src/hermes/proxy.test.ts (3 tests) 1026ms\n   ✓ GET /api/hermes/ws > authenticates with the session cookie and pipes frames both ways  320ms\n   ✓ GET /api/hermes/ws > forwards a client frame sent before the upstream connects (cold-start race)  542ms\n ✓ src/routes/auth.test.ts (7 tests) 1073ms\n ✓ src/routes/adminConnections.test.ts (5 tests) 1088ms\n   ✓ admin connections CRUD > creates, lists, updates and deletes a connection without exposing the token  304ms\n ✓ src/routes/avatar.test.ts (7 tests) 1135ms\n ✓ src/routes/rate-limit.test.ts (3 tests) 1181ms\n   ✓ login rate limiting > locks after 5 consecutive failures and returns 429  426ms\n   ✓ login rate limiting > rejects the correct password while locked  331ms\n   ✓ login rate limiting > resets the counter after a successful login  423ms\n ✓ src/paths.test.ts (6 tests) 16ms\n ✓ src/hermes/client.test.ts (6 tests) 83ms\n ✓ src/routes/skillUi.test.ts (11 tests) 1559ms\n ✓ src/routes/oidc.test.ts (5 tests) 1702ms\n   ✓ OIDC provider > is li"
   }
 }
