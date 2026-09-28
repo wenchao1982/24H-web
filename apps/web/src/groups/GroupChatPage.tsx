@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useGateway } from "../chat/GatewayProvider";
 import { t } from "../i18n";
-import { normalizeAgentList, type AgentSummary } from "../agents/agents";
+import { ConfirmDialog, EmptyState } from "../ui";
+import { agentInitial, normalizeAgentList, type AgentSummary } from "../agents/agents";
 import {
   buildMemberInputs,
   isGroupsSupported,
@@ -34,7 +35,9 @@ export default function GroupChatPage() {
   const [draft, setDraft] = useState("");
   const [name, setName] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
+  const [memberSearch, setMemberSearch] = useState("");
   const [renameDraft, setRenameDraft] = useState("");
+  const [disbandTarget, setDisbandTarget] = useState<GroupRoom | null>(null);
   const [error, setError] = useState<string | null>(null);
   const threadRef = useRef<string>("");
 
@@ -223,24 +226,47 @@ export default function GroupChatPage() {
   }
 
   const active = rooms.find((room) => room.id === activeId) ?? null;
+  const query = memberSearch.trim().toLowerCase();
+  const filteredProfiles = query
+    ? profiles.filter(
+        (profile) =>
+          (profile.displayName || profile.name).toLowerCase().includes(query) ||
+          profile.name.toLowerCase().includes(query),
+      )
+    : profiles;
+  const selectedProfiles = profiles.filter((profile) => selected.includes(profile.name));
+  const valid =
+    name.trim() !== "" &&
+    selected.length >= MIN_GROUP_MEMBERS &&
+    selected.length <= MAX_GROUP_MEMBERS;
 
   return (
     <div className="chat groups-page">
       <aside className="chat-list">
         <div className="session-list">
-          <form className="card" onSubmit={createRoom}>
+          <form className="card groups-create" onSubmit={createRoom}>
             <input
               aria-label={t("groups.name")}
               placeholder={t("groups.name")}
               value={name}
               onChange={(event) => setName(event.target.value)}
             />
+            <input
+              className="group-member-search"
+              type="search"
+              aria-label={t("groups.searchMembers")}
+              placeholder={t("groups.searchMembers")}
+              value={memberSearch}
+              onChange={(event) => setMemberSearch(event.target.value)}
+            />
             <fieldset className="groups-members">
               <legend>{t("groups.pickMembers")}</legend>
               {profiles.length === 0 ? (
                 <p className="empty">{t("groups.noMembers")}</p>
+              ) : filteredProfiles.length === 0 ? (
+                <p className="empty">{t("groups.noMatch")}</p>
               ) : (
-                profiles.map((profile) => (
+                filteredProfiles.map((profile) => (
                   <label key={profile.name} className="groups-member-option">
                     <input
                       type="checkbox"
@@ -253,30 +279,67 @@ export default function GroupChatPage() {
                 ))
               )}
             </fieldset>
+            {selectedProfiles.length > 0 ? (
+              <div className="group-selected-chips">
+                {selectedProfiles.map((profile) => (
+                  <span key={profile.name} className="group-chip">
+                    {profile.displayName || profile.name}
+                    <button
+                      type="button"
+                      className="group-chip-remove"
+                      aria-label={t("groups.removeMember", { name: profile.name })}
+                      onClick={() => toggleMember(profile.name)}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : null}
             <p className="groups-hint">
               {t("groups.selectedCount", { count: selected.length })}
             </p>
-            <button className="primary" type="submit">
+            <button className="primary" type="submit" disabled={!valid}>
               {t("groups.create")}
             </button>
           </form>
           {rooms.length === 0 ? (
-            <p className="empty">{t("groups.empty")}</p>
+            <EmptyState title={t("groups.empty")} description={t("groups.emptyDescription")} />
           ) : (
-            <ul className="session-items">
+            <ul className="session-items group-room-list">
               {rooms.map((room) => (
                 <li key={room.id}>
                   <button
                     type="button"
-                    className="session-item"
+                    className="session-item group-room-card"
                     data-active={room.id === activeId}
                     aria-label={t("groups.selectRoom", { name: room.name })}
                     onClick={() => void openRoom(room)}
                   >
-                    {room.name}
-                    {room.members.length > 0
-                      ? ` · ${t("groups.memberCount", { count: room.members.length })}`
-                      : ""}
+                    <span className="group-room-head">
+                      <span className="group-room-name">{room.name}</span>
+                      <span className="group-room-count muted">
+                        {t("groups.memberCount", { count: room.members.length })}
+                      </span>
+                    </span>
+                    {room.members.length > 0 ? (
+                      <span className="group-room-members" aria-hidden="true">
+                        {room.members.slice(0, 4).map((member) => (
+                          <span
+                            key={member.id}
+                            className="group-room-avatar"
+                            title={member.name}
+                          >
+                            {agentInitial(member.name)}
+                          </span>
+                        ))}
+                        {room.members.length > 4 ? (
+                          <span className="group-room-avatar group-room-avatar--more">
+                            +{room.members.length - 4}
+                          </span>
+                        ) : null}
+                      </span>
+                    ) : null}
                   </button>
                 </li>
               ))}
@@ -308,7 +371,7 @@ export default function GroupChatPage() {
                 className="ghost"
                 type="button"
                 aria-label={t("groups.disbandRoom", { name: active.name })}
-                onClick={() => void disband(active)}
+                onClick={() => setDisbandTarget(active)}
               >
                 {t("groups.disband")}
               </button>
@@ -361,9 +424,27 @@ export default function GroupChatPage() {
             </div>
           </>
         ) : (
-          <p className="empty chat-hint">{t("groups.noRoom")}</p>
+          <EmptyState title={t("groups.noRoomTitle")} description={t("groups.noRoom")} />
         )}
       </section>
+
+      <ConfirmDialog
+        open={disbandTarget !== null}
+        title={t("groups.disbandTitle")}
+        message={
+          disbandTarget ? t("groups.disbandConfirm", { name: disbandTarget.name }) : ""
+        }
+        confirmLabel={t("groups.disbandConfirmLabel")}
+        danger
+        onConfirm={() => {
+          const target = disbandTarget;
+          setDisbandTarget(null);
+          if (target) {
+            void disband(target);
+          }
+        }}
+        onCancel={() => setDisbandTarget(null)}
+      />
     </div>
   );
 }
