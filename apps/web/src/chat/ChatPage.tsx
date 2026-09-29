@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGateway } from "./GatewayProvider";
 import { api } from "../api/client";
+import { isSessionNotFound } from "../api/ws";
 import { useMediaQuery } from "../shell/useMediaQuery";
 import { useDetails } from "../shell/details-context";
 import { Icon } from "../ui/icons";
@@ -27,9 +28,10 @@ import {
   completeAssistant,
   deltaText,
   errorText,
-  isSameSession,
-  normalizeCreatedId,
+  matchesRuntime,
+  normalizeCreatedIdentity,
   normalizeReplayed,
+  normalizeResumedId,
   normalizeSessions,
   normalizeWorkspaces,
   parseStatus,
@@ -41,6 +43,7 @@ import {
   type Attachment,
   type PendingRequest,
   type RequestKind,
+  type SessionIdentity,
   type SessionSummary,
   type StatusInfo,
   type TranscriptItem,
@@ -65,6 +68,7 @@ export default function ChatPage() {
   const [view, setView] = useState<"list" | "chat">("list");
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [identity, setIdentity] = useState<SessionIdentity | null>(null);
   const [filter, setFilter] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<TranscriptItem[]>([]);
@@ -84,6 +88,8 @@ export default function ChatPage() {
   const [commands, setCommands] = useState<SlashCommand[]>([]);
 
   const activeIdRef = useRef<string | null>(null);
+  const identityRef = useRef<SessionIdentity | null>(null);
+  const attachInFlightRef = useRef<Map<string, Promise<string>>>(new Map());
   const respondersRef = useRef(new Map<string, (result: Record<string, unknown>) => void>());
   const seqRef = useRef(0);
   const nextId = useCallback(() => `i${seqRef.current++}`, []);
@@ -153,9 +159,15 @@ export default function ChatPage() {
     };
   }, [gateway]);
 
+  const activePair = useCallback((): SessionIdentity | null => {
+    const pair = identityRef.current;
+    return pair && pair.storedId === activeIdRef.current ? pair : null;
+  }, []);
+
   useEffect(() => {
     gateway.on("message.delta", (payload) => {
-      if (!isSameSession(payload, activeIdRef.current)) {
+      const pair = activePair();
+      if (!pair || !matchesRuntime(payload, pair.runtimeId)) {
         return;
       }
       const text = deltaText(payload);
@@ -164,13 +176,15 @@ export default function ChatPage() {
       }
     });
     gateway.on("message.complete", (payload) => {
-      if (!isSameSession(payload, activeIdRef.current)) {
+      const pair = activePair();
+      if (!pair || !matchesRuntime(payload, pair.runtimeId)) {
         return;
       }
       setItems((current) => completeAssistant(current, deltaText(payload), nextId()));
     });
     gateway.on("tool.start", (payload) => {
-      if (!isSameSession(payload, activeIdRef.current)) {
+      const pair = activePair();
+      if (!pair || !matchesRuntime(payload, pair.runtimeId)) {
         return;
       }
       setItems((current) =>
@@ -180,7 +194,8 @@ export default function ChatPage() {
       );
     });
     gateway.on("tool.generating", (payload) => {
-      if (!isSameSession(payload, activeIdRef.current)) {
+      const pair = activePair();
+      if (!pair || !matchesRuntime(payload, pair.runtimeId)) {
         return;
       }
       setItems((current) =>
@@ -190,7 +205,8 @@ export default function ChatPage() {
       );
     });
     gateway.on("tool.complete", (payload) => {
-      if (!isSameSession(payload, activeIdRef.current)) {
+      const pair = activePair();
+      if (!pair || !matchesRuntime(payload, pair.runtimeId)) {
         return;
       }
       setItems((current) =>
@@ -200,30 +216,37 @@ export default function ChatPage() {
       );
     });
     gateway.on("thinking", (payload) => {
-      if (!isSameSession(payload, activeIdRef.current)) {
+      const pair = activePair();
+      if (!pair || !matchesRuntime(payload, pair.runtimeId)) {
         return;
       }
       setStatus({ phase: "thinking", ...parseStatus(payload) });
     });
     gateway.on("done", (payload) => {
-      if (!isSameSession(payload, activeIdRef.current)) {
+      const pair = activePair();
+      const hasId = payload.session_id != null || payload.sessionId != null;
+      if (hasId && (!pair || !matchesRuntime(payload, pair.runtimeId))) {
         return;
       }
       setRunning(false);
       setStatus({ phase: "done" });
     });
     gateway.on("error", (payload) => {
-      if (!isSameSession(payload, activeIdRef.current)) {
+      const pair = activePair();
+      const hasId = payload.session_id != null || payload.sessionId != null;
+      if (hasId && (!pair || !matchesRuntime(payload, pair.runtimeId))) {
         return;
       }
       setRunning(false);
       setStatus({ phase: "error", error: errorText(payload) });
-      setItems((current) => [
-        ...current,
-        { kind: "notice", id: nextId(), level: "error", text: errorText(payload) },
-      ]);
+      if (hasId) {
+        setItems((current) => [
+          ...current,
+          { kind: "notice", id: nextId(), level: "error", text: errorText(payload) },
+        ]);
+      }
     });
-  }, [gateway, nextId]);
+  }, [activePair, gateway, nextId]);
 
   useEffect(() => {
     for (const kind of REQUEST_KINDS) {
@@ -237,12 +260,12 @@ export default function ChatPage() {
 
   // 断线重放：切换会话时拉取待处理服务端请求快照，重新渲染卡片。
   useEffect(() => {
-    if (!activeId) {
+    if (!identity || identity.storedId !== activeId) {
       return;
     }
     let alive = true;
     gateway
-      .request("session.events.since", { session_id: activeId })
+      .request("session.events.since", { session_id: identity.runtimeId })
       .then((result) => {
         if (!alive) {
           return;
@@ -262,58 +285,102 @@ export default function ChatPage() {
     return () => {
       alive = false;
     };
-  }, [activeId, gateway]);
+  }, [identity?.runtimeId, activeId, gateway]);
 
-  const linkedRef = useRef(false);
-  // 通知中心直达：`/chat?session=<id>` 选中该会话（仅一次）。
-  useEffect(() => {
-    if (linkedRef.current || sessions.length === 0 || typeof window === "undefined") {
-      return;
-    }
-    const target = new URLSearchParams(window.location.search).get("session");
-    if (target && sessions.some((session) => session.id === target)) {
-      linkedRef.current = true;
-      setActiveId(target);
+  const resumeRuntime = useCallback(
+    async (storedId: string): Promise<string> => {
+      const inflight = attachInFlightRef.current.get(storedId);
+      if (inflight) {
+        return inflight;
+      }
+      const promise = (async () => {
+        const result = await gateway.request("session.resume", { session_id: storedId });
+        const runtimeId = normalizeResumedId(result);
+        if (!runtimeId) {
+          throw new Error("会话恢复失败：响应缺少 session_id");
+        }
+        return runtimeId;
+      })();
+      attachInFlightRef.current.set(storedId, promise);
+      try {
+        return await promise;
+      } finally {
+        attachInFlightRef.current.delete(storedId);
+      }
+    },
+    [gateway],
+  );
+
+  const attachSession = useCallback(
+    async (storedId: string): Promise<SessionIdentity> => {
+      const runtimeId = await resumeRuntime(storedId);
+      const pair: SessionIdentity = { storedId, runtimeId };
+      if (activeIdRef.current === storedId) {
+        setIdentity(pair);
+        identityRef.current = pair;
+      }
+      return pair;
+    },
+    [resumeRuntime],
+  );
+
+  const selectSession = useCallback(
+    (id: string) => {
+      setActiveId(id);
+      activeIdRef.current = id;
       setItems([]);
-    }
-  }, [sessions]);
+      setIdentity(null);
+      identityRef.current = null;
+      attachSession(id).catch(() => {
+        if (activeIdRef.current === id) {
+          setError("无法恢复会话");
+        }
+      });
+    },
+    [attachSession],
+  );
 
   const createSession = useCallback(async () => {
     try {
-      const result = await gateway.request("session.create", {});
-      const id = normalizeCreatedId(result);
-      if (!id) {
+      const ids = normalizeCreatedIdentity(await gateway.request("session.create", {}));
+      if (!ids) {
+        setError("无法新建会话");
         return;
       }
+      setActiveId(ids.storedId);
+      activeIdRef.current = ids.storedId;
+      setIdentity(ids);
+      identityRef.current = ids;
       setSessions((current) =>
-        current.some((session) => session.id === id)
+        current.some((session) => session.id === ids.storedId)
           ? current
-          : [{ id, title: "新会话" }, ...current],
+          : [{ id: ids.storedId, title: "新会话" }, ...current],
       );
-      setActiveId(id);
       setItems([]);
     } catch {
       setError("无法新建会话");
     }
   }, [gateway]);
 
-  const selectSession = useCallback((id: string) => {
-    setActiveId(id);
-    setItems([]);
-  }, []);
-
   const renameSession = useCallback(
-    async (id: string, title: string) => {
+    async (targetStoredId: string, title: string) => {
       try {
-        await gateway.request("session.title", { session_id: id, title });
+        const active = activePair();
+        const runtimeId =
+          active && active.storedId === targetStoredId
+            ? active.runtimeId
+            : await resumeRuntime(targetStoredId);
+        await gateway.request("session.title", { session_id: runtimeId, title });
         setSessions((current) =>
-          current.map((session) => (session.id === id ? { ...session, title } : session)),
+          current.map((session) =>
+            session.id === targetStoredId ? { ...session, title } : session,
+          ),
         );
       } catch {
         setError("重命名失败");
       }
     },
-    [gateway],
+    [activePair, gateway, resumeRuntime],
   );
 
   const deleteSession = useCallback(
@@ -329,18 +396,18 @@ export default function ChatPage() {
     [gateway],
   );
 
-  const resumeSession = useCallback(
-    async (id: string) => {
-      try {
-        await gateway.request("session.resume", { session_id: id });
-        setActiveId(id);
-        setItems([]);
-      } catch {
-        setError("恢复失败");
-      }
-    },
-    [gateway],
-  );
+  const linkedRef = useRef(false);
+  // 通知中心直达：`/chat?session=<id>` 选中该会话（仅一次，等价点选路径）。
+  useEffect(() => {
+    if (linkedRef.current || sessions.length === 0 || typeof window === "undefined") {
+      return;
+    }
+    const target = new URLSearchParams(window.location.search).get("session");
+    if (target && sessions.some((session) => session.id === target)) {
+      linkedRef.current = true;
+      selectSession(target);
+    }
+  }, [selectSession, sessions]);
 
   const pruneSessions = useCallback(async () => {
     try {
@@ -370,8 +437,8 @@ export default function ChatPage() {
 
   const handleSend = useCallback(
     (text: string) => {
-      const sessionId = activeIdRef.current;
-      if (!sessionId) {
+      const storedId = activeIdRef.current;
+      if (!storedId) {
         return;
       }
       setItems((current) => [
@@ -380,31 +447,69 @@ export default function ChatPage() {
       ]);
       setRunning(true);
       setStatus({ phase: "thinking" });
-      const payload: Record<string, unknown> = { session_id: sessionId, text };
+      const base: Record<string, unknown> = { text };
       if (attachments.length > 0) {
-        payload.attachments = attachments.map((attachment) => attachment.id);
+        base.attachments = attachments.map((attachment) => attachment.id);
       }
       setAttachments([]);
-      gateway.request("prompt.submit", payload).catch(() => {
-        setRunning(false);
-        setError("发送失败");
-      });
+      const msg = (error: unknown) => String((error as Error)?.message ?? "发送失败");
+      void (async () => {
+        let pair = activePair();
+        if (!pair) {
+          try {
+            pair = await attachSession(storedId);
+          } catch {
+            setRunning(false);
+            setError("无法恢复会话");
+            return;
+          }
+        }
+        if (activeIdRef.current !== storedId) {
+          setRunning(false);
+          return;
+        }
+        try {
+          await gateway.request("prompt.submit", { ...base, session_id: pair.runtimeId });
+        } catch (error) {
+          if (!isSessionNotFound(error)) {
+            setRunning(false);
+            setError(msg(error));
+            return;
+          }
+          const next = await attachSession(storedId).catch(() => null);
+          if (next && activeIdRef.current === storedId) {
+            try {
+              await gateway.request("prompt.submit", { ...base, session_id: next.runtimeId });
+              return;
+            } catch (retryError) {
+              setRunning(false);
+              setError(msg(retryError));
+              return;
+            }
+          }
+          setRunning(false);
+          if (activeIdRef.current !== storedId) {
+            return;
+          }
+          setError(msg(error));
+        }
+      })();
     },
-    [attachments, gateway, nextId],
+    [activePair, attachSession, attachments, gateway, nextId],
   );
 
   const handleStop = useCallback(() => {
-    const sessionId = activeIdRef.current;
-    if (!sessionId) {
+    const pair = activePair();
+    if (!pair) {
       return;
     }
     gateway
-      .request("session.interrupt", { session_id: sessionId })
+      .request("session.interrupt", { session_id: pair.runtimeId })
       .catch(() => {
         setError("无法中断");
       })
       .finally(() => setRunning(false));
-  }, [gateway]);
+  }, [activePair, gateway]);
 
   // T20.1 执行 slash 命令：`slash.exec {command, args}`，结果作为完成提示追加到 transcript。
   const handleSlash = useCallback(
@@ -431,8 +536,9 @@ export default function ChatPage() {
 
   const handleAttach = useCallback(
     (files: File[]) => {
-      const sessionId = activeIdRef.current;
-      if (!sessionId) {
+      const runtimeId = activePair()?.runtimeId;
+      if (!runtimeId) {
+        setError("会话未就绪，无法添加附件");
         return;
       }
       for (const file of files) {
@@ -448,7 +554,7 @@ export default function ChatPage() {
         ]);
         gateway
           .request(method, {
-            session_id: sessionId,
+            session_id: runtimeId,
             name: file.name,
             size: file.size,
             type: file.type,
@@ -456,7 +562,7 @@ export default function ChatPage() {
           .catch(() => setError("附件上传失败"));
       }
     },
-    [gateway, nextId],
+    [activePair, gateway, nextId],
   );
 
   const removeAttachment = useCallback((id: string) => {
@@ -509,12 +615,12 @@ export default function ChatPage() {
   const handleWorkspaceChange = useCallback(
     (value: string) => {
       setWorkspace(value);
-      const sessionId = activeIdRef.current;
-      if (!sessionId || !value) {
+      const storedId = activeIdRef.current;
+      if (!storedId || !value) {
         return;
       }
       gateway
-        .request("session.workspace.move", { session_id: sessionId, workspace: value })
+        .request("session.workspace.move", { session_key: storedId, cwd: value })
         .catch(() => setError("切换工作区失败"));
     },
     [gateway],
@@ -594,7 +700,7 @@ export default function ChatPage() {
           onCreate={createSession}
           onRename={renameSession}
           onDelete={deleteSession}
-          onResume={resumeSession}
+          onResume={(id) => selectSession(id)}
           onPrune={pruneSessions}
           onBulkDelete={bulkDeleteSessions}
         />
@@ -707,7 +813,10 @@ export default function ChatPage() {
             </div>
             {shareLink ? <p className="muted chat-share">{shareLink}</p> : null}
             {subagentsOpen ? (
-              <SubagentsPanel sessionId={activeId} onClose={() => setSubagentsOpen(false)} />
+              <SubagentsPanel
+                sessionId={activePair()?.runtimeId ?? null}
+                onClose={() => setSubagentsOpen(false)}
+              />
             ) : null}
             {imageOpen ? <ImageGenAction onClose={() => setImageOpen(false)} /> : null}
             {contextOpen ? <ContextFilesPanel onClose={() => setContextOpen(false)} /> : null}

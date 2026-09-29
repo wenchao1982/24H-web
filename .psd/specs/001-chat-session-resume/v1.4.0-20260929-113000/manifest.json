@@ -1,0 +1,37 @@
+{
+  "specId": "001-chat-session-resume",
+  "version": "1.4.0",
+  "timestamp": "2026-09-29T11:30:00Z",
+  "description": "最终版：并入第 4 轮对抗性评审（0 CRITICAL）全部 7 项——create 用例订正、R≠S 改为服务端保证（附证据）、resume 入参保持 stored、T===A 重命名复用身份、image/pdf/clipboard attach 证据、事件 camelCase 回退与无 id 终止兜底、TASK-011 进入验证链。",
+  "author": "spec-agent",
+  "status": "approved-for-build",
+  "parentVersion": "1.3.0",
+  "changes": [
+    "契约矩阵补 runtime id 形态证据 (methods_session.py:65-67) 与 image/pdf/clipboard attach 证据",
+    "REQ-001 AC 改为'R 取自回包'；R≠S 明确为服务端保证，客户端不强制",
+    "REQ-009 增加 T===A 复用现身份（不重 resume）",
+    "REQ-011 新增：无 id 的 done/error 清 running 不追加内容",
+    "matchesRuntime 恢复 camelCase 回退",
+    "createSession 明确 ID-3 守卫与列表项 id = stored_session_id",
+    "design §6 订正：session.resume 入参保持 stored；create 用例必须补 stored_session_id",
+    "TASK-011 进入验证链（TASK-008→TASK-011→TASK-013）",
+    "属性测试 1 措辞订正；新增属性测试 9(终止兜底)"
+  ],
+  "reviewResult": {
+    "verdict": "BREACH",
+    "reviewer": "adversarial-reviewer",
+    "timestamp": "2026-09-29T11:15:00Z",
+    "onVersion": "1.3.0",
+    "criticalFindings": 0,
+    "findings": [
+      "HIGH: 既有 session.create 用例未补 stored_session_id → check 必红",
+      "HIGH: R≠S 声明但未落地（已改为服务端保证 + fixture 校验）",
+      "MEDIUM: design 误列 session.resume 入参需改 runtime id",
+      "MEDIUM: T===A 重命名临时 resume 导致身份陈旧",
+      "MEDIUM: image/pdf attach 缺矩阵证据",
+      "MEDIUM: 严格匹配丢失 camelCase/无 id 事件 → running 可能卡住",
+      "LOW: TASK-011 未进入验证链"
+    ],
+    "note": "用户授权 A（出规格并转交 build）。第 4 轮 0 CRITICAL；本版并入全部 7 项后按停机规则不再加评审轮。"
+  }
+}

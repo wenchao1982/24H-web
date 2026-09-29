@@ -33,6 +33,15 @@
 | 通知 | 未读/挂起聚合（审批/回答/完成/失败）+ 偏好 |
 | 项目 | 具名多文件夹工作区：列表/切换/新建/编辑/删除 |
 
+### 3.1 对话：历史会话恢复（stored id / runtime id）
+
+- **点选即 attach**：点选或 `?session=` 深链进入历史会话时，以 stored id 调 `session.resume` 取得 runtime id，建立身份对 `{storedId, runtimeId}`；此后会话域 RPC 与事件匹配一律用 runtime id。
+- **有界自动恢复**：`prompt.submit` 返回 4001（`session not found`）时，以**发送时**的 stored id 重新 resume 并重试**恰好一次**；重试仍失败才提示网关错误。
+- **身份矩阵**：`session.resume` 入参、`session.delete`、`session.workspace.move`（字段名 `session_key`）用 stored id；`prompt.submit` / `session.interrupt` / `session.title` / 附件（file/image/pdf/clipboard）/ `subagent.*` / `session.events.since` 用 runtime id。
+- **逐行隔离**：对非活动行重命名/删除不得改写当前活动会话身份；重命名目标即活动会话时复用现身份，不重复 resume。
+- **新建零 resume**：`session.create` 以回包 `stored_session_id` 作 storedId、`session_id` 作 runtimeId，列表项 id 用 stored。
+- **错误透传**：resume/submit 失败展示网关真实 message；归一化缺失 `session_id` 即报错，禁止回退 stored id。
+
 ## 4. 关键表单字段
 
 - **登录**：`username` + `password`；支持 OIDC SSO（可选）。

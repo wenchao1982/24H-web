@@ -1,0 +1,34 @@
+{
+  "specId": "001-chat-session-resume",
+  "version": "1.3.0",
+  "timestamp": "2026-09-29T11:00:00Z",
+  "description": "Bugfix (rev 4): 修正回环 3 的发现——根因 B(resumeSession) 漏修、逐行操作对象错误、normalizeResumedId 的 `?? id` fail-open、session.create 双字段未接线、守卫缺失与引用订正。",
+  "author": "spec-agent",
+  "status": "draft",
+  "parentVersion": "1.2.0",
+  "changes": [
+    "REQ-009 逐行操作：重命名按目标行临时 resume，删除用目标 stored id，不改写当前 identity",
+    "REQ-010 恢复菜单等价于 selectSession（删除旧 resumeSession）",
+    "normalizeResumedId 仅接受 session_id（移除 `?? id` fail-open）",
+    "新增 normalizeCreatedIdentity：用 session.create 回包 session_id(runtime) + stored_session_id(stored)",
+    "新增 ID-5 与属性测试 7(create 双 id)/8(逐行隔离)",
+    "属性测试 1 限定为 runtime-id RPC（delete/workspace.move 除外）",
+    "既有断言订正清单（含 workspace.move→session_key、subagent.list 调用点 SubagentsPanel.tsx:29）",
+    "DAG 补入 TASK-011"
+  ],
+  "reviewResult": {
+    "verdict": "BREACH",
+    "reviewer": "adversarial-reviewer",
+    "timestamp": "2026-09-29T10:45:00Z",
+    "onVersion": "1.2.0",
+    "findings": [
+      "CRITICAL: 根因 B(resumeSession) 孤立——恢复菜单仍可导致跨会话 runtime id 发送",
+      "HIGH: 逐行重命名/删除对象错误 + 读取缺 ID-2 守卫与 null 处理",
+      "HIGH: normalizeResumedId 的 `?? id` 回退可返回 stored id（fail-open）",
+      "MEDIUM: session.create 契约未进矩阵（delete/workspace.move 会拿到 runtime id）",
+      "MEDIUM: fakeGateway runtime 值未定义；既有断言未订正",
+      "LOW: 属性测试 1 范围 / subagent.list 引用 / DAG 漏 TASK-011"
+    ],
+    "note": "用户授权第 4 轮回环生成 v1.3.0。"
+  }
+}

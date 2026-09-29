@@ -1,0 +1,30 @@
+{
+  "specId": "001-chat-session-resume",
+  "version": "1.1.0",
+  "timestamp": "2026-09-29T10:15:00Z",
+  "description": "Bugfix (rev 2): 历史会话点选未 session.resume 导致 prompt.submit 被 4001 拒绝。v1.1.0 修复 v1.0.0 对抗性评审的 4 项问题：禁止归一化 fail-open、events.since 身份补源码证据、4001 重试改用发送时 storedId + 乱序守卫、ws.ts 暴露 error.code。",
+  "author": "spec-agent",
+  "status": "draft",
+  "parentVersion": "1.0.0",
+  "changes": [
+    "新增 REQ-005 乱序守卫；REQ-002 补充 events.since 身份验收",
+    "attachSession 移除 `?? storedId` fail-open，改为归一化失败即抛错",
+    "handleSend 4001 重试改用发送时捕获的 storedId（非当前 activeId）",
+    "新增 TASK-004：ws.ts rejection 附带 code + isSessionNotFound + 单测",
+    "补充属性测试 4(乱序安全)/5(身份一致性)",
+    "补齐 events.since 身份证据：event_replay.py:57 与 server.py:665-668",
+    "补齐错误码证据：server.py:848 _err 下发 {code,message}"
+  ],
+  "reviewResult": {
+    "verdict": "BREACH",
+    "reviewer": "adversarial-reviewer",
+    "timestamp": "2026-09-29T10:10:00Z",
+    "onVersion": "1.0.0",
+    "findings": [
+      "CRITICAL Boundary Penetration: attachSession 的 `?? storedId` fail-open 击穿 Never 边界",
+      "HIGH Assumption Challenge: events.since 身份未验证（现以源码证据确认用运行时 id）",
+      "HIGH Edge Case Stress: 重试读取当前 activeIdRef；缺乱序/并发守卫",
+      "MEDIUM Traceability: 依赖 error code 4001 但 ws.ts 未暴露 code"
+    ]
+  }
+}

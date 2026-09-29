@@ -6,6 +6,15 @@ export interface SessionSummary {
   updatedAt?: string;
 }
 
+/**
+ * 会话身份对：`storedId` 为持久化会话 id（列表/删除/工作区移动），
+ * `runtimeId` 仅来自 `session.resume` / `session.create` 回包（会话域 RPC/事件）。
+ */
+export interface SessionIdentity {
+  storedId: string;
+  runtimeId: string;
+}
+
 export type ToolStatus = "start" | "generating" | "complete";
 
 export type RequestKind = "approval" | "clarify" | "sudo" | "secret" | "mcp.setup";
@@ -117,6 +126,31 @@ export function normalizeCreatedId(result: unknown): string | null {
   }
   const record = result as Record<string, unknown>;
   return str(record.session_id) ?? str(record.id) ?? str(record.session?.toString()) ?? null;
+}
+
+/** `session.resume` 回包的 runtime id：**只接受 `session_id`**，绝不回退 `id`。 */
+export function normalizeResumedId(result: unknown): string | null {
+  if (!result || typeof result !== "object") {
+    return null;
+  }
+  return str((result as Record<string, unknown>).session_id) ?? null;
+}
+
+/** `session.create` 回包的身份对：`stored_session_id` + `session_id`，两者缺一不可。 */
+export function normalizeCreatedIdentity(result: unknown): SessionIdentity | null {
+  if (!result || typeof result !== "object") {
+    return null;
+  }
+  const record = result as Record<string, unknown>;
+  const storedId = str(record.stored_session_id);
+  const runtimeId = str(record.session_id);
+  return storedId && runtimeId ? { storedId, runtimeId } : null;
+}
+
+/** 事件是否属于给定 runtime id（接受 `session_id` 或 `sessionId`）。 */
+export function matchesRuntime(payload: Record<string, unknown>, runtimeId: string | null): boolean {
+  const id = payload.session_id ?? payload.sessionId;
+  return typeof runtimeId === "string" && id === runtimeId;
 }
 
 /** `message.delta` / `message.complete` 的增量文本。 */

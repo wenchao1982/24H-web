@@ -46,7 +46,15 @@ export class FakeGateway implements Gateway {
 
   request<T = unknown>(method: string, params: GatewayEventPayload = {}): Promise<T> {
     this.requests.push({ method, params });
-    return Promise.resolve(this.impl(method, params) as T);
+    const result = this.impl(method, params);
+    // 仅当测试 handler 未给出非空结果时，才补默认应答（session.resume/create）。
+    if (isEmptyResult(result)) {
+      const fallback = defaultReply(method, params);
+      if (fallback !== undefined) {
+        return Promise.resolve(fallback as T);
+      }
+    }
+    return Promise.resolve(result as T);
   }
 
   on(type: string, handler: GatewayEventHandler): void {
@@ -85,6 +93,37 @@ export class FakeGateway implements Gateway {
   paramsOf(method: string): GatewayEventPayload[] {
     return this.requests.filter((entry) => entry.method === method).map((entry) => entry.params);
   }
+}
+
+/** 空结果判定：null/undefined / 空数组 / 无非空自有键的对象（Promise 不算空）。 */
+function isEmptyResult(result: unknown): boolean {
+  if (result == null) {
+    return true;
+  }
+  if (typeof (result as { then?: unknown }).then === "function") {
+    return false;
+  }
+  if (Array.isArray(result)) {
+    return result.length === 0;
+  }
+  if (typeof result === "object") {
+    return Object.keys(result as object).length === 0;
+  }
+  return false;
+}
+
+/** 会话身份 RPC 的默认应答：刻意 R≠S 以捕获 fail-open（客户端不得用 stored 当 runtime）。 */
+function defaultReply(
+  method: string,
+  params: GatewayEventPayload,
+): GatewayEventPayload | undefined {
+  if (method === "session.resume") {
+    return { session_id: "runtime:" + String(params.session_id) };
+  }
+  if (method === "session.create") {
+    return { session_id: "runtime:new", stored_session_id: "stored:new" };
+  }
+  return undefined;
 }
 
 export function createFakeGateway(

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { GatewayClient, wsUrl } from "./ws";
+import { GatewayClient, isSessionNotFound, wsUrl } from "./ws";
 
 /** Controllable stand-in for the browser WebSocket, never touches the network. */
 class FakeWebSocket {
@@ -118,5 +118,42 @@ describe("GatewayClient", () => {
     stubWebSocket();
     const client = new GatewayClient();
     await expect(client.request("session.list", {})).rejects.toThrow("gateway 未连接");
+  });
+
+  it("rejects with an Error carrying the JSON-RPC error code", async () => {
+    const sockets = stubWebSocket();
+    const client = new GatewayClient();
+    const connected = client.connect("ws://example.test/api/hermes/ws");
+    sockets[0].open();
+    await connected;
+
+    const pending = client.request("prompt.submit", {});
+    sockets[0].receive(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        error: { code: 4001, message: "session not found" },
+      }),
+    );
+
+    await expect(pending).rejects.toMatchObject({ code: 4001, message: "session not found" });
+  });
+});
+
+describe("isSessionNotFound", () => {
+  it("treats a 4001 code as not found", () => {
+    const error = new Error("boom") as Error & { code?: number };
+    error.code = 4001;
+    expect(isSessionNotFound(error)).toBe(true);
+  });
+
+  it("treats another code with a non-matching message as not not-found", () => {
+    const error = new Error("boom") as Error & { code?: number };
+    error.code = 500;
+    expect(isSessionNotFound(error)).toBe(false);
+  });
+
+  it("falls back to the error message", () => {
+    expect(isSessionNotFound(new Error("session not found"))).toBe(true);
   });
 });

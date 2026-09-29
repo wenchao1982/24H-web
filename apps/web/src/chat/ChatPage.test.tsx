@@ -76,7 +76,7 @@ describe("ChatPage T6.2 新建会话", () => {
         return SESSIONS;
       }
       if (method === "session.create") {
-        return { session_id: "s3" };
+        return { session_id: "runtime:new", stored_session_id: "stored:new" };
       }
       return {};
     });
@@ -87,6 +87,7 @@ describe("ChatPage T6.2 新建会话", () => {
     await user.click(screen.getByRole("button", { name: "新建会话" }));
 
     expect(gateway.paramsOf("session.create")).toHaveLength(1);
+    expect(gateway.paramsOf("session.resume")).toHaveLength(0);
     expect(await screen.findByRole("heading", { name: "新会话" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "新会话" })).toHaveAttribute("data-active", "true");
   });
@@ -105,16 +106,18 @@ describe("ChatPage T6.3 流式消息", () => {
     await user.click(screen.getByRole("button", { name: "发送" }));
 
     expect(screen.getByText("你好")).toBeInTheDocument();
-    expect(gateway.paramsOf("prompt.submit")).toEqual([{ session_id: "s1", text: "你好" }]);
+    expect(gateway.paramsOf("prompt.submit")).toEqual([
+      { session_id: "runtime:s1", text: "你好" },
+    ]);
 
     act(() => {
-      gateway.emit("message.delta", { session_id: "s1", text: "收到" });
-      gateway.emit("message.delta", { session_id: "s1", text: "了" });
+      gateway.emit("message.delta", { session_id: "runtime:s1", text: "收到" });
+      gateway.emit("message.delta", { session_id: "runtime:s1", text: "了" });
     });
     expect(screen.getByText("收到了")).toBeInTheDocument();
 
     act(() => {
-      gateway.emit("message.complete", { session_id: "s1", text: "收到了，请稍等。" });
+      gateway.emit("message.complete", { session_id: "runtime:s1", text: "收到了，请稍等。" });
     });
     expect(screen.getByText("收到了，请稍等。")).toBeInTheDocument();
   });
@@ -130,14 +133,14 @@ describe("ChatPage T6.4 工具卡", () => {
     await user.click(await screen.findByRole("button", { name: "会话一" }));
 
     act(() => {
-      gateway.emit("tool.start", { session_id: "s1", id: "t1", name: "web_search" });
+      gateway.emit("tool.start", { session_id: "runtime:s1", id: "t1", name: "web_search" });
     });
     expect(screen.getByText("web_search")).toBeInTheDocument();
     expect(screen.getByText("已开始")).toBeInTheDocument();
 
     act(() => {
       gateway.emit("tool.generating", {
-        session_id: "s1",
+        session_id: "runtime:s1",
         id: "t1",
         name: "web_search",
         detail: "正在搜索",
@@ -148,7 +151,7 @@ describe("ChatPage T6.4 工具卡", () => {
 
     act(() => {
       gateway.emit("tool.complete", {
-        session_id: "s1",
+        session_id: "runtime:s1",
         id: "t1",
         name: "web_search",
         result: "3 条结果",
@@ -242,7 +245,7 @@ describe("ChatPage T6.7 中断", () => {
     expect(stop).toBeInTheDocument();
     await user.click(stop);
 
-    expect(gateway.paramsOf("session.interrupt")).toEqual([{ session_id: "s1" }]);
+    expect(gateway.paramsOf("session.interrupt")).toEqual([{ session_id: "runtime:s1" }]);
     expect(await screen.findByRole("button", { name: "发送" })).toBeInTheDocument();
   });
 });
@@ -258,7 +261,7 @@ describe("ChatPage T6.8 状态条", () => {
 
     act(() => {
       gateway.emit("thinking", {
-        session_id: "s1",
+        session_id: "runtime:s1",
         context_percent: 18,
         tokens: 62000,
         tps: 62,
@@ -292,7 +295,9 @@ describe("ChatPage T6.9 会话管理", () => {
     await user.type(input, "新名字");
     await user.click(screen.getByRole("button", { name: "确定" }));
 
-    expect(gateway.paramsOf("session.title")).toEqual([{ session_id: "s1", title: "新名字" }]);
+    expect(gateway.paramsOf("session.title")).toEqual([
+      { session_id: "runtime:s1", title: "新名字" },
+    ]);
     expect(screen.getByRole("button", { name: "新名字" })).toBeInTheDocument();
   });
 
@@ -348,7 +353,7 @@ describe("ChatPage T6.10 断线重放", () => {
     await user.click(await screen.findByRole("button", { name: "会话一" }));
 
     expect(await screen.findByText("恢复的审批")).toBeInTheDocument();
-    expect(gateway.paramsOf("session.events.since")).toEqual([{ session_id: "s1" }]);
+    expect(gateway.paramsOf("session.events.since")).toEqual([{ session_id: "runtime:s1" }]);
   });
 });
 
@@ -366,7 +371,7 @@ describe("ChatPage T6.11 附件", () => {
 
     expect(await screen.findByText("notes.txt")).toBeInTheDocument();
     expect(gateway.paramsOf("file.attach")).toEqual([
-      { session_id: "s1", name: "notes.txt", size: 5, type: "text/plain" },
+      { session_id: "runtime:s1", name: "notes.txt", size: 5, type: "text/plain" },
     ]);
 
     await user.type(screen.getByLabelText("消息"), "带你一起");
@@ -374,7 +379,7 @@ describe("ChatPage T6.11 附件", () => {
 
     const submits = gateway.paramsOf("prompt.submit");
     expect(submits).toHaveLength(1);
-    expect(submits[0]).toMatchObject({ session_id: "s1", text: "带你一起" });
+    expect(submits[0]).toMatchObject({ session_id: "runtime:s1", text: "带你一起" });
     expect((submits[0].attachments as string[])).toHaveLength(1);
   });
 });
@@ -513,7 +518,7 @@ describe("ChatPage T6.15 工作区", () => {
     await user.selectOptions(select, "/home/u/b");
     await waitFor(() => {
       expect(gateway.paramsOf("session.workspace.move")).toEqual([
-        { session_id: "s1", workspace: "/home/u/b" },
+        { session_key: "s1", cwd: "/home/u/b" },
       ]);
     });
   });
@@ -543,7 +548,7 @@ describe("ChatPage T17.5 子代理观测", () => {
     expect(
       await screen.findByRole("button", { name: "查看子代理 reviewer 输出" }),
     ).toBeInTheDocument();
-    expect(gateway.paramsOf("subagent.list")).toEqual([{ session_id: "s1" }]);
+    expect(gateway.paramsOf("subagent.list")).toEqual([{ session_id: "runtime:s1" }]);
   });
 });
 
@@ -579,5 +584,176 @@ describe("ChatPage T20.1 Slash 命令菜单", () => {
 
     expect(gateway.paramsOf("slash.exec")).toEqual([{ command: "/goal", args: "" }]);
     expect(await screen.findByText("已设置目标")).toBeInTheDocument();
+  });
+});
+
+describe("ChatPage 会话身份对（stored/runtime id）", () => {
+  it("[REQ-001] resumes on selection and submits with the returned runtime id", async () => {
+    const gateway = createFakeGateway((method) =>
+      method === "session.list" ? { sessions: [{ id: "s1", title: "会话一" }] } : {},
+    );
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+
+    expect(gateway.paramsOf("session.resume")).toEqual([{ session_id: "s1" }]);
+
+    await user.type(screen.getByLabelText("消息"), "你好");
+    await user.click(screen.getByRole("button", { name: "发送" }));
+
+    expect(gateway.paramsOf("prompt.submit")[0]).toMatchObject({ session_id: "runtime:s1" });
+  });
+
+  it("[REQ-003] recovers from a 4001 with exactly one resume and one retry", async () => {
+    let submits = 0;
+    const gateway = createFakeGateway((method) => {
+      if (method === "session.list") {
+        return { sessions: [] };
+      }
+      if (method === "session.create") {
+        return { session_id: "runtime:new", stored_session_id: "stored:new" };
+      }
+      if (method === "prompt.submit") {
+        submits += 1;
+        if (submits === 1) {
+          const error = new Error("session not found") as Error & { code?: number };
+          error.code = 4001;
+          throw error;
+        }
+        return {};
+      }
+      return {};
+    });
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "新建会话" }));
+
+    await user.type(screen.getByLabelText("消息"), "你好");
+    await user.click(screen.getByRole("button", { name: "发送" }));
+
+    await waitFor(() => expect(gateway.paramsOf("prompt.submit")).toHaveLength(2));
+    expect(gateway.paramsOf("session.resume")).toEqual([{ session_id: "stored:new" }]);
+    expect(gateway.paramsOf("prompt.submit")[0]).toMatchObject({ session_id: "runtime:new" });
+    expect(gateway.paramsOf("prompt.submit")[1]).toMatchObject({
+      session_id: "runtime:stored:new",
+    });
+  });
+
+  it("[REQ-004] errors when resume lacks session_id and never uses the stored id as runtime", async () => {
+    const gateway = createFakeGateway((method) => {
+      if (method === "session.list") {
+        return { sessions: [{ id: "s1", title: "会话一" }] };
+      }
+      if (method === "session.resume") {
+        return { id: "s1" };
+      }
+      return {};
+    });
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+
+    await user.type(screen.getByLabelText("消息"), "你好");
+    await user.click(screen.getByRole("button", { name: "发送" }));
+
+    expect(await screen.findByText("无法恢复会话")).toBeInTheDocument();
+    expect(gateway.paramsOf("prompt.submit")).toHaveLength(0);
+    const storedAsRuntime = gateway.requests.filter(
+      (entry) => entry.method !== "session.resume" && entry.params.session_id === "s1",
+    );
+    expect(storedAsRuntime).toEqual([]);
+  });
+
+  it("[REQ-005] ignores a late resume response and keeps the newest selection", async () => {
+    const pending = new Map<string, (value: unknown) => void>();
+    const gateway = createFakeGateway((method, params) => {
+      if (method === "session.list") {
+        return {
+          sessions: [
+            { id: "a", title: "会话A" },
+            { id: "b", title: "会话B" },
+          ],
+        };
+      }
+      if (method === "session.resume") {
+        return new Promise((resolve) => {
+          pending.set(String(params.session_id), resolve);
+        });
+      }
+      return {};
+    });
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话A" }));
+    await user.click(screen.getByRole("button", { name: "会话B" }));
+
+    await act(async () => {
+      pending.get("a")?.({ session_id: "runtime:a" });
+    });
+    await act(async () => {
+      pending.get("b")?.({ session_id: "runtime:b" });
+    });
+
+    await user.type(screen.getByLabelText("消息"), "你好");
+    await user.click(screen.getByRole("button", { name: "发送" }));
+
+    await waitFor(() =>
+      expect(gateway.paramsOf("prompt.submit")[0]).toMatchObject({ session_id: "runtime:b" }),
+    );
+  });
+
+  it("[REQ-006] creates without resume and uses stored_session_id as the list id", async () => {
+    const gateway = createFakeGateway((method) => {
+      if (method === "session.list") {
+        return { sessions: [] };
+      }
+      if (method === "session.create") {
+        return { session_id: "runtime:new", stored_session_id: "stored:new" };
+      }
+      return {};
+    });
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "新建会话" }));
+
+    expect(gateway.paramsOf("session.resume")).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "新会话" })).toHaveAttribute("data-active", "true");
+  });
+
+  it("[REQ-002] ignores events that do not match the active runtime id", async () => {
+    const gateway = createFakeGateway((method) =>
+      method === "session.list" ? { sessions: [{ id: "s1", title: "会话一" }] } : {},
+    );
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+
+    act(() => {
+      gateway.emit("message.delta", { session_id: "runtime:other", text: "不应出现" });
+    });
+    expect(screen.queryByText("不应出现")).not.toBeInTheDocument();
+
+    act(() => {
+      gateway.emit("message.delta", { session_id: "runtime:s1", text: "应出现" });
+    });
+    expect(screen.getByText("应出现")).toBeInTheDocument();
+  });
+
+  it("[REQ-011] clears running on a done event with no session id", async () => {
+    const gateway = createFakeGateway((method) =>
+      method === "session.list" ? { sessions: [{ id: "s1", title: "会话一" }] } : {},
+    );
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+
+    await user.type(screen.getByLabelText("消息"), "跑起来");
+    await user.click(screen.getByRole("button", { name: "发送" }));
+    expect(screen.getByRole("button", { name: "停止" })).toBeInTheDocument();
+
+    act(() => {
+      gateway.emit("done", {});
+    });
+    expect(await screen.findByRole("button", { name: "发送" })).toBeInTheDocument();
   });
 });

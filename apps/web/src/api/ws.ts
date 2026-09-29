@@ -23,6 +23,14 @@ type Pending = {
   reject: (error: Error) => void;
 };
 
+/** 会话不在内存（需重新 resume）：错误码 4001，或消息含 "session not found"。 */
+export function isSessionNotFound(error: unknown): boolean {
+  if ((error as { code?: number } | null)?.code === 4001) {
+    return true;
+  }
+  return /session not found/i.test(String((error as Error)?.message ?? error));
+}
+
 /** 由页面 origin 推导 `/api/hermes/ws` 的 WebSocket 地址（http→ws，https→wss）。 */
 export function wsUrl(origin: string, basePath = ""): string {
   const base = basePath.replace(/\/$/, "");
@@ -68,7 +76,7 @@ export class GatewayClient implements Gateway {
       id?: number | string;
       method?: string;
       result?: unknown;
-      error?: { message?: string };
+      error?: { message?: string; code?: number };
       params?: { type?: string; payload?: Record<string, unknown> };
     };
     try {
@@ -83,7 +91,13 @@ export class GatewayClient implements Gateway {
       if (pending) {
         this.pending.delete(frame.id);
         if (frame.error) {
-          pending.reject(new Error(String(frame.error.message ?? frame.error)));
+          const err = new Error(String(frame.error.message ?? frame.error)) as Error & {
+            code?: number;
+          };
+          if (typeof frame.error.code === "number") {
+            err.code = frame.error.code;
+          }
+          pending.reject(err);
         } else {
           pending.resolve(frame.result);
         }

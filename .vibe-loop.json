@@ -532,12 +532,102 @@
       "priority": "medium",
       "status": "completed",
       "completedAt": "2026-09-28T13:14:51.238Z"
+    },
+    {
+      "id": "mum0x6r5zeo9",
+      "createdAt": "2026-09-29T01:54:44.465Z",
+      "updatedAt": "2026-09-29T01:55:33.817Z",
+      "title": "测试 24H Web 对话功能",
+      "description": "验证 apps/web 对话模块 + BFF hermes WS 代理链路的对话功能是否正常：前端 ws.ts / chat 模块、BFF hermes 代理、相关测试与 e2e。",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-29T01:55:33.817Z"
+    },
+    {
+      "id": "mum14mpe7j28",
+      "createdAt": "2026-09-29T02:00:31.730Z",
+      "updatedAt": "2026-09-29T03:02:14.195Z",
+      "title": "实施修复(按 spec v1.4.0)：会话身份对 resume",
+      "description": "按规格 .psd/specs/001-chat-session-resume/v1.4.0-20260929-113000/ 实施（Wave0 基线文档 → Wave1 代码 → Wave2 验证）。核心：SessionIdentity 身份对；selectSession/深链同步清空后 resume；create 用 session_id+stored_session_id；4001 以发送时 storedId 有界重试；事件严格匹配；title/interrupt/attachments/subagent 用 runtime id；workspace.move 用 session_key；测试辅助与既有断言订正。",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-29T03:02:14.195Z"
+    },
+    {
+      "id": "mum309brotuy",
+      "createdAt": "2026-09-29T02:53:06.999Z",
+      "updatedAt": "2026-09-29T02:54:42.238Z",
+      "title": "Wave 0: baseline docs (architecture/requirement/ui-spec/task-list)",
+      "description": "Add session identity section to architecture.md; chat resume subsection to requirement.md; chat interaction rules to ui-spec.md; N15 row to task-list.md.",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-29T02:54:42.238Z"
+    },
+    {
+      "id": "mum309hbyss9",
+      "createdAt": "2026-09-29T02:53:07.199Z",
+      "updatedAt": "2026-09-29T02:56:44.002Z",
+      "title": "Wave 1: types.ts identity helpers",
+      "description": "SessionIdentity, normalizeResumedId (session_id only), normalizeCreatedIdentity, matchesRuntime.",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-29T02:56:44.002Z"
+    },
+    {
+      "id": "mum309n16a7z",
+      "createdAt": "2026-09-29T02:53:07.405Z",
+      "updatedAt": "2026-09-29T02:56:44.097Z",
+      "title": "Wave 1: ws.ts error code + isSessionNotFound",
+      "description": "Reject Error carrying code; export isSessionNotFound.",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-29T02:56:44.097Z"
+    },
+    {
+      "id": "mum309wi6i5j",
+      "createdAt": "2026-09-29T02:53:07.746Z",
+      "updatedAt": "2026-09-29T02:59:06.827Z",
+      "title": "Wave 1: ChatPage identity pair + resume + matrix",
+      "description": "Replace ad-hoc activeId session usage with identity pair; resume/attach/select/create/send/handlers/rename/delete/workspace/attachments/subagents.",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-29T02:59:06.827Z"
+    },
+    {
+      "id": "mum30a2kffdz",
+      "createdAt": "2026-09-29T02:53:07.964Z",
+      "updatedAt": "2026-09-29T02:59:06.950Z",
+      "title": "Wave 1: fakeGateway defaults for resume/create",
+      "description": "Default session.resume and session.create replies when handler returns falsy.",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-29T02:59:06.950Z"
+    },
+    {
+      "id": "mum30aaa06xt",
+      "createdAt": "2026-09-29T02:53:08.242Z",
+      "updatedAt": "2026-09-29T03:01:31.861Z",
+      "title": "Wave 2: tests (ws.test.ts + ChatPage.test.tsx)",
+      "description": "Add ws error-code tests; reconcile existing ChatPage tests to runtime ids; add new identity tests.",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-29T03:01:31.861Z"
+    },
+    {
+      "id": "mum30ag77326",
+      "createdAt": "2026-09-29T02:53:08.455Z",
+      "updatedAt": "2026-09-29T03:01:31.969Z",
+      "title": "Wave 3: npm run check green",
+      "description": "Run npm run check from repo root and fix root causes until green.",
+      "priority": "high",
+      "status": "completed",
+      "completedAt": "2026-09-29T03:01:31.969Z"
     }
   ],
   "lastVerification": {
-    "timestamp": "2026-09-28T14:28:16.803Z",
+    "timestamp": "2026-09-29T03:37:29.314Z",
     "command": "npm run typecheck && npm run test",
     "success": true,
-    "output": "> 24h-web@0.1.0 typecheck\n> npm -w @24h/web run typecheck && npm -w @24h/server run typecheck && npm -w @24h/shared run typecheck\n\n\n> @24h/web@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/server@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/shared@0.1.0 typecheck\n> tsc --noEmit\n\n\n> 24h-web@0.1.0 test\n> npm -w @24h/server run test && npm -w @24h/web run test\n\n\n> @24h/server@0.1.0 test\n> vitest run\n\n\n RUN  v3.2.7 /vol1/@apphome/trim.openclaw/data/home/24h-web/apps/server\n\n ✓ src/session/role.test.ts (3 tests) 654ms\n   ✓ requireSuperAdmin > allows a super_admin  301ms\n ✓ src/routes/github.test.ts (5 tests) 759ms\n ✓ src/routes/change-password.test.ts (3 tests) 794ms\n   ✓ POST /api/auth/change-password > rejects a wrong old password with 400 and keeps the flag  313ms\n   ✓ POST /api/auth/change-password > changes the password and clears must_change_password  324ms\n ✓ src/http/csrf.test.ts (5 tests) 835ms\n ✓ src/routes/profile.test.ts (4 tests) 880ms\n   ✓ PATCH /api/auth/profile > renames the current user  331ms\n ✓ src/hermes/proxy.test.ts (3 tests) 990ms\n   ✓ GET /api/hermes/ws > authenticates with the session cookie and pipes frames both ways  335ms\n   ✓ GET /api/hermes/ws > forwards a client frame sent before the upstream connects (cold-start race)  524ms\n ✓ src/routes/system.test.ts (6 tests) 1018ms\n   ✓ GET /api/system/version > returns the core version from Hermes and the web build version  303ms\n ✓ src/routes/auth.test.ts (7 tests) 1064ms\n ✓ src/routes/adminConnections.test.ts (5 tests) 1060ms\n ✓ src/routes/avatar.test.ts (7 tests) 1144ms\n ✓ src/routes/rate-limit.test.ts (3 tests) 1218ms\n   ✓ login rate limiting > locks after 5 consecutive failures and returns 429  454ms\n   ✓ login rate limiting > rejects the correct password while locked  326ms\n   ✓ login rate limiting > resets the counter after a successful login  437ms\n ✓ src/paths.test.ts (6 tests) 11ms\n ✓ src/routes/oidc.test.ts (5 tests) 1472ms\n   ✓ OIDC provider > is listed only when OIDC is configured  312ms\n   ✓ OIDC "
+    "output": "> 24h-web@0.1.0 typecheck\n> npm -w @24h/web run typecheck && npm -w @24h/server run typecheck && npm -w @24h/shared run typecheck\n\n\n> @24h/web@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/server@0.1.0 typecheck\n> tsc --noEmit\n\n\n> @24h/shared@0.1.0 typecheck\n> tsc --noEmit\n\n\n> 24h-web@0.1.0 test\n> npm -w @24h/server run test && npm -w @24h/web run test\n\n\n> @24h/server@0.1.0 test\n> vitest run\n\n\n RUN  v3.2.7 /vol1/@apphome/trim.openclaw/data/home/24h-web/apps/server\n\n ✓ src/session/role.test.ts (3 tests) 610ms\n ✓ src/routes/github.test.ts (5 tests) 740ms\n ✓ src/routes/change-password.test.ts (3 tests) 806ms\n   ✓ POST /api/auth/change-password > rejects a wrong old password with 400 and keeps the flag  305ms\n   ✓ POST /api/auth/change-password > changes the password and clears must_change_password  310ms\n ✓ src/http/csrf.test.ts (5 tests) 809ms\n ✓ src/routes/profile.test.ts (4 tests) 861ms\n   ✓ PATCH /api/auth/profile > renames the current user  321ms\n ✓ src/hermes/proxy.test.ts (3 tests) 1001ms\n   ✓ GET /api/hermes/ws > authenticates with the session cookie and pipes frames both ways  337ms\n   ✓ GET /api/hermes/ws > forwards a client frame sent before the upstream connects (cold-start race)  545ms\n ✓ src/routes/auth.test.ts (7 tests) 1089ms\n ✓ src/routes/system.test.ts (6 tests) 1083ms\n   ✓ GET /api/system/version > returns the core version from Hermes and the web build version  325ms\n ✓ src/routes/adminConnections.test.ts (5 tests) 1109ms\n   ✓ admin connections CRUD > creates, lists, updates and deletes a connection without exposing the token  302ms\n ✓ src/routes/avatar.test.ts (7 tests) 1178ms\n ✓ src/routes/rate-limit.test.ts (3 tests) 1189ms\n   ✓ login rate limiting > locks after 5 consecutive failures and returns 429  451ms\n   ✓ login rate limiting > rejects the correct password while locked  321ms\n   ✓ login rate limiting > resets the counter after a successful login  416ms\n ✓ src/paths.test.ts (6 tests) 15ms\n ✓ src/routes/skillUi.test.ts (11 tests) 1514ms\n ✓ src/route"
   }
 }

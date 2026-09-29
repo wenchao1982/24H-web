@@ -1,0 +1,17 @@
+{
+  "specId": "001-chat-session-resume",
+  "version": "1.0.0",
+  "timestamp": "2026-09-29T10:05:00Z",
+  "description": "Bugfix: 历史会话点选未 session.resume，导致 session-scoped RPC (prompt.submit) 被网关以 4001 拒绝；引入 stored id / runtime id 双身份模型与有界自动恢复。",
+  "author": "spec-agent",
+  "status": "draft",
+  "parentVersion": null,
+  "changes": [
+    "定位根因：selectSession 不 resume / resumeSession 丢弃 runtime id / handleSend 无自动恢复",
+    "定义 REQ-001..004 (GEARS) 与 3 条属性测试",
+    "设计 stored id / runtime id 双身份模型与 attachSession",
+    "拆解 Wave 0 基线文档 / Wave 1 代码 / Wave 2 验证任务",
+    "记录附带发现 F2：历史消息未渲染"
+  ],
+  "reviewResult": null
+}

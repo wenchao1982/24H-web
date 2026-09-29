@@ -75,7 +75,35 @@
 - 子进程 **`shell:false`** + 参数数组，禁止 shell 注入。
 - 应用根用 `apps/server/src/paths.ts#findRepoRoot`（src 与 bundle 语义一致）。
 
-## 6. 详见
+## 6. 会话身份（stored id / runtime id）与 session.resume
+
+Hermes 会话有**两个身份**，必须成对使用，客户端不得混用：
+
+```ts
+interface SessionIdentity { storedId: string; runtimeId: string }
+```
+
+- `storedId`：持久化会话 id（`session.list` 行的 `id` / `session.create` 回包的 `stored_session_id`），用于删除等持久操作。
+- `runtimeId`：运行时内存 id（`session.resume` 回包的 `session_id` / `session.create` 回包的 `session_id`），用于会话域 RPC 与事件匹配。
+- `runtimeId` **仅来自 resume/create 回包**；列表 id 永不充当 runtime id。点选/深链历史会话必须先 `session.resume` 建立身份对。
+
+### 契约矩阵（官方源码为准）
+
+| RPC / 事件 | 身份键 | 说明 |
+| --- | --- | --- |
+| `session.resume` | 入参 = **stored id**；回包 `session_id` = **runtime id** | `contracts/sessions.py:174-191` |
+| `session.create` | 回包含 `session_id`(runtime) 与 `stored_session_id`(stored) | `contracts/sessions.py:138-143` |
+| `session.list` | 行 `id` = **stored id** | `methods_session.py:118-124` |
+| `prompt.submit` / `session.interrupt` / `session.title` | **runtime id** | `methods_prompt.py:585`、`methods_session.py:2146-2149 / 1096-1097` |
+| `file.attach` / `image.attach` / `image.attach_bytes` / `pdf.attach` / `clipboard.paste` | **runtime id** | `methods_prompt.py:845-849 / 728-730 / 756 / 787-794 / 704-706` |
+| `subagent.list` / `delegation.status` | **runtime id** | `methods_subagents.py:53-58` |
+| `session.events.since` | **runtime id**（回放 ring 键） | `server.py:665-668` |
+| `session.delete` | **stored id**（DB 键） | `methods_session.py:1055-1064` |
+| `session.workspace.move` | **stored id，字段名 `session_key`（非 `session_id`）** | `methods_session.py:987-992` |
+
+**规则**：任何 runtime-id RPC 发出前，必须存在已提交的身份对且 `identity.storedId === activeId`；否则不得发送（4001 `session not found` 的根因即误用 stored id 作 runtime id）。归一化失败即报错，禁止回退 stored id。
+
+## 7. 详见
 
 - 完整分层与关键流：[`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
 - 接口清单（BFF / L1 / L2）：[`docs/INTERFACES.md`](./docs/INTERFACES.md)
