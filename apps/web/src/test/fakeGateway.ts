@@ -4,6 +4,7 @@ import type {
   GatewayEventHandler,
   GatewayEventPayload,
   GatewayServerRequestHandler,
+  Unsubscribe,
 } from "../api/ws";
 
 export interface RecordedRequest {
@@ -57,16 +58,33 @@ export class FakeGateway implements Gateway {
     return Promise.resolve(result as T);
   }
 
-  on(type: string, handler: GatewayEventHandler): void {
+  on(type: string, handler: GatewayEventHandler): Unsubscribe {
     const set = this.handlers.get(type) ?? new Set<GatewayEventHandler>();
     set.add(handler);
     this.handlers.set(type, set);
+    return () => {
+      set.delete(handler);
+      if (set.size === 0) {
+        this.handlers.delete(type);
+      }
+    };
   }
 
-  onServerRequest(method: string, handler: GatewayServerRequestHandler): void {
+  onServerRequest(method: string, handler: GatewayServerRequestHandler): Unsubscribe {
     const set = this.serverHandlers.get(method) ?? new Set<GatewayServerRequestHandler>();
     set.add(handler);
     this.serverHandlers.set(method, set);
+    return () => {
+      set.delete(handler);
+      if (set.size === 0) {
+        this.serverHandlers.delete(method);
+      }
+    };
+  }
+
+  /** 便于断言：某事件类型当前存活的 handler 数量。 */
+  subscriberCount(type: string): number {
+    return this.handlers.get(type)?.size ?? 0;
   }
 
   /** 触发一个 server→client 事件。 */

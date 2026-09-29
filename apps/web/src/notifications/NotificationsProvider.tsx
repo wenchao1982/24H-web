@@ -59,7 +59,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const seqRef = useRef(0);
 
   useEffect(() => {
-    for (const kind of REQUEST_KINDS) {
+    const unsubscribes = REQUEST_KINDS.map((kind) =>
       gateway.onServerRequest(kind, (params) => {
         const sessionId = sessionIdOf(params);
         setItems((current) =>
@@ -74,19 +74,26 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
             createdAt: Date.now(),
           }),
         );
-      });
-    }
-    gateway.on("done", (payload) => {
-      const sessionId = sessionIdOf(payload);
-      setItems((current) =>
-        upsertActivity(current, {
-          id: `activity:${sessionId ?? "global"}`,
-          sessionId,
-          title: t("notifications.activity.done"),
-          createdAt: Date.now(),
-        }),
-      );
-    });
+      }),
+    );
+    unsubscribes.push(
+      gateway.on("done", (payload) => {
+        const sessionId = sessionIdOf(payload);
+        setItems((current) =>
+          upsertActivity(current, {
+            id: `activity:${sessionId ?? "global"}`,
+            sessionId,
+            title: t("notifications.activity.done"),
+            createdAt: Date.now(),
+          }),
+        );
+      }),
+    );
+    return () => {
+      for (const unsubscribe of unsubscribes) {
+        unsubscribe();
+      }
+    };
   }, [gateway]);
 
   const markRead = useCallback((id: string) => setItems((cur) => markReadItem(cur, id)), []);

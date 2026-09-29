@@ -188,6 +188,43 @@ describe("GatewayClient", () => {
 
     await expect(pending).rejects.toMatchObject({ code: 4001, message: "session not found" });
   });
+
+  it("creates only one WebSocket when connect() is called twice", async () => {
+    const sockets = stubWebSocket();
+    const client = new GatewayClient();
+
+    const first = client.connect("ws://example.test/api/hermes/ws");
+    const second = client.connect("ws://example.test/api/hermes/ws");
+
+    expect(sockets).toHaveLength(1);
+
+    sockets[0].open();
+    await Promise.all([first, second]);
+
+    expect(sockets).toHaveLength(1);
+  });
+
+  it("stops invoking a handler once its unsubscribe is called", async () => {
+    const sockets = stubWebSocket();
+    const client = new GatewayClient();
+    const handler = vi.fn();
+    const unsubscribe = client.on("message.delta", handler);
+
+    const connected = client.connect("ws://example.test/api/hermes/ws");
+    sockets[0].open();
+    await connected;
+
+    unsubscribe();
+    sockets[0].receive(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        method: "event",
+        params: { type: "message.delta", session_id: "rt-1", payload: { text: "hi" } },
+      }),
+    );
+
+    expect(handler).not.toHaveBeenCalled();
+  });
 });
 
 describe("isSessionNotFound", () => {

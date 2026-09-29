@@ -1,0 +1,17 @@
+{
+  "specId": "001-chat-session-resume",
+  "version": "1.4.2",
+  "timestamp": "2026-09-29T14:50:00Z",
+  "description": "Patch: React StrictMode 双跑 effect + 无 cleanup + Gateway 无 unsubscribe，导致 message.complete handler 注册两次、单轮回复出现重复助手气泡；并修复 connect() 非幂等导致的多 WebSocket 泄漏。",
+  "author": "spec-agent",
+  "status": "implemented",
+  "parentVersion": "1.4.1",
+  "changes": [
+    "Gateway.on/onServerRequest 返回 Unsubscribe",
+    "GatewayClient.connect 幂等（connectPromise）",
+    "ChatPage / NotificationsProvider effect 增加注销 cleanup",
+    "新增复现测试 ChatPage.strictmode.test.tsx（失败→通过）",
+    "ws.test.ts 新增连接唯一 + 注销用例"
+  ],
+  "reviewResult": null
+}

@@ -165,6 +165,7 @@ export default function ChatPage() {
   }, []);
 
   useEffect(() => {
+    const unsubscribes = [
     gateway.on("message.delta", (payload) => {
       const pair = activePair();
       if (!pair || !matchesRuntime(payload, pair.runtimeId)) {
@@ -174,14 +175,14 @@ export default function ChatPage() {
       if (text) {
         setItems((current) => appendDelta(current, text, nextId()));
       }
-    });
+    }),
     gateway.on("message.complete", (payload) => {
       const pair = activePair();
       if (!pair || !matchesRuntime(payload, pair.runtimeId)) {
         return;
       }
       setItems((current) => completeAssistant(current, deltaText(payload), nextId()));
-    });
+    }),
     gateway.on("tool.start", (payload) => {
       const pair = activePair();
       if (!pair || !matchesRuntime(payload, pair.runtimeId)) {
@@ -192,7 +193,7 @@ export default function ChatPage() {
           detail: toolDetail(payload),
         }),
       );
-    });
+    }),
     gateway.on("tool.generating", (payload) => {
       const pair = activePair();
       if (!pair || !matchesRuntime(payload, pair.runtimeId)) {
@@ -203,7 +204,7 @@ export default function ChatPage() {
           detail: toolDetail(payload),
         }),
       );
-    });
+    }),
     gateway.on("tool.complete", (payload) => {
       const pair = activePair();
       if (!pair || !matchesRuntime(payload, pair.runtimeId)) {
@@ -214,14 +215,14 @@ export default function ChatPage() {
           result: toolResult(payload),
         }),
       );
-    });
+    }),
     gateway.on("thinking", (payload) => {
       const pair = activePair();
       if (!pair || !matchesRuntime(payload, pair.runtimeId)) {
         return;
       }
       setStatus({ phase: "thinking", ...parseStatus(payload) });
-    });
+    }),
     gateway.on("done", (payload) => {
       const pair = activePair();
       const hasId = payload.session_id != null || payload.sessionId != null;
@@ -230,7 +231,7 @@ export default function ChatPage() {
       }
       setRunning(false);
       setStatus({ phase: "done" });
-    });
+    }),
     gateway.on("error", (payload) => {
       const pair = activePair();
       const hasId = payload.session_id != null || payload.sessionId != null;
@@ -245,17 +246,28 @@ export default function ChatPage() {
           { kind: "notice", id: nextId(), level: "error", text: errorText(payload) },
         ]);
       }
-    });
+    }),
+    ];
+    return () => {
+      for (const unsubscribe of unsubscribes) {
+        unsubscribe();
+      }
+    };
   }, [activePair, gateway, nextId]);
 
   useEffect(() => {
-    for (const kind of REQUEST_KINDS) {
+    const unsubscribes = REQUEST_KINDS.map((kind) =>
       gateway.onServerRequest(kind, (params, respond) => {
         const id = nextId();
         respondersRef.current.set(id, respond);
         setPending((current) => [...current, { id, kind, params }]);
-      });
-    }
+      }),
+    );
+    return () => {
+      for (const unsubscribe of unsubscribes) {
+        unsubscribe();
+      }
+    };
   }, [gateway, nextId]);
 
   // 断线重放：切换会话时拉取待处理服务端请求快照，重新渲染卡片。

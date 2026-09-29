@@ -7,14 +7,17 @@ export type GatewayServerRequestHandler = (
   respond: (result: GatewayEventPayload) => void,
 ) => void;
 
+/** 退订函数：调用后移除对应的 handler（StrictMode/切页时释放订阅）。 */
+export type Unsubscribe = () => void;
+
 /**
  * L1 网关客户端抽象。ChatPage 只依赖本接口，测试注入 fake gateway，绝不连网络。
  */
 export interface Gateway {
   connect(url?: string): Promise<void>;
   request<T = unknown>(method: string, params?: GatewayEventPayload): Promise<T>;
-  on(type: string, handler: GatewayEventHandler): void;
-  onServerRequest(method: string, handler: GatewayServerRequestHandler): void;
+  on(type: string, handler: GatewayEventHandler): Unsubscribe;
+  onServerRequest(method: string, handler: GatewayServerRequestHandler): Unsubscribe;
   close(): void;
 }
 
@@ -50,14 +53,19 @@ export class GatewayClient implements Gateway {
   private readonly outbox: string[] = [];
   private readonly handlers = new Map<string, Set<GatewayEventHandler>>();
   private readonly serverRequests = new Map<string, Set<GatewayServerRequestHandler>>();
+  private connectPromise: Promise<void> | null = null;
 
   connect(url: string = wsUrl(location.origin)): Promise<void> {
     if (typeof WebSocket === "undefined") {
       return Promise.reject(new Error("当前环境不支持 WebSocket"));
     }
+    // 幂等：已有进行中/已成功的连接时复用同一 Promise，避免重复建 socket。
+    if (this.connectPromise) {
+      return this.connectPromise;
+    }
     const ws = new WebSocket(url);
     this.ws = ws;
-    return new Promise<void>((resolve, reject) => {
+    const promise = new Promise<void>((resolve, reject) => {
       ws.addEventListener("open", () => resolve(), { once: true });
       ws.addEventListener("error", () => reject(new Error("WebSocket 连接失败")), {
         once: true,
@@ -69,6 +77,12 @@ export class GatewayClient implements Gateway {
         ws.send(frame);
       }
     });
+    // 失败时清空，允许后续重连；成功则保留供复用。
+    this.connectPromise = promise.catch((error: unknown) => {
+      this.connectPromise = null;
+      throw error;
+    });
+    return this.connectPromise;
   }
 
   private dispatch(raw: string): void {
@@ -170,21 +184,42 @@ export class GatewayClient implements Gateway {
     });
   }
 
-  on(type: string, handler: GatewayEventHandler): void {
+  on(type: string, handler: GatewayEventHandler): Unsubscribe {
     const set = this.handlers.get(type) ?? new Set<GatewayEventHandler>();
     set.add(handler);
     this.handlers.set(type, set);
+    return () => {
+      const current = this.handlers.get(type);
+      if (!current) {
+        return;
+      }
+      current.delete(handler);
+      if (current.size === 0) {
+        this.handlers.delete(type);
+      }
+    };
   }
 
-  onServerRequest(method: string, handler: GatewayServerRequestHandler): void {
+  onServerRequest(method: string, handler: GatewayServerRequestHandler): Unsubscribe {
     const set = this.serverRequests.get(method) ?? new Set<GatewayServerRequestHandler>();
     set.add(handler);
     this.serverRequests.set(method, set);
+    return () => {
+      const current = this.serverRequests.get(method);
+      if (!current) {
+        return;
+      }
+      current.delete(handler);
+      if (current.size === 0) {
+        this.serverRequests.delete(method);
+      }
+    };
   }
 
   close(): void {
     this.ws?.close();
     this.ws = null;
+    this.connectPromise = null;
   }
 }
 
