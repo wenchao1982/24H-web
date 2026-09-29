@@ -16,3 +16,6 @@ e2e/.tmp/
 e2e/**/*.db
 test-results/
 playwright-report/
+
+# VibeLoop local runtime state (machine-specific)
+.vibe-loop.json
