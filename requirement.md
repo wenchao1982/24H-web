@@ -41,6 +41,7 @@
 - **逐行隔离**：对非活动行重命名/删除不得改写当前活动会话身份；重命名目标即活动会话时复用现身份，不重复 resume。
 - **新建零 resume**：`session.create` 以回包 `stored_session_id` 作 storedId、`session_id` 作 runtimeId，列表项 id 用 stored。
 - **错误透传**：resume/submit 失败展示网关真实 message；归一化缺失 `session_id` 即报错，禁止回退 stored id。
+- **打断收尾**：回合运行中点「停止」时以 **runtime id** 调 `session.interrupt`；打断后网关仍会回传 `message.complete`，其 `status="interrupted"`（`text` 可能为空）。前端须据 `status` 结算悬挂工具卡、把状态相位置为「已中断」，并保留被打断回合已生成的部分文本。
 
 ## 4. 关键表单字段
 

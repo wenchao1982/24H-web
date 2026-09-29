@@ -103,6 +103,8 @@ interface SessionIdentity { storedId: string; runtimeId: string }
 
 **规则**：任何 runtime-id RPC 发出前，必须存在已提交的身份对且 `identity.storedId === activeId`；否则不得发送（4001 `session not found` 的根因即误用 stored id 作 runtime id）。归一化失败即报错，禁止回退 stored id。
 
+**打断契约**：`session.interrupt` 入参 `session_id` 用 **runtime id**，回包 `{status:"interrupted"|"not_interrupted"}`；打断后网关仍发 `message.complete`，`status ∈ {complete,error,interrupted}`（`contracts/events.py` TurnStatus），`status="error"` 时另有 `error`/`recoverable`/`error_surface`/`partial`。用户停止会清除 durable turn marker，**不会**触发 auto-continue（仅进程崩溃遗留 marker 才会）。
+
 ## 7. 详见
 
 - 完整分层与关键流：[`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
