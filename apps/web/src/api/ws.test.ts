@@ -114,6 +114,56 @@ describe("GatewayClient", () => {
     ]);
   });
 
+  it("merges the sibling params.session_id into the event payload", async () => {
+    const sockets = stubWebSocket();
+    const client = new GatewayClient();
+    const handler = vi.fn();
+    client.on("message.delta", handler);
+
+    const connected = client.connect("ws://example.test/api/hermes/ws");
+    sockets[0].open();
+    await connected;
+
+    sockets[0].receive(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        method: "event",
+        params: { type: "message.delta", session_id: "rt-1", payload: { text: "hi" } },
+      }),
+    );
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler).toHaveBeenCalledWith(expect.objectContaining({ text: "hi", session_id: "rt-1" }));
+  });
+
+  it("does not overwrite a session_id already present in the payload", async () => {
+    const sockets = stubWebSocket();
+    const client = new GatewayClient();
+    const handler = vi.fn();
+    client.on("message.delta", handler);
+
+    const connected = client.connect("ws://example.test/api/hermes/ws");
+    sockets[0].open();
+    await connected;
+
+    sockets[0].receive(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        method: "event",
+        params: {
+          type: "message.delta",
+          session_id: "rt-outer",
+          payload: { text: "hi", session_id: "rt-inner" },
+        },
+      }),
+    );
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler).toHaveBeenCalledWith(
+      expect.objectContaining({ text: "hi", session_id: "rt-inner" }),
+    );
+  });
+
   it("rejects a request issued before connect()", async () => {
     stubWebSocket();
     const client = new GatewayClient();

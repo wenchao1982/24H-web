@@ -1,0 +1,17 @@
+{
+  "specId": "001-chat-session-resume",
+  "version": "1.4.1",
+  "timestamp": "2026-09-29T13:45:00Z",
+  "description": "Patch: 真机暴露的第二个缺陷——GatewayClient.dispatch 丢弃事件帧 params.session_id，导致 v1.4.0 的严格事件过滤把所有增量丢弃（turn 完成但界面无回复）。修复为分发时合并 session_id 到 handler payload。",
+  "author": "spec-agent",
+  "status": "implemented",
+  "parentVersion": "1.4.0",
+  "changes": [
+    "REQ-012 新增：事件帧 session_id 必须透传到 handler payload",
+    "ws.ts dispatch 事件分支合并 params.session_id（不覆盖、不改写原帧）",
+    "ws.test.ts 新增 2 条回归测试（真实帧形状）",
+    "记录 fake-vs-real 差异：FakeGateway.emit 绕过 dispatch 拆包，故单测未捕获",
+    "npm run check：web 293 / server 131 全绿"
+  ],
+  "reviewResult": null
+}

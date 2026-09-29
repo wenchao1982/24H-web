@@ -77,7 +77,12 @@ export class GatewayClient implements Gateway {
       method?: string;
       result?: unknown;
       error?: { message?: string; code?: number };
-      params?: { type?: string; payload?: Record<string, unknown> };
+      params?: {
+        type?: string;
+        payload?: Record<string, unknown>;
+        session_id?: string;
+        sessionId?: string;
+      };
     };
     try {
       frame = JSON.parse(raw);
@@ -109,7 +114,14 @@ export class GatewayClient implements Gateway {
     if (frame.method === "event") {
       const type = frame.params?.type;
       if (type) {
-        const payload = frame.params?.payload ?? {};
+        const raw = frame.params?.payload;
+        const payload: Record<string, unknown> = {
+          ...(raw && typeof raw === "object" ? raw : {}),
+        };
+        const sid = frame.params?.session_id ?? frame.params?.sessionId;
+        if (typeof sid === "string" && payload.session_id === undefined) {
+          payload.session_id = sid;
+        }
         for (const handler of this.handlers.get(type) ?? []) {
           handler(payload);
         }
