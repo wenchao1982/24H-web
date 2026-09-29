@@ -1,0 +1,725 @@
+# Design: 对话页重构（hero/docked + 会话控件 + WS 租户守卫）
+
+> Spec ID: 003-composer-redesign | Phase: design | Version: v1.0.0-20260929-173000
+> 输入：`requirements.md`（同目录，16 条 REQ）+ Gate 2 已确认的 4 节设计
+
+## 1. 系统架构
+
+### 1.1 分层与职责（沿用既有架构，不新增框架）
+
+```mermaid
+graph LR
+  SPA["apps/web SPA<br/>React 19 + Vite"] -->|"/api/hermes/ws (WS JSON-RPC)"| BFF["apps/server BFF<br/>Fastify"]
+  SPA -->|"/api/auth /api/hermes/* (REST)"| BFF
+  BFF -->|"L1 /api/ws?token="| H["hermes serve"]
+  BFF -->|"L2 /api/*"| H
+  H --> HOME["~/.hermes<br/>profiles/*"]
+```
+
+本次改动只落在 SPA 与 BFF 两层，**不改 Hermes**（契约已支持全部所需能力）。
+
+### 1.2 组件架构与状态归属
+
+图例：`[S]`=持有 state；`[P]`=只接 props（受控）；`[纯]`=无 state 纯逻辑。
+
+```mermaid
+graph TD
+  ChatPage["ChatPage [S]<br/>sessions/activeId/identity/items/pending/running/status/error/view/commands"]
+  USC["useSessionControls [S]<br/>selection{profile,model,cwd,yolo}<br/>options/attachments/modelSwitch"]
+  PA["pendingAttachments [纯]<br/>screenFiles/kindOf/dedupe/readAsBase64"]
+  Var["deriveComposerVariant [纯]"]
+  Cat["modelCatalog [纯]<br/>normalizeModelCatalog"]
+  Agents["agentOptions [纯]<br/>normalizeAgentOptions"]
+  Composer["Composer [S]<br/>draft/references/菜单焦点<br/>[P] variant/controller/onSend"]
+  Controls["ComposerControls [P]<br/>布局壳"]
+  Model["ModelPicker [P]"]
+  Agent["AgentPicker [P]"]
+  WS["WorkspacePicker [P]"]
+  Upload["UploadMenu [S]<br/>open"]
+  Signal["SignalMenu slash/@<br/>[S] activeIndex/dismissed"]
+  Header["SessionHeaderMenu [S]<br/>连接/导入/导出/分享/重命名"]
+  Menu["MenuButton [S]<br/>APG 原语 (REQ-016)"]
+  Transcript["Transcript [P]"]
+  StatusBar["StatusBar [P]"]
+
+  ChatPage -->|调用 + 依赖注入| USC
+  USC --> PA
+  USC --> Cat
+  USC --> Agents
+  ChatPage --> Var
+  ChatPage -->|variant/controller/callbacks| Composer
+  Composer --> Controls
+  Composer --> Signal
+  Controls --> Model
+  Controls --> Agent
+  Controls --> WS
+  Controls --> Upload
+  Menu -.->|复用| Header
+  Menu -.->|复用| Upload
+  Menu -.->|复用| Model
+  ChatPage -->|items| Transcript
+  ChatPage -->|status| StatusBar
+  ChatPage -->|callbacks| Header
+```
+
+### 1.3 状态归属决策
+
+| 状态 | 归属 | 理由 |
+|---|---|---|
+| `sessions / activeId / identity / items / pending / running / status / error / view / commands` | **ChatPage** | 会话运行时唯一真相源；事件订阅与发送编排的宿主；跨 header/composer/transcript 共享 |
+| `selection{profile,model,cwd,yolo}` | **useSessionControls** | 控件域内聚；`handleSend` 只需读 `buildCreateParams()`，避免 4 个 setter 铺进 ChatPage |
+| `options{agents,models,workspaces}` + loading | **useSessionControls** | 生命周期 = 每会话 ≤1 次；与控件强绑定；避免 ChatPage 再爆 3 个 state |
+| `attachments: PendingAttachment[]` | **useSessionControls** | 与 selection 同属「待发送表单」；`uploadAll(runtimeId)` 由 hook 提供 |
+| `modelSwitch{status,message}` | **useSessionControls** | `deferred`/`confirm` 是模型控件的异步分支，不该污染 turn 态 |
+| `draft / references / 菜单开合 / activeIndex` | **Composer** | 按键级 UI；无跨组件消费方 |
+| `SessionHeaderMenu.open` / `UploadMenu.open` / `MenuButton.open` | 各自组件 | 纯本地浮层 |
+
+**边界原则**：ChatPage 不感知控件内部结构（只拿 controller 对象）；控件不写会话运行时（只通过 controller 暴露的 RPC 动作影响）；`identity`/`running` 单向传入 hook（只读），杜绝重复真相源。
+
+### 1.4 双态派生（纯函数，禁止条件渲染两个组件）
+
+```ts
+export type ComposerVariant = "hero" | "docked";
+
+export function deriveComposerVariant(input: {
+  activeId: string | null;
+  itemCount: number;
+}): ComposerVariant {
+  return input.activeId === null && input.itemCount === 0 ? "hero" : "docked";
+}
+```
+
+**不变量**：hero 与 docked 互斥且穷尽；`hero ⟺ activeId===null && itemCount===0`。
+
+| 场景 | 结果 | 说明 |
+|---|---|---|
+| 切会话中途 | docked | `selectSession` 同步 `setActiveId`；旧会话历史晚到由 `activeIdRef` 门控丢弃 |
+| resume 未完成 | docked + 控件禁用 | `activeId!==null` → docked；`identityReady===false` → 禁用 + 本地拦截（REQ-014） |
+| hero create 失败 | 保持 hero | `activeId` 仍 null、无乐观项；draft/chip 保留 |
+| docked submit 失败 | 保持 docked | 已 append 乐观 user 项 → `itemCount>0`；按 `ui-spec.md §2` 合并/还原文本 |
+| StrictMode 双渲染 | 不变 | 纯计算，幂等 |
+
+**⚠️ 关键约束**：`Composer` 必须**单实例**、以 `data-variant` 切布局；若条件渲染两个不同组件，切换会卸载并丢失 `draft`/`chips`/`references`（违反 REQ-001/005）。hero 专属的「大标识 + 标题 + 最近会话」抽为独立 `HeroIntro`，**Composer 本体共享**。
+
+### 1.5 技术栈与选型理由
+
+| 层 | 选型 | 来源 | 理由 |
+|---|---|---|---|
+| 前端框架 | React 19 + TypeScript strict（ESM） | 既有 | 硬约束；`StrictMode` 双调用下需幂等 |
+| 构建（前端） | Vite 6 | 既有 | 既有 pipeline（`tsc --noEmit && vite build`） |
+| 路由 | react-router-dom 7 | 既有 | 既有 |
+| 样式 | **手写 CSS** + `--ds-*` design token；圆角 `--ds-radius-*` | 既有 | **硬约束：不引 UI 库**（`AGENTS.md §8`）。`corner-shape` 超椭圆在代码中不存在，不得依赖 |
+| 状态管理 | `useReducer`（纯 reducer）+ 自定义 hook；**不引** Redux/Zustand/Jotai | 新增（React 内置） | `selection` + `attachments` 天然是状态机，纯函数可穷举测试；单消费方（ChatPage），Context 属过度设计 |
+| 布局响应 | CSS Container Queries（`@container chat`），回退 flex/grid | 新增（原生 CSS） | 侧栏折叠 / 详情面板让步时媒体查询感知不到容器宽度；jsdom 无布局 → 需 e2e 验证 |
+| 过渡动画 | 仅 `transform` / `opacity` | 新增（原生 CSS） | 合成层，不触发布局；避免 CLS |
+| 单元 / 组件测试 | Vitest 3 + `@testing-library/react` 16 + jsdom 27 | 既有 | 验证命令 `npm run check` 的一部分 |
+| 属性测试 | **确定性生成器 + 边界遍历表**（不引 `fast-check`） | 新增（自写） | 仓库无该依赖，避免新增 dev 依赖；边界值可枚举 |
+| E2E | Playwright | 既有 | `npm run test:e2e`，**独立跑、不进 `check`**；CLS / container query / 真实拖拽只能在真实浏览器断言 |
+| BFF 框架 | Fastify | 既有 | 既有 |
+| BFF ←→ Hermes WS | `ws` 库（服务端到服务端透传） | 既有 | `hermes/proxy.ts` 已有；需显式设 `maxPayload`（风险 R3） |
+| 存储 | better-sqlite3（prepared statements） | 既有 | 硬约束：SQL 参数化 |
+| BFF 构建 | esbuild → 单文件 ESM `apps/server/dist/server.mjs`（`packages: external`） | 既有 | 硬约束 |
+| 契约 | Hermes 官方 **L1 `/api/ws` JSON-RPC** + **L2 `/api/*` REST** | 既有（官方） | **不新增任何契约**；本次全部能力（`profile` / `model` / `cwd` / `attach*` / `config.set`）均为既有原生参数 |
+| 图标 | 内联 SVG / 文本字符 | 新增 | 不引图标库（`AGENTS.md §8`） |
+| i18n | 仓库既有 `t()` + `i18n/zh.ts` key 注册（类型约束） | 既有 | 新增 key 必须先注册，否则 TS 编译失败 |
+
+**新增依赖清单：无。** 本 Spec 不引入任何 npm 运行时或开发依赖（属性测试自写生成器；菜单原语手写 `MenuButton.tsx`）。
+
+**被明确否决的选型**：
+
+| 选项 | 否决理由 |
+|---|---|
+| 引入 UI 库（Radix / Headless UI / shadcn） | 违反 `AGENTS.md §8`「不引 UI 库」；菜单原语手写工作量可控（`MenuButton.tsx`） |
+| React Context 承载控件状态 | 单消费方（ChatPage）；Context 会导致全子树重渲染，且 reducer 已足够可测 |
+| 复用 `settings/model.ts#normalizeModelOptions` | 只认扁平 `models`/`options` 并产出 `string[]`，拿不到 `providers[].models` 与 `capabilities[].fast`；改动会牵动已验收的 T8.2 与 `ModelPanel`（见 N-011） |
+| 用 `image.attach{path}` / `clipboard.paste` / `input.detect_drop` | 三者作用于**网关/宿主**侧，浏览器无对应能力（见 N-007 / N-008） |
+| 走「先 REST 上传再传引用」 | 契约无此通道；需新造 BFF 路由 + 落盘 + 清理 + 跨主机路径，本期不做（登记为未来演进，见 `design.md §3` 的选型对比） |
+| 引入 `fast-check` | 避免新增 dev 依赖；边界值（0 / 10MB / 10MB+1 / 第 11 个）可确定性枚举 |
+
+---
+
+## 2. 序列图
+
+### 2.1 hero 首条消息（延迟绑定 + 失败分支）
+
+```mermaid
+sequenceDiagram
+  participant U as 用户
+  participant C as Composer
+  participant P as ChatPage(编排)
+  participant G as Gateway(WS)
+  participant H as Hermes
+
+  U->>C: 输入文本 + 选 2 附件
+  C->>P: attach(files) → chip 暂存（0 RPC）
+  U->>C: 点击发送
+  C->>P: onSend(text)  [activeId=null]
+  P->>G: session.create(buildCreateParams())
+  alt create 失败
+    G-->>P: error
+    P-->>C: {ok:false,message} → 保持 hero，保留 draft/chip
+  else create 成功
+    G-->>P: {session_id:runtime, stored_session_id:stored}
+    P->>P: setActiveId(stored)+setIdentity → 派生 docked
+    loop 逐附件（顺序，runtime id）
+      P->>G: image.attach_bytes{content_base64,filename} / file.attach{data_url,name} / pdf.attach{content_base64,filename}
+      alt 第 1 个成功
+        G-->>P: {ref_path, ref_text, uploaded}
+      else 第 2 个失败
+        G-->>P: error
+        P-->>C: 中止：不 submit，透传 message，保留剩余 chip
+      end
+    end
+    P->>G: prompt.submit({text, session_id:runtime})
+    G-->>P: ok
+    P->>P: clearAttachments() + revoke previewUrl
+    P-->>C: {ok:true} → 清空 draft
+  end
+```
+
+### 2.2 会话内切模型（成功 / deferred / confirm / 回合结束后回正）
+
+```mermaid
+sequenceDiagram
+  participant U as 用户
+  participant MP as ModelPicker(hook)
+  participant G as Gateway
+  participant H as Hermes
+
+  U->>MP: 选 m-b
+  alt hero（activeId === null）
+    MP->>MP: selection.model="m-b"（0 RPC）
+    Note over MP: 下次 session.create 带 model；无前端二次确认（REQ-011a）
+  else 会话内（identityReady）
+    MP->>MP: 乐观置目标 + modelSwitch=pending
+    MP->>G: config.set{key:"model",value:"m-b",session_id:runtime}
+    alt A 成功
+      G-->>MP: {}（可能含 scope）
+      MP->>MP: modelSwitch=idle
+    else B 回合运行中 deferred
+      G-->>MP: {deferred:true}
+      MP->>MP: modelSwitch=deferred；提示「将于下一回合生效」
+      Note over H: 不热切；stash 在 turn start 应用/丢弃（prompt_turn.py:622）
+      Note over MP,G: —— 回合结束后回正（REQ-010a）——
+      H-->>MP: event "message.complete"
+      MP->>G: model.options{profile, session_id: runtimeId}
+      G-->>MP: {model, provider, providers[]}
+      alt 回包 model === 用户选择
+        MP->>MP: 保持选中，清除 pending
+      else 回包 model !== 用户选择
+        MP->>MP: 回滚选中态 + 提示「切换未生效」
+      end
+    else C 网关要求二次确认
+      G-->>MP: {confirm_required:true, confirm_message}
+      MP->>U: 二次确认（modelSwitch=confirm，不落库）
+      Note over MP: 前端不预判「昂贵」，以此回包为唯一判据
+      alt 确认
+        U->>MP: confirmModel()
+        MP->>G: config.set{..., confirm_expensive_model:true}
+        G-->>MP: ok → idle
+      else 取消
+        U->>MP: cancelModelConfirm()
+        MP->>MP: 回滚 selection.model；idle
+      end
+    end
+  end
+```
+
+**对齐来源说明**：契约中**不存在 `session.info`**；`session.status` 回包仅 `{output: str}`（`contracts/sessions.py:431-440`），不可用于对齐。唯一结构化来源是 `model.options{session_id}` 回包的 `model` / `provider`（`contracts/config_free_tier_control.py:273-277`，doc: *"layered over the session's live provider when given"*）；触发器为 **`message.complete`** 事件（`contracts/events.py:205`）。
+
+### 2.3 BFF WS 守卫（default-deny 分类 + 越权 + 租户上下文注入）
+
+```mermaid
+sequenceDiagram
+  participant B as 浏览器 SPA
+  participant P as BFF bridge
+  participant R as userCanAccessProfile
+  participant H as Hermes L1
+
+  B->>P: 上行帧
+  P->>P: 解码与分类（default-deny）
+  alt 二进制帧 或 JSON 解析失败
+    P-->>B: 拒绝（error:400，不转发）
+  else 解析为 JSON 数组（batch）
+    P->>P: 逐元素分类（任一元素含 method 即按 request 处理）
+    P->>P: 对每个 request 元素施加守卫与租户注入
+  else 含 method 字符串（无论有无 id、无论是否带 result/error）
+    P->>P: 按 request 处理（不再有"通知/响应"豁免）
+    P->>P: profile = params.profile
+    alt profile 缺省（非 super_admin）
+      P->>P: method 前缀命中 session./profiles./mcp./skills. ?
+      alt 命中且有 default_profile
+        P->>P: 注入 params.profile = default_profile（REQ-017）
+      else 无任何分配 profile
+        P-->>B: 同 id 403 PROFILE_FORBIDDEN（不转发）
+      end
+    else profile 存在且非 super_admin
+      P->>R: userCanAccessProfile(user.id, profile)
+      alt 未分配
+        P-->>B: 同 id 403 PROFILE_FORBIDDEN（不转发）
+      end
+    end
+    P->>H: 转发
+  else 无 method 字符串（客户端回包/通知）
+    P->>H: 直接转发
+  end
+```
+
+**关键修正**：原设计把「无 `id`」「带 `result`/`error`」「数组/二进制」当作放行理由，形成 4 条可复现绕过（评审 CRITICAL #1）。现行判据只有一条：**解析后是否含 `method` 字符串**。
+
+### 2.4 切换工作区（hero 写参数 vs 会话内 move）
+
+```mermaid
+sequenceDiagram
+  participant U as 用户
+  participant W as WorkspacePicker
+  participant G as Gateway
+
+  U->>W: 选 /w/b
+  alt hero（activeId=null）
+    W->>W: selection.cwd="/w/b"
+    Note over W: 仅改 create 参数；发送时 cwd_explicit:true，0 RPC
+  else 会话内
+    W->>G: session.workspace.move{session_key: storedId, cwd:"/w/b"}
+    alt 成功
+      G-->>W: ok
+    else 失败
+      G-->>W: error → 回滚 selection.cwd，展示 message
+    end
+  end
+```
+
+## 3. 模块与接口设计
+
+### 3.1 新增/修改文件清单
+
+```
+apps/web/src/chat/
+├── Composer.tsx                    [改] + variant prop；data-variant 布局；拆出附件 chip 区
+├── ChatPage.tsx                    [改] hero 分支；移除 9 按钮工具栏；发送编排改延迟绑定
+├── SessionHeaderMenu.tsx           [新] 连接/导入/导出/分享/重命名
+├── HeroIntro.tsx                   [新] hero 专属（大标识 + 标题 + 最近会话），Composer 共享
+├── composer/
+│   ├── index.ts                    [新] 导出
+│   ├── ComposerControls.tsx        [新] pill 行 + 底行布局壳
+│   ├── ModelPicker.tsx             [新] controlled
+│   ├── AgentPicker.tsx             [新] controlled
+│   ├── WorkspacePicker.tsx         [新] controlled
+│   ├── PermissionPicker.tsx        [新] 权限模式（yolo）
+│   ├── UploadMenu.tsx              [新] 文件/图片/PDF + 子代理/命令/上下文/人格/图片生成入口
+│   ├── MenuButton.tsx              [新] APG Menu Button 原语（REQ-016）
+│   ├── useSessionControls.ts       [新] 状态机 + RPC
+│   ├── pendingAttachments.ts       [新] 纯函数
+│   ├── modelCatalog.ts             [新] WS model.options 归一化
+│   ├── agentOptions.ts             [新] me.profiles 归一化
+│   └── variant.ts                  [新] deriveComposerVariant
+└── (既有 SlashMenu/ReferenceMenu/工具卡/面板保持不变)
+
+apps/server/src/hermes/
+├── proxy.ts                        [改] WS 守卫：帧分类 + profile 校验 + 响应帧过滤（REQ-015）
+└── proxy.test.ts                   [改] 越权/放行/响应帧用例
+
+apps/server/src/routes/
+└── hermes.ts                       [改] 抽出可复用的 profile 判定（保持 REST 行为不变）
+
+apps/web/src/styles.css             [改] hero/docked/pill/chip/menu 样式（全 --ds-*）
+apps/web/src/i18n/zh.ts             [改] 新增文案 key
+apps/web/src/api/ws.ts              [改] 支持读取 error.data.code 字符串（REQ-008 可断言）
+```
+
+### 3.2 `useSessionControls` 接口
+
+```ts
+export type ModelSwitchState =
+  | { status: "idle" }
+  | { status: "pending"; target: string }
+  | { status: "deferred"; target: string }
+  | { status: "confirm"; target: string; message?: string }
+  | { status: "error"; target: string; message: string };
+
+export interface SessionSelection {
+  profile: string | null;
+  model: string | null;
+  cwd: string | null;
+  yolo: string;
+}
+
+export interface PendingAttachment {
+  id: string;
+  kind: "image" | "file" | "pdf";
+  file: File;
+  name: string;
+  size: number;
+  previewUrl?: string;
+}
+
+export interface UseSessionControlsArgs {
+  gateway: Gateway;
+  activeId: string | null;
+  identity: SessionIdentity | null;
+  running: boolean;
+  me: { profiles: string[]; default_profile: string | null } | null;
+  itemCount: number;
+  onError: (message: string) => void;
+}
+
+export interface SessionControls {
+  variant: ComposerVariant;
+  identityReady: boolean;      // activeId!==null && identity?.storedId===activeId
+  selection: SessionSelection;
+  options: {
+    agents: AgentOption[];
+    models: ModelOption[];
+    workspaces: string[];
+    loading: { agents: boolean; models: boolean; workspaces: boolean };
+  };
+  modelSwitch: ModelSwitchState;
+  confirmModel(): Promise<void>;
+  cancelModelConfirm(): void;
+  attachments: PendingAttachment[];
+  attach(files: File[]): void;
+  removeAttachment(id: string): void;
+  clearAttachments(): void;
+  /** 逐条 attach*，fail-fast；**single-flight**：发送进行中重复调用为 no-op */
+  uploadAll(runtimeId: string): Promise<void>;
+  /** 发送编排入口；**single-flight**：进行中重复调用返回同一 Promise，不重复 create */
+  send(text: string): Promise<SendOutcome>;
+  selectProfile(name: string | null): void;
+  selectModel(name: string): Promise<void>;
+  selectWorkspace(path: string | null): Promise<void>;
+  selectYolo(mode: string): Promise<void>;
+  buildCreateParams(): {
+    profile?: string;
+    cwd?: string;
+    cwd_explicit?: true;   // 仅显式选目录时存在
+    model?: string;
+  };
+  /** 由 ChatPage 在收到 message.complete 时调用；仅当 modelSwitch.status==="deferred" 时发 RPC（REQ-010a） */
+  reconcileModel(): Promise<void>;
+  resetForNewSession(): void;
+}
+
+export type SendOutcome =
+  | { ok: true }
+  | { ok: false; message: string; stage: "create" | "attach" | "submit" };
+
+export function useSessionControls(args: UseSessionControlsArgs): SessionControls;
+```
+
+**注**：原设计中的 `syncFromSession(info)` 已**删除**——契约无 `session.info`，改为 `reconcileModel()`（内部调 `model.options{session_id}`）。
+
+**内部结构**：`selection` + `attachments` 用 `useReducer(controlsReducer, ...)`（纯函数可穷举）；`options` / `modelSwitch` 用 `useState`；RPC 异步放在 dispatch 外层，保证 reducer 是纯函数。
+
+### 3.3 `previewUrl` 生命周期（防内存泄漏）
+
+- 创建：`attach()` 内仅对 `kind === "image"` 调 `URL.createObjectURL(file)`，URL 记入 `createdUrlsRef: Set<string>`。
+- **恰好 revoke 一次的 4 个时机**：`removeAttachment(id)` / `clearAttachments()` / 发送成功后清 chip / hook 卸载（`useEffect(() => () => revokeAll(), [])`）。revoke 后 `delete` 该 URL（StrictMode 双 mount 下防止二次 revoke）。
+- 被拒附件（>10MB / 超 10 个）**不创建** URL。
+- base64 由 `FileReader.readAsDataURL` 异步产出，不阻塞主线程 > 50ms。
+
+### 3.4 options 会话键与缓存迁移（防重复加载）
+
+NFR 要求「选项加载每会话 ≤ 1 次」，但 hero 态 `activeId === null` → create 成功后变为 storedId，**朴素以 `activeId` 为键会加载 2 次**。
+
+**定义**：
+
+| 场景 | 缓存键 | 行为 |
+|---|---|---|
+| hero（`activeId === null`） | 占位键 `"__hero__"` | 加载 `me.profiles`（REST）、`model.options{profile: default_profile}`、`chat/workspaces?profile=...` |
+| create 成功（拿到 storedId） | **迁移**：把 `"__hero__"` 的条目改键为 `storedId`，**不重载** | 已加载的 models/workspaces 直接复用 |
+| 切会话（resume） | 键 = 目标 storedId | 未命中才加载 |
+| `profiles` 选择变更 | 键追加 `::${profile}`，视为新条目 | 重载 `model.options` / `workspaces`（租户上下文变了） |
+
+**不变量**：同一 `(storedId, profile)` 组合在一次页面生命周期内加载 ≤ 1 次；StrictMode 双挂载由 `Map` 缓存 + `inFlight` Promise 去重保证。
+
+`useSessionControls` 的 options 加载须携带 `profile` 参数（REQ-019）：`model.options{profile}`、`/api/hermes/chat/workspaces?profile=<name>`。
+
+## 4. 数据模型与归一化
+
+### 4.1 WS `model.options` → `ModelCatalog`（**不复用** `settings/model.ts`）
+
+```ts
+export interface ModelCapabilities { fast?: boolean; reasoning?: boolean }
+export interface ModelOption {
+  id: string; provider: string; label: string;
+  capabilities: ModelCapabilities; authenticated: boolean;
+  pricing?: { inputPerM?: number; outputPerM?: number };
+}
+export interface ModelCatalog {
+  options: ModelOption[];
+  current: { model: string | null; provider: string | null };
+}
+export function normalizeModelCatalog(payload: unknown): ModelCatalog;
+```
+
+| 目标 | 来源优先级 | 缺失回退 |
+|---|---|---|
+| provider | `providers[].slug\|id\|name\|provider` | `""` |
+| model id | `providers[].models[]`（string 或对象 `id/name/model`）；顶层 `models[]`/`options[]` | 丢弃该条（**不臆造**） |
+| label | 对象 `label/display_name` | = id |
+| capabilities | `provider.capabilities[id].{fast,reasoning}` | `{}` |
+| authenticated | `provider.authenticated ?? model.authenticated` | `false` |
+| pricing | `model.pricing`（数值容错） | `undefined` |
+| current | 顶层 `model` / `provider` | `null` |
+| 去重键 | `${provider}::${id}` | — |
+
+**为何不复用**：`settings/model.ts#normalizeModelOptions`（`model.ts:27-50`）只认扁平 `models`/`options` 并产出 `string[]`，**拿不到** `providers[].models` 与 `capabilities[model].fast` → `Flash` 徽标无法取值。改动它会牵动 `ModelPanel` 及其测试（T8.2 已验收）→ 新建独立模块。
+
+### 4.2 `agentOptions` ← `/api/auth/me`
+
+```ts
+export interface AgentOption { name: string; isDefault: boolean; avatarUrl?: string }
+export function normalizeAgentOptions(me: { profiles?: unknown; default_profile?: unknown } | null): AgentOption[];
+```
+
+规则：仅接受 `me.profiles` 为字符串数组；trim + 去重；`isDefault = default_profile ∈ profiles`，否则取 `profiles[0]`；缺失/非数组 → `[]`。**绝不回退 `profiles.list`**（REQ-002 不变量）。头像需另取，本期先用首字占位（`avatarUrl` 留空，实现阶段确认 `/api/auth/me` 是否带头像）。
+
+### 4.2b `model.options` 的调用参数（REQ-019）
+
+```
+model.options{ profile: <当前 selection.profile 或 default_profile>, session_id?: <runtimeId> }
+```
+
+- hero 态：只传 `profile`（无 session）。
+- 会话内：同时传 `session_id: runtimeId`，使回包 `model` 为**该会话的实时模型**（对齐用途，见 REQ-010a）。
+- **不得**发起不带 `profile` 的 `model.options` 调用。
+
+### 4.3 workspace
+
+复用现有 `apps/web/src/chat/types.ts#normalizeWorkspaces`（`:112`），不新增。
+
+### 4.4 新增 normalizer（`agentOptions` / `modelCatalog`）放入**新测试文件**，不动 `types.test.ts` / `settings/model.ts`。
+
+## 5. API / RPC 设计（只用官方契约，无新契约）
+
+| 动作 | 通道 | 方法 | 身份键 / 租户上下文 |
+|---|---|---|---|
+| 创建会话（hero 发送） | L1 WS | `session.create{profile?, model?, cwd?, cwd_explicit?}` | `profile` = 当前选择（非 super_admin 由 BFF 注入 default） |
+| 恢复历史会话 | L1 WS | `session.resume{session_id: stored}` | 入参 stored，回包 runtime |
+| 切模型（会话内） | L1 WS | `config.set{key:"model", value, session_id, confirm_expensive_model?}` | **runtime** |
+| 切权限模式 | L1 WS | `config.set{key:"yolo", value, session_id, scope:"session"}` | **runtime** |
+| 模型清单 / 对齐 | L1 WS | `model.options{profile, session_id?}` | **必须带 `profile`**（REQ-019） |
+| 切工作区（会话内） | L1 WS | `session.workspace.move{session_key, cwd}` | **stored** |
+| 上传图片 | L1 WS | `image.attach_bytes{content_base64, filename, ext?}` | **runtime** |
+| 上传文件 | L1 WS | `file.attach{data_url, name}` | **runtime** |
+| 上传 PDF | L1 WS | `pdf.attach{content_base64, filename}` | **runtime** |
+| 发消息 | L1 WS | `prompt.submit{text, session_id}` | **runtime** |
+| 重命名 | L1 WS | `session.title{session_id, title}` | **runtime** |
+| 停止 | L1 WS | `session.interrupt{session_id}` | **runtime** |
+| 智能体选项 | BFF REST | `GET /api/auth/me` → `{profiles[], default_profile}` | 会话 cookie |
+| 工作区列表 | BFF REST | `GET /api/hermes/chat/workspaces?profile=<name>` | **必须带 `profile`**（REQ-012） |
+| 已删除 | — | ~~`session.info`~~ | **不存在**；参见 `session.status`（仅 `output: str`，不可用于对齐） |
+
+**错误结构**：REST `{error, message}`；WS `{jsonrpc, id, error:{code:<number>, message, data:{code:"<STRING>"}}}`。为支持 REQ-008 的命名错误码断言，需扩展 `apps/web/src/api/ws.ts:112-119` 读取 `error.data.code`。
+
+## 6. 错误处理矩阵
+
+| 失败点 | 错误来源 | UI 表现 | 状态回滚 | 可重试 |
+|---|---|---|---|---|
+| create 失败 | WS `session.create` error | 输入框容错条（`role=alert`）透传 message；保留 hero | 不建 identity；不 append 乐观项；保留 draft/chip | 是 |
+| attach 失败 | WS `*.attach*` error | 透传 message；标注第几个附件失败 | 已成功的 attach 不撤销（网关侧副作用保留）；**不 submit**；保留剩余 chip | 是（复用 identity） |
+| submit 失败 | WS `prompt.submit` error | 透传 message；助手气泡不出现 | docked 已 append 的乐观 user 项按 `ui-spec.md §2` 合并/回滚文本；`running=false` | 是 |
+| 模型 deferred | 回包 `{deferred:true}` | 中性提示「将于下一回合生效」；目标模型高亮 | **不回滚**目标值（网关已 stash）；收到该会话的 **`message.complete`** 事件后由 `reconcileModel()` 调 `model.options{session_id}` 并以回包 **`model`** 回正（不一致则回滚 + 提示「切换未生效」） | 否（等回合） |
+| 模型 confirm 取消 | 用户点取消 | 弹窗关闭，无错误条 | `selection.model` 回滚到变更前；无落库 | 是 |
+| yolo 失败 | `config.set{key:"yolo"}` error | 透传 message | 选中态回滚（REQ-013） | 是 |
+| workspace.move 失败 | 回包 error | 透传 message | `selection.cwd` 回滚；会话实际 cwd 不变 | 是 |
+| 10MB / 超 10 个 | 前端校验（无 RPC） | `role=alert`：「文件 X 超过 10MB 上限」；其余合法文件照常入 chip | 被拒文件不入 chip | 是 |
+| WS 守卫 403 | BFF 同 id 回 `PROFILE_FORBIDDEN` | 透传「无权访问该 profile」；控件回安全值 | 不产生会话；`selection.profile` 回退到 `me.profiles` 内 | 否（换授权 profile） |
+| identity 未就绪 | `identityReady===false` | 控件禁用 + 「恢复中…」；发送按钮置灰 | 本地拦截，0 条 runtime-id RPC 外发 | 是（resume 完成后放行） |
+| `profiles.list` 被过滤 | REQ-015 | 智能体页对 admin 只显示已分配 profile（预期行为） | — | 否 |
+
+> 统一：所有网关/上游 message **原样透传**，不替换为泛化文案。
+
+## 7. 安全设计
+
+### 7.1 WS 守卫插入点与 default-deny 判据
+
+插入点：`apps/server/src/hermes/proxy.ts#bridge()` 的 `socket.on("message", ...)` 回调**最前面**（`:40-46`）。理由：只覆盖客户端上行帧（下行在 `:76`），天然不误拦服务端响应/事件；且在 `pending` 入队**之前**拦截，冷启动竞态下越权帧也不会在 `ws.on("open")` 冲刷时漏出。
+
+**分类（default-deny，唯一判据 = 解析后是否含 `method` 字符串）**：
+
+| 输入 | 判定 | 处理 |
+|---|---|---|
+| **二进制帧**（`isBinary === true`） | 非合法 L1 帧 | **拒绝**：回 `error:400`（可读 message），不转发 |
+| 文本帧但 JSON 解析失败 | 非法 | **拒绝**：回 `error:400`，不转发 |
+| JSON 数组（batch） | 逐元素分类 | 每个元素：含 `method` → 按 request 守卫 + 租户注入；越权元素 → 以错误数组回应该 `id`；其余元素正常转发 |
+| JSON 对象**含 `method` 字符串**（**无论**有无 `id`、**无论**是否带 `result`/`error`） | **request** | 施加 profile 守卫（7.1.1）与租户上下文注入（7.1.2） |
+| JSON 对象**不含 `method`** | 客户端回包/通知 | 直接转发（审批/secret/sudo 回包在此路径） |
+| 其它（`null` / 数字 / 字符串 / 布尔） | 非法 | **拒绝** |
+
+**禁止**的免拦理由（评审 CRITICAL #1 的 4 条绕过路径）：
+1. ❌「无 `id` 所以是通知」→ 含 `method` 即 request
+2. ❌「带 `result`/`error` 所以是响应」→ 含 `method` 即 request
+3. ❌「数组批帧一律放行」→ 必须逐元素处理
+4. ❌「二进制帧放行」→ 必须拒绝
+
+**须在 `proxy.ts` 中导出一个稳定接口供响应侧复用**：
+
+```ts
+export interface FrameClassification {
+  kind: "request" | "response" | "notification" | "batch" | "invalid" | "binary";
+  id?: number | string;
+  method?: string;
+  profile?: string;
+  elements?: FrameClassification[];   // kind === "batch"
+}
+export function classifyFrame(data: RawData, isBinary: boolean): FrameClassification;
+```
+
+TASK-003 负责实现并导出该函数；TASK-029（响应过滤）依赖它，**不得**自行解析帧文本。
+
+#### 7.1.1 profile 守卫（REQ-008）
+
+- 提取 `frame.params.profile`（顶层非空字符串）。
+- `super_admin` → 放行。
+- `profile` 存在且非 `super_admin` → `userCanAccessProfile(db, request.user.id, profile)`（复用 `users/repo.ts:139-144`）；未分配 → 同 `id` 回 `{error:{code:403, message:"无权访问该 profile", data:{code:"PROFILE_FORBIDDEN"}}}`，**不转发、不入 pending**。
+- `request.user` 由 `requireAuth` 注入（`proxy.test.ts` 已证明无 cookie 时连接被拒）。
+
+#### 7.1.2 租户上下文注入（REQ-017）
+
+- 非 `super_admin` 且 `profile` **缺省**时：若 `method` 前缀命中 `session.` / `profiles.` / `mcp.` / `skills.` → 注入 `params.profile = 调用者 default_profile`（来自 `user_profiles.is_default`，回退为任一已分配 profile）。
+- 无任何已分配 profile → 同 `id` 回 403 `PROFILE_FORBIDDEN`，不转发。
+- `super_admin` **不注入**（保持全量视野，与 REQ-015 的 super_admin 分支一致）。
+- 理由：`session.list` / `session.resume` / `session.events.since` 以会话 id 寻址、不含 `profile`，不注入将落到**启动 profile** 的存储 → 跨租户。
+- **已知残余**：前缀白名单的完备性须以官方 `method(...)` 全清单核对（风险 R14）。
+
+### 7.2 REQ-015：`profiles.list` 响应帧过滤（fail-closed）
+
+`profiles.list` **无 `params.profile`**（7.1.2 注入后仍会返回全量），需在**响应方向**处理：
+
+1. BFF 用 `classifyFrame` 记录「发起了 `profiles.list` / `profiles.describe` 的 request id」到 `pendingProfileReads: Map<id, {userId, kind}>`（**batch 元素的 id 也要记录**）。
+2. 上游回包中匹配该 id 的帧：按调用者 `user_profiles` 白名单过滤 `result.profiles[]` 后下发。
+3. **fail-closed**：若响应非 JSON、结构不符（缺 `profiles` 键、`profiles` 非数组）、或过滤过程中任何异常 → **不下发该响应**，回 `{error:{code:500, message:"profiles 过滤失败"}}`。**绝不**原样透传全量。
+4. `profiles.describe{name}`：`name` 不在白名单 → 回 403 `PROFILE_FORBIDDEN`。
+5. `super_admin` 不过滤。
+6. 上限：`pendingProfileReads` 须有长度上限与超时清理（避免泄漏）；上游永不响应时按超时移除。
+
+### 7.3 为什么「前端白名单」不构成边界
+
+- WS 客户端可被任意脚本（devtools / XSS / 外部 `curl` + 会话 cookie）驱动；`AgentPicker` 的 `options ⊆ me.profiles` 只是**渲染约束**，不阻止手工构造 `{method:"session.create", params:{profile:"px"}}`。
+- 浏览器不持 Hermes token，但 **BFF 会话 cookie 即授权凭证**：cookie 认证的 WS 一旦建立，非授权 profile 的请求同样能到达 BFF 并被转发。HttpOnly/CSRF 防的是 token 窃取与跨站写，**不防已认证用户自发的帧伪造**。
+- 唯一可信边界在 **BFF（服务端 `userCanAccessProfile`）**；前端白名单是 UX 与防误操作。
+
+### 7.4 已知偏差登记
+
+| 偏差 | 说明 | 补偿控制 |
+|---|---|---|
+| WS 单帧可达 10MB（base64 ≈13.3MB），OWASP 建议 ≤64KB | 契约无分片通道 | >2MB 等待态；失败复用 identity 不重复 create；建议 BFF 显式设 `maxPayload`；`proxy.ts:33-46` 的 `pending`/`outbound` 需上限；网关上限实测（R3/R11） |
+| 服务端 magic bytes 校验落点未定 | `File.type` 仅客户端声明 | 客户端仅作 UX 预筛；实测网关，若不做则 BFF 补（R10，独立任务） |
+| BFF 无帧大小/队列上限（评审 MEDIUM #14） | `proxy.ts:33-34` 的 `pending`/`outbound` 为无界数组，10MB（≈13.3MB base64）单帧在冷启动队列下被放大 | **REQ-018**：显式设 `maxPayload` 与队列长度上限；超限回可读错误并仅终止该连接 |
+| 契约源码在仓库外，判定不可 CI 复核（评审 LOW #16） | 所有「以官方源码为准」的断言无法被本仓库独立验证 | **TC-016**：归档可核验的契约片段到 `contracts-evidence.md`（TASK-033） |
+
+## 8. 测试策略
+
+> 工具：`vitest` + `@testing-library/react`。仓库**无 `fast-check`**；属性测试用「确定性生成器 + 遍历表」实现，不新增依赖。
+
+### 8.1 纯函数层（属性测试）
+
+| 模块 | Invariant | 生成器 / 边界 |
+|---|---|---|
+| `pendingAttachments.screenFiles` | 入 chip 者恒 `size ≤ 10MB`；单批 ≤ 10；超限不影响合法项 | 随机 `(name,size,type)`，边界 `{0, 10MB, 10MB+1}`，第 11 个 |
+| `pendingAttachments.kindOf` | `image/*→image`、`application/pdf→pdf`、其余 `→file` | 随机 MIME + 无 MIME |
+| `pendingAttachments.dedupe` | 输出无 `(name,size,lastModified)` 重复；合法不同文件不误删 | 随机含重复项列表 |
+| `deriveComposerVariant` | `hero ⊕ docked`；`hero ⟺ activeId===null && itemCount===0` | `activeId∈{null,"a"}` × `itemCount∈{0,1,n}` |
+| `normalizeModelCatalog` | 任意 JSON 不抛；无重复键；缺失不臆造 | 随机嵌套对象/数组/字符串/null |
+| `normalizeAgentOptions` | 返回 name 集合 ⊆ `me.profiles` | profiles 空/缺字段/重复/非数组 |
+| `reconcileModel` 触发器 | 仅 `modelSwitch.status === "deferred"` 时发起；每次 `message.complete` 至多 1 次 | `modelSwitch` 状态 ∈ {idle, pending, deferred, confirm, error} × 事件次数 ∈ {0,1,2,n} |
+| `optionsCache` 会话键 | 同一 `(storedId, profile)` 恒 ≤ 1 次加载；hero→create 后**迁移**而非重载 | `activeId ∈ {null, "s1"}` × `profile ∈ {null, "p1"}` × 重复触发 |
+| `classifyFrame` | 含 `method` 恒为 `request`（不论 `id`/`result`/`error`）；二进制恒 `binary`；非法 JSON 恒 `invalid`；数组恒 `batch` 且逐元素 | 4 条绕过路径的构造帧、合法响应帧、通知帧、`null`/数字/字符串 |
+| `send` single-flight | 进行中重复调用恒不产生第 2 次 `session.create` | 并发双击、attach 挂起中再次触发 |
+| `cwd` 透传 | hero 恒 `cwd_explicit:true`（仅显式选目录）；相对路径恒原样透传 | `""` / `"./x"` / `/abs` / 未选 |
+
+> 说明：上表末 5 行为本次对抗性评审回环新增的属性；原 REQ-006 / REQ-010 / REQ-011 / REQ-014 / REQ-015 对应的既有属性行已在 `requirements.md §6` 同步更新（并发 single-flight、deferred 回正、过滤 fail-closed）。
+
+### 8.2 组件层
+
+- `ModelPicker`：选项数 = `options.models.length`；`identityReady===false` → `disabled`；仅 `capabilities.fast` 渲染只读 `Flash` 徽标；`confirm` 态渲染 `role="alertdialog"`。
+- `AgentPicker`（hero）：选项恒 = `me.profiles`，**不含** `profiles.list` 结果；docked 只读 + 提示「切换将新建会话」。
+- `UploadMenu` / 拖拽 / 粘贴：drop 3 文件 → 3 chip 且 `gateway.requests.length===0`；粘贴走 `ClipboardEvent`，断言**无** `clipboard.paste` / `input.detect_drop`。
+- `ComposerControls`：底行 DOM 集合精确匹配；断言 `voice-live` 与 branch pill 不存在。
+- `MenuButton`（REQ-016）：打开 → `aria-expanded="true"`；`Esc` → 关闭且 `document.activeElement` 为触发元素；子项均有 `role="menuitem"`。
+- `SessionHeaderMenu`：恰 5 个 `menuitem`；重命名回包用 runtime id。
+
+### 8.3 集成层（调用序断言，基于 `fakeGateway.requests` / `paramsOf`）
+
+```ts
+const methods = gateway.requests.map((r) => r.method);
+expect(methods.indexOf("session.create")).toBeLessThan(methods.indexOf("prompt.submit"));
+expect(gateway.paramsOf("session.create")[0]).toMatchObject({
+  model: "m-b", cwd: "/w/a", cwd_explicit: true,
+});
+// attach 用 runtime id（create 回包刻意 ≠ stored）
+expect(gateway.paramsOf("image.attach_bytes")[0].session_id).toBe("runtime:new");
+// 失败分支：第 2 个 attach 抛错 → 0 次 submit
+expect(gateway.paramsOf("prompt.submit")).toHaveLength(0);
+// workspace 用 stored
+expect(gateway.paramsOf("session.workspace.move")[0]).toEqual({ session_key: "s1", cwd: "/w/b" });
+```
+
+另测：身份未就绪点发送 → `prompt.submit` 长度 0；`config.set` 参数含 `session_id:"runtime:..."`；`deferred` 后出现提示；`confirm_required` 后首次不落库、确认后第二次带 `confirm_expensive_model:true`。
+
+### 8.4 BFF 层（`proxy.test.ts`）
+
+复用 `loginAndGetCookies` + `startEchoUpstream`（需扩展「记录收到的原始帧」）+ `messageQueue`。**必须覆盖评审 CRITICAL #1 的 4 条绕过路径**：
+
+| # | 用例 | 预期 |
+|---|---|---|
+| 1 | `admin` 未分配 `px` 发 `{id:1,method:"session.create",params:{profile:"px"}}` | 同 `id` 403 `PROFILE_FORBIDDEN`；上游未收到 |
+| 2 | **绕过 A**：同帧**省略 `id`**（通知化） | **拒绝**且上游未收到 |
+| 3 | **绕过 B**：同帧附 `"error":null`（或 `"result":null`） | **拒绝**且上游未收到 |
+| 4 | **绕过 C**：`[{...same...}]` 数组批帧 | 逐元素守卫；越权元素被拒；上游未收到越权部分 |
+| 5 | **绕过 D**：把帧以 **binary** 发送 | 拒绝且上游未收到 |
+| 6 | 非法 JSON 文本帧 | 拒绝（回 `error:400`） |
+| 7 | **误拦防护**：上游发 server→client request（`{id:9,method:"approval"}`），客户端回 `{id:9,result:{choice:"once"}}` | 上游收到该结构（无 `method` → 直转） |
+| 8 | **回归**：`profiles.list{include_sessions:false}`（无 `profile`） | 放行转发（`super_admin`） |
+| 9 | **REQ-017**：`admin`（default=`alpha`）发 `{method:"session.list",params:{}}` | 转发帧的 `params.profile === "alpha"` |
+| 10 | **REQ-017**：`admin` 无任何分配 profile 发 `session.list` | 403 且不转发 |
+| 11 | **REQ-018**：上行帧超 `maxPayload` | 可读错误 + 仅该连接关闭 |
+| 12 | **REQ-015**：`admin` 发 `profiles.list` | 回包 `profiles[]` 仅含已分配 |
+| 13 | **REQ-015 fail-closed**：上游返回 `{nope:1}` | 不下发全量，回错误 |
+
+### 8.5 StrictMode / 幂等
+
+- `<StrictMode>`：附件不重复入 chip（id 去重）；`session.create` 不双调；options 每会话 ≤1 次（hook 内 `ref` 以 `activeId` 为缓存键）。
+- `previewUrl` 卸载 revoke 后重挂不重复 revoke（`Set` 清除）。
+- `ChatPage.strictmode.test.tsx` 既有 `message.complete` 单注册不变量保持不变。
+
+## 9. 迁移与兼容
+
+### 9.1 现有测试的影响
+
+| 文件 | 是否必改 | 最小改法 |
+|---|---|---|
+| `Composer.test.tsx` | **改** | 新 props 全部可选且带默认（`variant="docked"`、controller 可省）；`移除引用`/`发送`/`停止`/`添加附件` aria-label **不得改名** |
+| `ChatPage.test.tsx` | **改（多处）** | ① 附件（`:369-384`）：由「即时 `file.attach`」改为「入 chip 0 RPC；发送时 create→attach→submit」；② 导入/导出/分享/清理：按钮移入 `SessionHeaderMenu`，需先点会话头菜单；③ 工作区：由 `<select aria-label="工作区">` 改 pill，**尽量保留 `工作区` 文案**；④ 子代理 toggle：移入 `＋` 菜单，需先展开 |
+| `ChatPage.integration.test.tsx` | 低风险 | `resume`+`prompt.submit` 契约不变；若 `handleSend` 改为返回 outcome 需同步 mock 返回值 |
+| `ChatPage.strictmode.test.tsx` | 不改 | 事件订阅不变量无关；确保 `Composer` 默认 props 下渲染成功 |
+| `slash.test.ts` / `types.test.ts` | 不改 | 新增 normalizer 放**新文件**（`composer/modelCatalog.test.ts` / `agentOptions.test.ts`） |
+| `api/ws.test.ts` | **改** | 新增断言：`error.data.code` 字符串可被解析（REQ-008 命名错误码） |
+
+### 9.2 `styles.css` 类名
+
+- **新增**：`.chat-hero`、`.chat-hero-brand`、`.chat-hero-title`、`.chat-hero-pills`、`.composer[data-variant="hero"|"docked"]`、`.composer-pill`、`.composer-pill[data-active="true"]`、`.composer-bottom-row`、`.composer-spacer`、`.pill-menu`、`.pill-menu-item`、`.upload-menu`、`.attach-dropzone`、`.attach-dropzone[data-dragover="true"]`、`.model-flash-badge`、`.model-confirm`、`.sync-banner`、`.attachment-thumb`。
+- **修改**：`.composer`（加 `data-variant` 分支、hero 居中最大宽度）、`.attachment-chip`（图片缩略图变体）。
+- **复用不改**：`.composer-input`、`.attachment-remove`、`.composer-slash`、`.chat-header`、`.chat-header-actions`。
+- **废弃候选**（确认无引用后删）：`.chat-toolbar`、`.chat-import`、`.chat-workspace`。
+- **圆角一律 `--ds-radius-*`**（代码中不存在 `corner-shape`）。
+- **a11y 修复**：`.composer-file` 若为 `display:none` → 改 visually-hidden（`clip-path: inset(50%)`），并在 `input:focus` 时给 label 可见指示。
+- **布局建议**：聊天主区 `container-type: inline-size; container-name: chat`，用 `@container chat (width < 600px)` 响应自身宽度（侧栏折叠/详情让步时媒体查询感知不到）；hero↔docked 过渡只动 `transform`/`opacity`；hero 容器预留稳定 `min-height` 防 CLS；transcript 维持默认 `overflow-anchor` 并显式实现「是否贴底」判定（距离阈值），不依赖浏览器默认。
+- **BFF 上限**：`hermes/proxy.ts` 显式设置 `maxPayload`（建议与 10MB base64 上界对齐并留余量）与 `pending`/`outbound` 队列长度上限；超限回可读错误。
+- **帧分类复用**：`classifyFrame` 必须从 `proxy.ts` 导出，供响应过滤（REQ-015）复用，避免两处独立解析帧文本。
+
+### 9.3 后端既有调用点
+
+`AgentsPage.tsx:90`、`GroupChatPage.tsx:66` 调 `profiles.list {include_sessions:false}`（无 `params.profile`）→ 7.1 守卫放行，**功能不受影响**；REQ-015 上线后按白名单过滤（预期行为变化，需在测试中显式覆盖）。
+
+## 10. 实施顺序（与 tasks.md 波次对应）
+
+1. **Wave 0**：订正 4 份基线 + `docs/TASKS.md` + `task-list.md`（红线强制先行）
+2. **Wave 1（安全与守卫同波次，可并行）**：WS default-deny 守卫 + 稳定 `classifyFrame` 接口 + `profiles.list` 响应过滤（fail-closed）+ `default_profile` 注入 + `maxPayload`/队列上限 + `ws.ts` 错误码解析 + 纯函数/归一化 + `fakeGateway` 扩展 + `MenuButton` 原语 + 契约片段归档
+3. **Wave 2**：展示组件（picker / upload / composer variant / 会话头菜单）
+4. **Wave 3**：ChatPage 装配（双态 + single-flight 延迟绑定发送编排 + 模型三态与回正 + 工作区/权限 + 会话头菜单）
+5. **Wave 4**：测试补齐（a11y / 集成 / StrictMode / BFF 13 例）
+6. **Wave 5**：`npm run check` 全绿 + 基线一致性复核
+
+> **安全项同波次原则（PR-011）**：REQ-008 / REQ-015 / REQ-017 / REQ-018 全部落在 Wave 1，不得跨波次交付。

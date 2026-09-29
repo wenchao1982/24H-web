@@ -52,7 +52,7 @@
 | T4.1 | M3 | 内部凭证（BFF 获取访问 Hermes token） | — | 能调 `/api/status` | 已验收 |
 | T4.2 | M3 | REST 代理 `/api/hermes/*` → Hermes `/api/*` | T4.1,T2.7 | 转发成功 | 已验收 |
 | T4.3 | M3 | profile 守卫（目标 profile 校验权限） | T4.2,T3.5 | 越权 403 | 已验收 |
-| T4.4 | M3 | WS 代理 `/api/hermes/ws`（先认证再代理） | T4.1,T2.7 | 收发事件 | 已验收 |
+| T4.4 | M3 | WS 代理 `/api/hermes/ws`（先认证再代理；含 `method` 帧 default-deny profile 守卫 + 租户注入 + 响应过滤） | T4.1,T2.7 | 收发事件 | 已验收 |
 | T4.5 | M3 | 代理错误归一 | T4.2 | 错误一致 | 已验收 |
 | T4.6 | M3 | 上游健康探测 + 降级提示 | T4.1 | 断开可提示 | 已验收 |
 | T4.7 | M3 | 连接管理（多 Hermes 实例 registry） | T4.1 | 可切换实例 | 已验收 |
@@ -98,7 +98,7 @@
 | T7.4 | M6 | MCP 管理（列表/增删/启停/目录） | T4.2 | 可管理 | 已验收 |
 | T7.5 | M6 | 插件（`plugins.manage` 列表/启停） | T4.2 | 可管理 | 已验收 |
 | T8.1 | M6 | Keys 管理（`/api/env`，不回显明文） | T4.2 | 可保存 | 已验收 |
-| T8.2 | M6 | 模型设置（`/api/model/*`） | T4.2 | 可切换 | 已验收 |
+| T8.2 | M6 | 模型设置（`/api/model/*`；设置=全局默认，对话页=本会话覆盖） | T4.2 | 可切换 | 已验收 |
 | T8.3 | M6 | 外观（主题/语言） | — | 生效 | 已验收 |
 | T8.4 | M6 | 配置中心（`/api/config`） | T4.2 | 可改 | 已验收 |
 | T7.6 | M6 | 技能安装（hub 搜索/安装/更新） | T7.1 | 可安装 | 已验收 |
@@ -239,6 +239,49 @@
 | T23.16 | M16 | Codex Runtime `/codex-runtime` | T8.2 | 可切换 | 已验收 |
 | T23.17 | M16 | Subscription Proxy | T18.14 | 可配置 | 已验收 |
 | T23.18 | M16 | Bot Screen（边缘，可后置） | T17.1 | 可查看 | 已验收 |
+
+## M17 对话页重构（Spec 003-composer-redesign）
+
+> Spec：[`.psd/specs/003-composer-redesign/v1.0.0-20260929-173000/`](.psd/specs/003-composer-redesign/v1.0.0-20260929-173000/)（requirements / design / tasks / constitution / manifest）。
+> **唯一「下一步」入口**：按 Wave 顺序执行，前置未验收不得开启后继；安全项（REQ-008 / 015 / 017 / 018）同波次（Wave 1）。验证命令固定 `npm run check`，e2e 单独 `npm run test:e2e`。
+
+| 编号 | 模块 | 描述 | 前置依赖 | 验收标准 | 状态 |
+| --- | --- | --- | --- | --- | --- |
+| TASK-001 | M17 | Wave0 订正 4 份基线（AGENTS.md / requirement.md / ui-spec.md / architecture.md） | — | 关键词 grep（`hero`/`WS 租户守卫`/`两级模型`/`--ds-radius` 命中、`corner-shape` 零命中） | 已验收 |
+| TASK-002 | M17 | Wave0 订正 docs/TASKS.md（T8.2/T4.4/T6.11）+ 更新 task-list.md（新增 M17） | TASK-001 | `rg "T8.2\|T4.4"` 语义一致、M17 段存在 | 已验收 |
+| TASK-003 | M17 | Wave1 `proxy.ts` default-deny 帧分类（导出 `classifyFrame`）+ profile 守卫 + 注入 | TASK-001 | 单测 + 评审：4 条绕过路径拒绝 | 待开始 |
+| TASK-004 | M17 | Wave1 `proxy.test.ts` 13 例（4 绕过 + 误拦防护 + REQ-017/018/015） | TASK-003 | vitest（server）全绿 | 待开始 |
+| TASK-029 | M17 | Wave1 REQ-015 `profiles.list`/`describe` 响应白名单过滤 + fail-closed | TASK-003 | vitest：过滤 + fail-closed + 上限清理 | 待开始 |
+| TASK-030 | M17 | Wave1 REQ-017 缺失 `params.profile` 注入 `default_profile` | TASK-003 | vitest：注入 / 无分配 403 / super_admin 不注入 | 待开始 |
+| TASK-031 | M17 | Wave1 REQ-018 WS `maxPayload` + `pending`/`outbound` 队列上限 | TASK-003 | vitest：超限拒绝且不影响他连接 | 待开始 |
+| TASK-005 | M17 | Wave1 `chat/composer/pendingAttachments.ts` 纯函数（预筛/kindOf/dedupe/readAsBase64） | — | vitest + 边界遍历 + 断言未读超限内容 | 待开始 |
+| TASK-006A | M17 | Wave1 `composer/controlsReducer.ts` 纯 reducer（selection/attachments/single-flight） | — | vitest：状态转移 + 回滚无残留 | 待开始 |
+| TASK-006B | M17 | Wave1 `composer/useOptions.ts` options 生命周期 + 会话键缓存迁移 | — | vitest：缓存迁移（≤1 次）+ 参数含 `profile` | 待开始 |
+| TASK-006C | M17 | Wave1 `composer/useSessionControls.ts` RPC + 模型状态机 + `reconcileModel` + single-flight | TASK-006A | vitest：三态 + 回正 + single-flight + hero 不被拦截 | 待开始 |
+| TASK-007 | M17 | Wave1 `composer/modelCatalog.ts` + `agentOptions.ts` 归一化（绝不回退 `profiles.list`） | — | vitest 新文件 | 待开始 |
+| TASK-008 | M17 | Wave1 `test/fakeGateway.ts` 扩展 + `api/ws.ts` 读 `error.data.code` | — | 既有测试全绿 + `ws.test.ts` 新断言 | 待开始 |
+| TASK-028 | M17 | Wave1 `composer/MenuButton.tsx` APG 原语 + 修 `SessionList` 两处菜单 | — | vitest a11y + `SessionList` 回归 | 待开始 |
+| TASK-032 | M17 | Wave1 REQ-015 过滤行为测试 | TASK-029 | vitest（server） | 待开始 |
+| TASK-033 | M17 | Wave1 归档 `contracts-evidence.md` | — | 文件存在且与官方源码逐条对应 | 待开始 |
+| TASK-009 | M17 | Wave2 `composer/ComposerControls.tsx`（hero pill 行 + 底行；无 voice/git） | TASK-006A,TASK-028 | 结构断言（DOM 集合精确匹配） | 待开始 |
+| TASK-010 | M17 | Wave2 `composer/ModelPicker.tsx`（本会话覆盖 + Flash 徽标 + deferred/confirm） | TASK-006C,TASK-007,TASK-028 | 组件测试（三态） | 待开始 |
+| TASK-011 | M17 | Wave2 `composer/AgentPicker.tsx`（选项恒 = `me.profiles`；docked 只读） | TASK-007 | 组件测试（不含 `profiles.list` 值） | 待开始 |
+| TASK-012 | M17 | Wave2 `composer/WorkspacePicker.tsx` + `PermissionPicker.tsx` | TASK-006A,TASK-006B,TASK-007 | 组件测试（回滚断言） | 待开始 |
+| TASK-013 | M17 | Wave2 `composer/UploadMenu.tsx` + 拖拽/粘贴（浏览器 API；禁 `clipboard.paste`） | TASK-005,TASK-028 | 组件测试（drop/paste；0 RPC） | 待开始 |
+| TASK-014 | M17 | Wave2 `chat/SessionHeaderMenu.tsx`（连接/导入/导出/分享/重命名） | TASK-028 | 组件测试（恰 5 项） | 待开始 |
+| TASK-015 | M17 | Wave2 改 `Composer.tsx` 双态单实例（`variant`/`data-variant`） | TASK-005,TASK-009,TASK-013 | 组件测试 + `Composer.test.tsx` 回归 | 待开始 |
+| TASK-016 | M17 | Wave3 `ChatPage.tsx` 双态渲染 + 新建 `chat/HeroIntro.tsx` | TASK-015 | 集成测试（hero/docked 互斥） | 待开始 |
+| TASK-017 | M17 | Wave3 发送编排延迟绑定（create → attach* → submit）+ single-flight | TASK-008,TASK-015,TASK-030 | 集成测试（调用序 + single-flight） | 待开始 |
+| TASK-018 | M17 | Wave3 模型提交路径接线（hero/会话内/deferred/confirm/`message.complete` 回正） | TASK-006C,TASK-010,TASK-017 | 集成测试（三态 + 回正） | 待开始 |
+| TASK-019 | M17 | Wave3 权限模式接线（`config.set{key:"yolo",scope:"session"}` + 回滚） | TASK-006A,TASK-012,TASK-017 | 集成测试 | 待开始 |
+| TASK-020 | M17 | Wave3 会话头菜单接入 + 身份键正确性（`workspace.move`=stored） | TASK-014,TASK-017 | 集成测试（身份键断言） | 待开始 |
+| TASK-021 | M17 | Wave3 `styles.css` hero/docked/pill/chip/menu（仅 `--ds-*`，圆角 `--ds-radius-*`） | TASK-015 | token grep + 视觉自查 | 待开始 |
+| TASK-022 | M17 | Wave4 组件 a11y / 键盘测试（APG、`Esc` 焦点归还、`role`） | TASK-009..015,TASK-028 | vitest | 待开始 |
+| TASK-023 | M17 | Wave4 ChatPage 集成（顺序/single-flight/10MB/回正/confirm） | TASK-016..021 | vitest | 待开始 |
+| TASK-024 | M17 | Wave4 StrictMode 幂等 + 4001 有界重试回归 + hero 发送不禁用 | TASK-016,TASK-017 | vitest | 待开始 |
+| TASK-025 | M17 | Wave4 BFF 守卫端到端（帧分类视角，4 绕过 + 放行 + 注入 + 超限） | TASK-003,TASK-004 | vitest（server） | 待开始 |
+| TASK-026 | M17 | Wave4 （可选，单独跑）e2e：hero 上传（点击 + 拖拽）→ 发送 → docked | TASK-023 | `npm run test:e2e` | 待开始 |
+| TASK-027 | M17 | Wave5 `npm run check` 全绿 + 基线一致性复核（防漂移） | TASK-001..026, TASK-028..033 | `npm run check` + 人工比对清单 | 待开始 |
 
 ## 后续任务（待开发）
 

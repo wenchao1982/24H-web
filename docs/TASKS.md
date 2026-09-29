@@ -53,7 +53,7 @@
 | T4.1 | 内部凭证 | BFF 获取/配置访问 Hermes 的 token（loopback） | — | — | 能调 `/api/status` |
 | T4.2 | REST 代理 | `/api/hermes/*` → Hermes `/api/*`（注入 token） | T4.1,T2.7 | BFF→L2 | 转发成功 |
 | T4.3 | profile 守卫 | 解析请求的目标 profile 并校验权限 | T4.2,T3.5 | BFF | 越权 403 |
-| T4.4 | WS 代理 | `/api/ws`：先认证再代理到 Hermes | T4.1,T2.7 | BFF→L1 | 收发事件 |
+| T4.4 | WS 代理 | `/api/ws`：先认证再代理到 Hermes；含 `method` 帧 **default-deny profile 守卫** + 缺失 `profile` 注入 `default_profile` + `profiles.list` 响应白名单过滤 | T4.1,T2.7 | BFF→L1 | 收发事件 |
 | T4.5 | 代理错误归一 | 上游错误 → 统一结构 | T4.2 | BFF | 错误一致 |
 | T4.6 | 上游健康探测 | BFF→Hermes `/api/status` 探活 + 降级提示 | T4.1 | BFF→L2 | 断开可提示 |
 | T4.7 | 连接管理 | 多个 Hermes 实例的增删/选择/探活（registry） | T4.1 | BFF | 可切换实例 |
@@ -83,7 +83,7 @@
 | T6.8 | 状态条 | 上下文/用量/速率（`thinking`/`done`/`error`） | T6.3 | L1 | 显示统计 |
 | T6.9 | 会话管理 | 重命名/删除/恢复（`session.title/delete/resume`） | T6.1 | L1 | 操作生效 |
 | T6.10 | 断线重放 | `session.events.since` 重建挂起状态 | T6.3 | L1 | 刷新可续 |
-| T6.11 | 附件 | 图片/文件/PDF 上传（`image/pdf/file.attach`） | T6.3 | L1 | 可发送 |
+| T6.11 | 附件 | 图片/文件/PDF 上传（`image.attach_bytes` / `file.attach{data_url}` / `pdf.attach{content_base64}`）；**延迟绑定**（先入 chip，发送时才 attach） | T6.3 | L1 | 可发送 |
 | T6.12 | 会话搜索 | 全文搜索（标题+内容，防抖） | T6.1 | L2 | 可搜索 |
 | T6.13 | 会话导入/导出/分享 | import / export（+分享链接） | T6.1 | L2 | 可导入导出 |
 | T6.14 | 会话清理 | prune / 批量删除 | T6.1 | L2 | 可清理 |
@@ -99,7 +99,7 @@
 | T7.4 | MCP 管理 | `/api/mcp/*`（列表/增删/启停/目录）（落点：智能体页） | T4.2 | L2 | 可管理 |
 | T7.5 | 插件 | `plugins.manage`（列表/启停）（落点：设置） | T4.2 | L1/L2 | 可管理 |
 | T8.1 | Keys 管理 | `/api/env` 读写（不回显明文）（落点：设置） | T4.2 | L2 | 可保存 |
-| T8.2 | 模型设置 | `/api/model/*`（info/options/set/moa）（落点：设置） | T4.2 | L2 | 可切换 |
+| T8.2 | 模型设置 | `/api/model/*`（info/options/set/moa）（落点：设置=全局默认；对话页=本会话覆盖，走 L1 `config.set`/`model.options`） | T4.2 | L2 | 可切换 |
 | T8.3 | 外观 | 主题/语言（落点：设置） | — | — | 生效 |
 | T8.4 | 配置中心 | `/api/config`（config.yaml 常用项）（落点：设置） | T4.2 | L2 | 可改 |
 | T7.6 | 技能安装（hub） | `POST /api/skills` + hub 搜索/安装/更新（落点：智能体页） | T7.1 | L2 | 可安装 |

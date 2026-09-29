@@ -105,7 +105,32 @@ interface SessionIdentity { storedId: string; runtimeId: string }
 
 **打断契约**：`session.interrupt` 入参 `session_id` 用 **runtime id**，回包 `{status:"interrupted"|"not_interrupted"}`；打断后网关仍发 `message.complete`，`status ∈ {complete,error,interrupted}`（`contracts/events.py` TurnStatus），`status="error"` 时另有 `error`/`recoverable`/`error_surface`/`partial`。用户停止会清除 durable turn marker，**不会**触发 auto-continue（仅进程崩溃遗留 marker 才会）。
 
-## 7. 详见
+## 7. 对话控件：两级模型语义 + WS 租户守卫 + 10MB 偏差
+
+### 7.1 模型两级语义（hero vs 会话内）
+
+- **hero 态（`activeId === null`）**：模型选择**只写入待创建参数**，发送时随 `session.create{model}` 下发；**不发 `config.set`**，前端**不预判「昂贵」**（`session.create` 无 `confirm_expensive_model` 字段）。
+- **会话内**：发 `config.set{key:"model", value, session_id: runtimeId}`。回合**运行中**网关把切换 stash 到下一回合并回 `deferred:true`，前端提示「将于下一回合生效」，**不得热切**。
+- **回合结束后回正（REQ-010a）**：收到该会话 **`message.complete`** 事件后，调 `model.options{session_id: runtimeId}` 并以回包 **`model`** 字段回正选中态；若 `model` ≠ 用户选择（stash 被 turn start 丢弃）则回滚并提示「切换未生效」。
+- **对齐来源**：契约**不存在 `session.info`**；`session.status` 回包仅 `{output: str}`，**不可**用于对齐。唯一结构化来源是 `model.options{session_id}` 回包的 `model` / `provider`。
+- 昂贵模型以网关 `config.set` 回包的 `confirm_required` 为**唯一判据**：确认后以 `confirm_expensive_model:true` 重发，取消则回滚选中态。
+- `model.options` / 工作区列表请求**必须携带 `profile`**（租户上下文明确，REQ-019 / REQ-012）。
+
+### 7.2 WS 租户守卫（BFF 代理，default-deny）
+
+- **唯一判据 = 解析后是否含 `method` 字符串**（不论有无 `id`、不论是否带 `result`/`error`）。凡含 `method` 一律按 request 施加守卫；**JSON 数组批帧逐元素**分类与守卫；**二进制帧与 JSON 解析失败一律拒绝**；`null`/数字/字符串/布尔拒绝。**禁止**以「无 `id`＝通知」「带 `result`/`error`＝响应」「数组/二进制放行」为由免拦。
+- **`params.profile` 守卫**：非 `super_admin` 且 `params.profile` 指向未分配 profile → 以**同 `id`** 回 `403 PROFILE_FORBIDDEN`，**不转发、不入 pending**。
+- **租户上下文注入（REQ-017）**：非 `super_admin` 的 `session.*` / `profiles.*` / `mcp.*` / `skills.*` 帧缺失 `params.profile` 时，注入调用者 `default_profile`（`user_profiles.is_default`，回退任一已分配）；无任何分配 → 403；`super_admin` **不注入**。
+- **响应侧过滤（REQ-015）**：对 `profiles.list` 响应按调用者 `user_profiles` 白名单过滤 `result.profiles[]` 后再下发；**fail-closed**——响应非 JSON、缺 `profiles` 键或非数组、过滤异常一律**不下发并回错误**，**绝不放行全量**；`super_admin` 不过滤。响应过滤复用 `proxy.ts` 导出的 `classifyFrame`，不得自行解析帧文本。
+- 判据与 REST 侧 `assertProfileAccess` / `userCanAccessProfile` 同语义；前端 `me.profiles` 白名单仅作 UX 约束，**不是**安全边界。
+
+### 7.3 10MB 单帧偏差与补偿控制
+
+- **偏差登记**：本设计允许 WS 单帧承载上传内容，base64 后 10MB ≈ 13.3MB；OWASP 建议 WS 消息 ≤64KB，本设计**显著超出**（契约无分片通道）。
+- **补偿控制**：① 前端**预筛**——单文件 >10MB、单批 >10 个在**读取内容之前**拒绝；② **REQ-018** 为 BFF WS 显式设 `maxPayload` 与 `pending`/`outbound` 队列长度上限（不依赖 `ws` 库默认值），超限回可读错误并**仅**终止该连接；③ 单文件 >2MB 显示等待态，失败重试**复用 identity**、不重复 `session.create`；④ 端到端可达性以**实测**为准；网关拒绝则原样透传 message。
+- 服务端 magic bytes 校验落点（Hermes 或 BFF）**未定**，客户端 `File.type` 仅作 UX 预筛；列为独立任务。
+
+## 8. 详见
 
 - 完整分层与关键流：[`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
 - 接口清单（BFF / L1 / L2）：[`docs/INTERFACES.md`](./docs/INTERFACES.md)

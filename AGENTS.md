@@ -37,6 +37,8 @@
 - **两级角色**：`super_admin`（全权 + 管理用户）/ `admin`（仅被分配 profile）。
 - **租户边界 = Hermes profile**：`user_profiles` 分配；统一守卫
   `user.role === 'super_admin' || userCanAccessProfile(user.id, profile)`。
+- **智能体 = Hermes profile**：对话页智能体选项**只取 `/api/auth/me` 的 `me.profiles[]`**（不回退
+  `profiles.list` 全量）；会话内切换智能体**强开新会话**（已建会话的 pill 只读）。
 - 口令 **argon2id**；**首登强制改密**；登录限流/锁定；**保护最后一个 active super_admin**。
 - **审计**所有管理操作。
 
@@ -46,6 +48,9 @@
 - BFF → Hermes：官方 **L1 `/api/ws`** + **L2 `/api/*`**；契约以官方生成文件为准
   （`gateway-contract.generated.ts` / OpenRPC），**不要猜 Hermes 内部 schema**。
 - 服务端 → 客户端请求（`approval`/`clarify`/`sudo`/`secret`）必须回包（同一 `id`）。
+- **WS 租户守卫**：BFF 代理对含 `method` 的帧 **default-deny**（数组批帧逐元素；二进制/解析失败一律拒绝），
+  越权以同 `id` 回 403 `PROFILE_FORBIDDEN` 且不转发；响应侧对 `profiles.list` 按白名单过滤 + **fail-closed**；
+  非 `super_admin` 的 `session.*`/`profiles.*`/`mcp.*`/`skills.*` 帧缺失 `params.profile` 时注入 `default_profile`。
 - 完整清单见 `docs/INTERFACES.md`。
 
 ## 6. 验证
@@ -86,6 +91,7 @@ npm run check     # typecheck（web + server + shared）+ vitest（server + web�
 | `apps/web/src/api/ws.ts` | 对话 WS JSON-RPC 客户端 |
 | `apps/web/src/pages/` | 登录 / 用户管理 |
 | `apps/web/src/{chat,agents,groups,tasks,usage,settings,details,notifications}/` | 各功能模块与设置面板 |
+| `apps/web/src/chat/composer/` | 对话页输入区控件（hero/docked 双态、pill、上传、菜单；**M17 规划落点**） |
 | `apps/server/src/index.ts` | BFF 入口：开库 → 迁移 → `ensureFirstAdmin` → listen |
 | `apps/server/src/config.ts` | env：`PORT` / `HERMES_BASE_URL` / `DB_PATH` |
 | `apps/server/src/http/app.ts` | Fastify 装配：统一错误 + CSRF + 会话中间件 + 路由 |

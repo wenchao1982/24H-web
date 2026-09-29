@@ -1,0 +1,66 @@
+{
+  "specId": "003-composer-redesign",
+  "version": "1.0.0",
+  "timestamp": "2026-09-29T17:30:00Z",
+  "description": "对话页重构（hero/docked 双态 + 会话控件）＋ WS 租户边界闭合",
+  "author": "spec-agent",
+  "status": "approved-for-build",
+  "parentVersion": null,
+  "changes": [
+    "REQ-001 hero/docked 双态渲染",
+    "REQ-002~004 三 pill（智能体/工作区/模型）与会话头 ··· 菜单（连接/导入/导出/分享/重命名）",
+    "REQ-005~007 浏览器侧上传三通道（点击/拖拽/粘贴）＋ 10MB 与单批 10 个预筛（读取内容前拒绝）",
+    "REQ-008 WS 代理 default-deny 帧分类（原 4 条绕过路径闭合）",
+    "REQ-009~013 模型两级语义 / deferred 回正 / 昂贵模型二次确认 / 工作区 / 权限模式",
+    "REQ-014 身份未就绪守卫（hero 态不适用）",
+    "REQ-015 profiles.list 响应按白名单过滤 ＋ fail-closed",
+    "REQ-016 WAI-ARIA APG Menu Button",
+    "REQ-017 缺失 params.profile 时注入调用者 default_profile",
+    "REQ-018 WS maxPayload 与 pending/outbound 队列上限",
+    "REQ-019 model.options 携带 profile",
+    "Wave 0 基线订正：AGENTS.md / requirement.md / ui-spec.md / architecture.md / docs/TASKS.md / task-list.md"
+  ],
+  "reviewResult": {
+    "verdict": "DEFEND",
+    "reviewer": "adversarial-reviewer",
+    "timestamp": "2026-09-29T17:30:00Z",
+    "rounds": [
+      {"severity": "CRITICAL", "issue": "帧分类 fail-open：以「无 id=通知」「带 result/error=响应」「数组/二进制放行」为免拦理由，形成 4 条可复现绕过", "resolution": "REQ-008 改写为 default-deny（凡含 method 即守卫；数组逐元素；二进制与解析失败一律拒绝）；constitution A-006 / N-013 / N-014 同步"},
+      {"severity": "MEDIUM", "issue": "单任务覆盖 REQ 过多", "resolution": "TASK-006 拆为 TASK-006A/006B/006C"},
+      {"severity": "MEDIUM", "issue": "BFF 无帧大小/队列上限（pending/outbound 为无界数组）", "resolution": "新增 REQ-018 + TASK-031"},
+      {"severity": "LOW", "issue": "契约源码在仓库外，安全判据不可被 CI 独立复核", "resolution": "TC-016 + TASK-033 归档 contracts-evidence.md"}
+    ]
+  },
+  "evidence": {
+    "gatewaySourceRoot": "/vol1/@apphome/trim.openclaw/data/home/hermes-desktop/home/hermes-agent/tui_gateway/",
+    "contracts": [
+      "contracts/common.py:221-231 (ProfileParams / SessionParams)",
+      "contracts/sessions.py:118-147 (SessionCreateParams：cwd / cwd_explicit / model)",
+      "contracts/sessions.py:174-191 (session.resume 入参 stored，回包 session_id runtime)",
+      "contracts/sessions.py:326-349 (workspace.move[session_key] / cwd.set[session_id])",
+      "contracts/config_free_tier_control.py:74-107 (ConfigSetParams.confirm_expensive_model)",
+      "contracts/config_free_tier_control.py:216-280 (model.options → {providers, model, provider})",
+      "contracts/prompt_voice.py:120-131 / 134-161 / 164-183 (image.attach_bytes / pdf.attach / file.attach)",
+      "contracts/prompt_voice.py:104-109 (clipboard.paste = 宿主侧，浏览器不可用)",
+      "contracts/prompt_voice.py:199-215 (input.detect_drop = 仅终端拖拽文本)",
+      "contracts/events.py:205 (message.complete 回合结束)",
+      "methods_config_set.py:73-91 (运行中模型切换 stash，回 deferred)",
+      "methods_profiles.py:266-285 (profiles.list 不按调用者过滤)",
+      "prompt_turn.py:622 (turn start 应用/丢弃 stash)"
+    ],
+    "baselineDriftVerifiedInRepo": [
+      "apps/web/src/styles.css 中 `corner-shape` 零命中、`--ds-radius-sm/md/lg/pill` 齐备 → ui-spec.md 的「corner-shape 超椭圆」表述确属基线漂移",
+      "requirement.md / ui-spec.md 早已写「模型就地切换」，但 Composer.tsx 从未实现",
+      "docs/TASKS.md 存在 T4.4 / T6.11 / T8.2，与规格描述一致"
+    ]
+  },
+  "knownGaps": [
+    "REQ-017 的 method 前缀白名单完备性未闭合（R14）",
+    "服务端 magic bytes 校验落点未定（R10）",
+    "WS 大帧端到端可达性未实测（R15）",
+    "hero 态昂贵模型无二次确认（REQ-011a / Q-009）",
+    "··· 菜单「连接」语义未定（Q-006）",
+    "/api/auth/me 是否返回头像未验证（Q-007）",
+    "契约片段尚未归档为 contracts-evidence.md（TASK-033）"
+  ]
+}
