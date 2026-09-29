@@ -49,8 +49,14 @@
   （`gateway-contract.generated.ts` / OpenRPC），**不要猜 Hermes 内部 schema**。
 - 服务端 → 客户端请求（`approval`/`clarify`/`sudo`/`secret`）必须回包（同一 `id`）。
 - **WS 租户守卫**：BFF 代理对含 `method` 的帧 **default-deny**（数组批帧逐元素；二进制/解析失败一律拒绝），
-  越权以同 `id` 回 403 `PROFILE_FORBIDDEN` 且不转发；响应侧对 `profiles.list` 按白名单过滤 + **fail-closed**；
-  非 `super_admin` 的 `session.*`/`profiles.*`/`mcp.*`/`skills.*` 帧缺失 `params.profile` 时注入 `default_profile`。
+  越权以同 `id` 回 403 `PROFILE_FORBIDDEN` 且不转发；响应侧对 `profiles.list` 按白名单过滤，
+  **仅「成功但结构不符」fail-closed，上游错误帧（`{id,error}`）原样透传**；
+  非 `super_admin` 的 request 帧缺失 `params.profile` 时，**除命中显式 profile-agnostic 豁免清单外一律注入
+  `default_profile`**（豁免清单：`ping` / `gateway.capabilities` / `client.capabilities` / `commands.catalog` /
+  `complete.path` / `complete.slash` / `llm.oneshot`），无可用 profile → 403 不转发；
+  **禁止「包含式前缀白名单」**（`session.*`/`profiles.*`/`mcp.*`/`skills.*`，遗漏即 fail-open）；
+  队列上限同时约束**条数 + 累计字节**（`pendingBytes ≤ K × maxPayload`，`maxPayload` 双 socket 生效）；
+  **守卫拒绝与响应过滤 fail-closed 必写 `audit`**（actor/profile/method/ip/结果/时间戳，不含 token/密钥/字节）。
 - 完整清单见 `docs/INTERFACES.md`。
 
 ## 6. 验证
