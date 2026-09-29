@@ -757,3 +757,93 @@ describe("ChatPage 会话身份对（stored/runtime id）", () => {
     expect(await screen.findByRole("button", { name: "发送" })).toBeInTheDocument();
   });
 });
+
+describe("ChatPage REQ-012 message.complete 结束本轮与推理渲染", () => {
+  function makeGateway() {
+    return createFakeGateway((method) =>
+      method === "session.list" ? { sessions: [{ id: "s1", title: "会话一" }] } : {},
+    );
+  }
+
+  it("(a) resets the composer to 发送 after message.complete", async () => {
+    const gateway = makeGateway();
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+
+    await user.type(screen.getByLabelText("消息"), "跑起来");
+    await user.click(screen.getByRole("button", { name: "发送" }));
+    expect(screen.getByRole("button", { name: "停止" })).toBeInTheDocument();
+
+    act(() => {
+      gateway.emit("message.complete", { session_id: "runtime:s1", text: "完成了" });
+    });
+    expect(await screen.findByRole("button", { name: "发送" })).toBeInTheDocument();
+  });
+
+  it("(b) renders text promoted from reasoning distinctly", async () => {
+    const gateway = makeGateway();
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+
+    await user.type(screen.getByLabelText("消息"), "问题");
+    await user.click(screen.getByRole("button", { name: "发送" }));
+
+    act(() => {
+      gateway.emit("message.complete", {
+        session_id: "runtime:s1",
+        text: "让我想想",
+        reasoning: "让我想想",
+      });
+    });
+
+    expect(screen.getByText("思考过程")).toBeInTheDocument();
+    expect(screen.getByText("让我想想").closest(".bubble")).toHaveAttribute(
+      "data-reasoning",
+      "true",
+    );
+  });
+
+  it("(c) leaves a normal completion without the reasoning flag", async () => {
+    const gateway = makeGateway();
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+
+    await user.type(screen.getByLabelText("消息"), "问题");
+    await user.click(screen.getByRole("button", { name: "发送" }));
+
+    act(() => {
+      gateway.emit("message.complete", { session_id: "runtime:s1", text: "正常回复" });
+    });
+    expect(screen.queryByText("思考过程")).not.toBeInTheDocument();
+    expect(screen.getByText("正常回复").closest(".bubble")).not.toHaveAttribute("data-reasoning");
+
+    act(() => {
+      gateway.emit("message.complete", {
+        session_id: "runtime:s1",
+        text: "另一种回复",
+        reasoning: "与答复不同的推理",
+      });
+    });
+    expect(screen.queryByText("思考过程")).not.toBeInTheDocument();
+    expect(screen.getByText("另一种回复").closest(".bubble")).not.toHaveAttribute("data-reasoning");
+  });
+
+  it("(d) still resets the composer on a legacy done event", async () => {
+    const gateway = makeGateway();
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+
+    await user.type(screen.getByLabelText("消息"), "跑起来");
+    await user.click(screen.getByRole("button", { name: "发送" }));
+    expect(screen.getByRole("button", { name: "停止" })).toBeInTheDocument();
+
+    act(() => {
+      gateway.emit("done", { session_id: "runtime:s1" });
+    });
+    expect(await screen.findByRole("button", { name: "发送" })).toBeInTheDocument();
+  });
+});

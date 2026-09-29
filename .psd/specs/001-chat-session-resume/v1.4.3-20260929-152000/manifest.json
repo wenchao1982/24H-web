@@ -1,0 +1,16 @@
+{
+  "specId": "001-chat-session-resume",
+  "version": "1.4.3",
+  "timestamp": "2026-09-29T15:20:00Z",
+  "description": "Patch: (A) Hermes 无 done 事件导致输入框永远卡在「停止」——改为在 message.complete 复位 running；(B) 模型纯推理回合被 Hermes 提升为 text，客户端加 isReasoningOnly 判定并渲染为「思考过程」块。",
+  "author": "spec-agent",
+  "status": "implemented",
+  "parentVersion": "1.4.2",
+  "changes": [
+    "REQ-017 message.complete 复位 running/status",
+    "REQ-018 text===reasoning 时渲染「思考过程」块（data-reasoning + 标签）",
+    "REQ-019 done 事件保留作前向兼容",
+    "Transcript/styles 新增思考块弱化样式"
+  ],
+  "reviewResult": null
+}

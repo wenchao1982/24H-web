@@ -11,7 +11,14 @@ export default function Transcript({ items }: { items: TranscriptItem[] }) {
       {items.map((item) => {
         if (item.kind === "message") {
           return (
-            <div key={item.id} className="bubble" data-role={item.role} data-streaming={item.streaming}>
+            <div
+              key={item.id}
+              className="bubble"
+              data-role={item.role}
+              data-streaming={item.streaming}
+              data-reasoning={item.reasoning ? "true" : undefined}
+            >
+              {item.reasoning ? <span className="bubble-label">思考过程</span> : null}
               {item.text}
             </div>
           );

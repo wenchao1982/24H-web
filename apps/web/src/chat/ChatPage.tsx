@@ -28,6 +28,7 @@ import {
   completeAssistant,
   deltaText,
   errorText,
+  isReasoningOnly,
   matchesRuntime,
   normalizeCreatedIdentity,
   normalizeReplayed,
@@ -181,7 +182,11 @@ export default function ChatPage() {
       if (!pair || !matchesRuntime(payload, pair.runtimeId)) {
         return;
       }
-      setItems((current) => completeAssistant(current, deltaText(payload), nextId()));
+      setItems((current) =>
+        completeAssistant(current, deltaText(payload), nextId(), isReasoningOnly(payload)),
+      );
+      setRunning(false);
+      setStatus({ phase: "done" });
     }),
     gateway.on("tool.start", (payload) => {
       const pair = activePair();

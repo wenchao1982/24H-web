@@ -44,7 +44,14 @@ export interface Attachment {
 }
 
 export type TranscriptItem =
-  | { kind: "message"; id: string; role: "user" | "assistant"; text: string; streaming?: boolean }
+  | {
+      kind: "message";
+      id: string;
+      role: "user" | "assistant";
+      text: string;
+      streaming?: boolean;
+      reasoning?: boolean;
+    }
   | {
       kind: "tool";
       id: string;
@@ -186,15 +193,41 @@ export function completeAssistant(
   items: TranscriptItem[],
   text: string,
   id: string,
+  reasoning = false,
 ): TranscriptItem[] {
   const last = items[items.length - 1];
   if (last && last.kind === "message" && last.role === "assistant" && last.streaming) {
-    return [...items.slice(0, -1), { ...last, text: text || last.text, streaming: false }];
+    return [
+      ...items.slice(0, -1),
+      {
+        ...last,
+        text: text || last.text,
+        streaming: false,
+        ...(reasoning ? { reasoning: true } : {}),
+      },
+    ];
   }
   if (text) {
-    return [...items, { kind: "message", id, role: "assistant", text, streaming: false }];
+    return [
+      ...items,
+      {
+        kind: "message",
+        id,
+        role: "assistant",
+        text,
+        streaming: false,
+        ...(reasoning ? { reasoning: true } : {}),
+      },
+    ];
   }
   return items;
+}
+
+/** `message.complete` 是否把推理当作答复（text 与 reasoning 同文，且 reasoning 非空）。 */
+export function isReasoningOnly(payload: Record<string, unknown>): boolean {
+  const raw = payload.reasoning;
+  if (typeof raw !== "string" || raw.trim() === "") return false;
+  return raw.trim() === deltaText(payload).trim();
 }
 
 /** `tool.*` 事件的工具名。 */

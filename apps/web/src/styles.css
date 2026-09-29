@@ -688,6 +688,19 @@ button {
   border: var(--ds-hairline) solid var(--ds-border-l1);
 }
 
+.bubble[data-reasoning="true"] {
+  background: var(--ds-surface-l3);
+  color: var(--ds-label-secondary);
+  font-size: var(--ds-font-size-sm);
+}
+
+.bubble-label {
+  display: block;
+  margin-bottom: var(--ds-space-1);
+  color: var(--ds-label-tertiary);
+  font-size: var(--ds-font-size-xs);
+}
+
 .notice {
   margin: 0;
   font-size: var(--ds-font-size-sm);
