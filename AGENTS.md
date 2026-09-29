@@ -110,3 +110,30 @@ npm run check     # typecheck（web + server + shared）+ vitest（server + web�
 - 规格来源：`docs/{ARCHITECTURE,INTERFACES,TASKS,UI}.md`（改接口先看这些，契约为准）。
 - **未采用**：Kanban 状态列看板；可视化编排画布（节点=agent）——见 `docs/UI.md`。
 - **TODO(future)**：IdP 接入（新增 `AuthProvider` 的 `oidc` 实现）。
+
+## 11. 红线规则（Spec 工作流）
+
+1. **变更先改 4 份基线文档**（`AGENTS.md` / `requirement.md` / `ui-spec.md` / `architecture.md`）
+   → **更新 `task-list.md`** → **再改代码**。
+2. **正式开发用 Spec 模式、禁 Vibe**；应急用 Build，事后必须补回基线文档。
+3. **任务顺序执行**：前置任务未验收，不得开启后继任务。
+4. **质量门不过不进人工验收**（`npm run check` 必须全绿）。
+5. **每 3–5 个任务重置会话**，避免上下文污染。
+
+> 工作流说明见 [`CONTRIBUTING.md`](./CONTRIBUTING.md)、[`opencode.json`](./opencode.json)。
+
+## 12. 根级 Spec 文件
+
+| 文件 | 作用 |
+| --- | --- |
+| `opencode.json` | Spec 工作流配置（`opencode-vibe-spec` 插件 + `instructions` + 只读 `ask` agent） |
+| `AGENTS.md` | 本文件；协作/架构/硬性约定（基线） |
+| `requirement.md` | 业务需求（基线） |
+| `ui-spec.md` | UI 规范（基线） |
+| `architecture.md` | 架构/接口约定（基线） |
+| `task-list.md` | 任务看板（动态更新，唯一"下一步"入口） |
+| `test-report.md` | 测试报告模板 + 当前汇总 |
+| `deploy.md` | A2 部署要点 |
+| `CONTRIBUTING.md` | Spec 驱动工作流快速卡片 |
+
+> 根文件为**精简入口**，细节一律链接 `docs/*`（避免双份维护漂移）。
