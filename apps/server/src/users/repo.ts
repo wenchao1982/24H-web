@@ -143,6 +143,15 @@ export function userCanAccessProfile(db: Db, userId: number, profile: string): b
   return row !== undefined;
 }
 
+/**
+ * 租户上下文注入所用 profile（REQ-017 / REQ-022）：
+ * `is_default` 优先，回退任一已分配，无任何分配则 `null`。
+ */
+export function resolveDefaultProfile(db: Db, userId: number): string | null {
+  const { profiles, defaultProfile } = listUserProfiles(db, userId);
+  return defaultProfile ?? profiles[0] ?? null;
+}
+
 export interface UserSummary {
   id: number;
   username: string;

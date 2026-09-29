@@ -4,8 +4,8 @@ import { api } from "../api/client";
 import { isSessionNotFound } from "../api/ws";
 import { useMediaQuery } from "../shell/useMediaQuery";
 import { useDetails } from "../shell/details-context";
+import { useOptionalSession } from "../auth/SessionProvider";
 import { Icon } from "../ui/icons";
-import { Button, EmptyState } from "../ui";
 import { t } from "../i18n";
 import SessionList from "./SessionList";
 import Transcript from "./Transcript";
@@ -17,6 +17,9 @@ import ImageGenAction from "./ImageGenAction";
 import CommandPanel from "./CommandPanel";
 import ContextFilesPanel from "./ContextFilesPanel";
 import PersonalityPanel from "./PersonalityPanel";
+import SessionHeaderMenu from "./SessionHeaderMenu";
+import HeroIntro from "./HeroIntro";
+import { ComposerControls, useSessionControls, type UploadPanelKind } from "./composer";
 import {
   normalizeCatalog,
   normalizeCompletions,
@@ -36,7 +39,6 @@ import {
   normalizeReplayed,
   normalizeResumedId,
   normalizeSessions,
-  normalizeWorkspaces,
   parseStatus,
   settleTools,
   toolDetail,
@@ -45,7 +47,6 @@ import {
   toolResult,
   turnStatus,
   upsertTool,
-  type Attachment,
   type PendingRequest,
   type RequestKind,
   type SessionIdentity,
@@ -71,6 +72,7 @@ function readFileText(file: File): Promise<string> {
 export default function ChatPage() {
   const gateway = useGateway();
   const details = useDetails();
+  const session = useOptionalSession();
   const narrow = useMediaQuery("(max-width: 900px)");
   const [view, setView] = useState<"list" | "chat">("list");
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
@@ -78,28 +80,50 @@ export default function ChatPage() {
   const [identity, setIdentity] = useState<SessionIdentity | null>(null);
   const [filter, setFilter] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [items, setItems] = useState<TranscriptItem[]>([]);
   const [pending, setPending] = useState<PendingRequest[]>([]);
   const [running, setRunning] = useState(false);
   const [status, setStatus] = useState<StatusInfo | null>(null);
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [searchResults, setSearchResults] = useState<SessionSummary[] | null>(null);
   const [shareLink, setShareLink] = useState<string | null>(null);
-  const [workspaces, setWorkspaces] = useState<string[]>([]);
-  const [workspace, setWorkspace] = useState("");
   const [subagentsOpen, setSubagentsOpen] = useState(false);
   const [imageOpen, setImageOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
   const [personalityOpen, setPersonalityOpen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [renameDraft, setRenameDraft] = useState("");
   const [commands, setCommands] = useState<SlashCommand[]>([]);
 
   const activeIdRef = useRef<string | null>(null);
   const identityRef = useRef<SessionIdentity | null>(null);
   const attachInFlightRef = useRef<Map<string, Promise<ResolvedSession>>>(new Map());
   const respondersRef = useRef(new Map<string, (result: Record<string, unknown>) => void>());
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const sendingRef = useRef(false);
   const seqRef = useRef(0);
   const nextId = useCallback(() => `i${seqRef.current++}`, []);
+
+  const me = useMemo(() => {
+    const user = session?.user;
+    if (!user) {
+      return null;
+    }
+    return { profiles: user.profiles ?? [], default_profile: user.default_profile ?? null };
+  }, [session?.user]);
+
+  const controls = useSessionControls({
+    gateway,
+    activeId,
+    identity,
+    running,
+    me,
+    itemCount: items.length,
+    onError: (message) => setError(message),
+  });
+  const selectionProfile = controls.selection.profile;
+  const { buildCreateParams, uploadAll, clearAttachments } = controls;
 
   useEffect(() => {
     activeIdRef.current = activeId;
@@ -121,7 +145,8 @@ export default function ChatPage() {
         // 连接失败仍尝试调用（可能此前已连接）
       }
       try {
-        const result = await gateway.request("session.list", {});
+        const params = selectionProfile ? { profile: selectionProfile } : {};
+        const result = await gateway.request("session.list", params);
         if (alive) {
           setSessions(normalizeSessions(result));
         }
@@ -135,7 +160,7 @@ export default function ChatPage() {
     return () => {
       alive = false;
     };
-  }, [gateway]);
+  }, [gateway, selectionProfile]);
 
   // T20.1 命令目录：优先 `commands.catalog`，为空时回退 `complete.slash`。
   useEffect(() => {
@@ -171,119 +196,122 @@ export default function ChatPage() {
     return pair && pair.storedId === activeIdRef.current ? pair : null;
   }, []);
 
+  const reconcileModel = controls.reconcileModel;
   useEffect(() => {
     const unsubscribes = [
-    gateway.on("message.delta", (payload) => {
-      const pair = activePair();
-      if (!pair || !matchesRuntime(payload, pair.runtimeId)) {
-        return;
-      }
-      const text = deltaText(payload);
-      if (text) {
-        setItems((current) => appendDelta(current, text, nextId()));
-      }
-    }),
-    gateway.on("message.complete", (payload) => {
-      const pair = activePair();
-      if (!pair || !matchesRuntime(payload, pair.runtimeId)) {
-        return;
-      }
-      const outcome = turnStatus(payload);
-      setItems((current) => {
-        const sealed = completeAssistant(
-          current,
-          deltaText(payload),
-          nextId(),
-          isReasoningOnly(payload),
-        );
-        if (outcome === "complete") {
-          return sealed;
+      gateway.on("message.delta", (payload) => {
+        const pair = activePair();
+        if (!pair || !matchesRuntime(payload, pair.runtimeId)) {
+          return;
         }
-        const settled = settleTools(sealed, outcome === "error" ? "complete" : "interrupted");
-        return outcome === "interrupted"
-          ? appendInterruptedNotice(settled, nextId())
-          : settled;
-      });
-      setRunning(false);
-      if (outcome === "interrupted") {
-        setStatus({ phase: "interrupted" });
-      } else if (outcome === "error") {
-        setStatus({ phase: "error", error: errorText(payload) });
-      } else {
+        const text = deltaText(payload);
+        if (text) {
+          setItems((current) => appendDelta(current, text, nextId()));
+        }
+      }),
+      gateway.on("message.complete", (payload) => {
+        const pair = activePair();
+        if (!pair || !matchesRuntime(payload, pair.runtimeId)) {
+          return;
+        }
+        const outcome = turnStatus(payload);
+        setItems((current) => {
+          const sealed = completeAssistant(
+            current,
+            deltaText(payload),
+            nextId(),
+            isReasoningOnly(payload),
+          );
+          if (outcome === "complete") {
+            return sealed;
+          }
+          const settled = settleTools(sealed, outcome === "error" ? "complete" : "interrupted");
+          return outcome === "interrupted"
+            ? appendInterruptedNotice(settled, nextId())
+            : settled;
+        });
+        setRunning(false);
+        if (outcome === "interrupted") {
+          setStatus({ phase: "interrupted" });
+        } else if (outcome === "error") {
+          setStatus({ phase: "error", error: errorText(payload) });
+        } else {
+          setStatus({ phase: "done" });
+        }
+        // REQ-010a：回合结束后以 `model.options{profile, session_id}` 回正模型。
+        void reconcileModel();
+      }),
+      gateway.on("tool.start", (payload) => {
+        const pair = activePair();
+        if (!pair || !matchesRuntime(payload, pair.runtimeId)) {
+          return;
+        }
+        setItems((current) =>
+          upsertTool(current, toolId(payload), toolName(payload), "start", {
+            detail: toolDetail(payload),
+          }),
+        );
+      }),
+      gateway.on("tool.generating", (payload) => {
+        const pair = activePair();
+        if (!pair || !matchesRuntime(payload, pair.runtimeId)) {
+          return;
+        }
+        setItems((current) =>
+          upsertTool(current, toolId(payload), toolName(payload), "generating", {
+            detail: toolDetail(payload),
+          }),
+        );
+      }),
+      gateway.on("tool.complete", (payload) => {
+        const pair = activePair();
+        if (!pair || !matchesRuntime(payload, pair.runtimeId)) {
+          return;
+        }
+        setItems((current) =>
+          upsertTool(current, toolId(payload), toolName(payload), "complete", {
+            result: toolResult(payload),
+          }),
+        );
+      }),
+      gateway.on("thinking", (payload) => {
+        const pair = activePair();
+        if (!pair || !matchesRuntime(payload, pair.runtimeId)) {
+          return;
+        }
+        setStatus({ phase: "thinking", ...parseStatus(payload) });
+      }),
+      gateway.on("done", (payload) => {
+        const pair = activePair();
+        const hasId = payload.session_id != null || payload.sessionId != null;
+        if (hasId && (!pair || !matchesRuntime(payload, pair.runtimeId))) {
+          return;
+        }
+        setRunning(false);
         setStatus({ phase: "done" });
-      }
-    }),
-    gateway.on("tool.start", (payload) => {
-      const pair = activePair();
-      if (!pair || !matchesRuntime(payload, pair.runtimeId)) {
-        return;
-      }
-      setItems((current) =>
-        upsertTool(current, toolId(payload), toolName(payload), "start", {
-          detail: toolDetail(payload),
-        }),
-      );
-    }),
-    gateway.on("tool.generating", (payload) => {
-      const pair = activePair();
-      if (!pair || !matchesRuntime(payload, pair.runtimeId)) {
-        return;
-      }
-      setItems((current) =>
-        upsertTool(current, toolId(payload), toolName(payload), "generating", {
-          detail: toolDetail(payload),
-        }),
-      );
-    }),
-    gateway.on("tool.complete", (payload) => {
-      const pair = activePair();
-      if (!pair || !matchesRuntime(payload, pair.runtimeId)) {
-        return;
-      }
-      setItems((current) =>
-        upsertTool(current, toolId(payload), toolName(payload), "complete", {
-          result: toolResult(payload),
-        }),
-      );
-    }),
-    gateway.on("thinking", (payload) => {
-      const pair = activePair();
-      if (!pair || !matchesRuntime(payload, pair.runtimeId)) {
-        return;
-      }
-      setStatus({ phase: "thinking", ...parseStatus(payload) });
-    }),
-    gateway.on("done", (payload) => {
-      const pair = activePair();
-      const hasId = payload.session_id != null || payload.sessionId != null;
-      if (hasId && (!pair || !matchesRuntime(payload, pair.runtimeId))) {
-        return;
-      }
-      setRunning(false);
-      setStatus({ phase: "done" });
-    }),
-    gateway.on("error", (payload) => {
-      const pair = activePair();
-      const hasId = payload.session_id != null || payload.sessionId != null;
-      if (hasId && (!pair || !matchesRuntime(payload, pair.runtimeId))) {
-        return;
-      }
-      setRunning(false);
-      setStatus({ phase: "error", error: errorText(payload) });
-      if (hasId) {
-        setItems((current) => [
-          ...current,
-          { kind: "notice", id: nextId(), level: "error", text: errorText(payload) },
-        ]);
-      }
-    }),
+      }),
+      gateway.on("error", (payload) => {
+        const pair = activePair();
+        const hasId = payload.session_id != null || payload.sessionId != null;
+        if (hasId && (!pair || !matchesRuntime(payload, pair.runtimeId))) {
+          return;
+        }
+        setRunning(false);
+        setStatus({ phase: "error", error: errorText(payload) });
+        if (hasId) {
+          setItems((current) => [
+            ...current,
+            { kind: "notice", id: nextId(), level: "error", text: errorText(payload) },
+          ]);
+        }
+      }),
     ];
     return () => {
       for (const unsubscribe of unsubscribes) {
         unsubscribe();
       }
     };
-  }, [activePair, gateway, nextId]);
+  }, [activePair, gateway, nextId, reconcileModel]);
 
   useEffect(() => {
     const unsubscribes = REQUEST_KINDS.map((kind) =>
@@ -306,8 +334,11 @@ export default function ChatPage() {
       return;
     }
     let alive = true;
+    const params = selectionProfile
+      ? { session_id: identity.runtimeId, profile: selectionProfile }
+      : { session_id: identity.runtimeId };
     gateway
-      .request("session.events.since", { session_id: identity.runtimeId })
+      .request("session.events.since", params)
       .then((result) => {
         if (!alive) {
           return;
@@ -327,7 +358,7 @@ export default function ChatPage() {
     return () => {
       alive = false;
     };
-  }, [identity?.runtimeId, activeId, gateway]);
+  }, [identity?.runtimeId, activeId, selectionProfile, gateway]);
 
   const resumeSession = useCallback(
     async (storedId: string): Promise<ResolvedSession> => {
@@ -336,7 +367,10 @@ export default function ChatPage() {
         return inflight;
       }
       const promise = (async (): Promise<ResolvedSession> => {
-        const result = await gateway.request("session.resume", { session_id: storedId });
+        const params = selectionProfile
+          ? { session_id: storedId, profile: selectionProfile }
+          : { session_id: storedId };
+        const result = await gateway.request("session.resume", params);
         const runtimeId = normalizeResumedId(result);
         if (!runtimeId) {
           throw new Error("会话恢复失败：响应缺少 session_id");
@@ -350,7 +384,7 @@ export default function ChatPage() {
         attachInFlightRef.current.delete(storedId);
       }
     },
-    [gateway],
+    [gateway, selectionProfile],
   );
 
   const attachSession = useCallback(
@@ -457,12 +491,13 @@ export default function ChatPage() {
   const pruneSessions = useCallback(async () => {
     try {
       await api("/api/hermes/sessions/prune", { method: "POST", body: JSON.stringify({}) });
-      const result = await gateway.request("session.list", {});
+      const params = selectionProfile ? { profile: selectionProfile } : {};
+      const result = await gateway.request("session.list", params);
       setSessions(normalizeSessions(result));
     } catch {
       setError("清理失败");
     }
-  }, [gateway]);
+  }, [gateway, selectionProfile]);
 
   const bulkDeleteSessions = useCallback(async (ids: string[]) => {
     if (ids.length === 0) {
@@ -481,24 +516,68 @@ export default function ChatPage() {
   }, []);
 
   const handleSend = useCallback(
-    (text: string) => {
-      const storedId = activeIdRef.current;
-      if (!storedId) {
-        return;
+    (text: string): Promise<boolean> => {
+      if (sendingRef.current) {
+        // single-flight：发送进行中忽略重复触发（不产生第 2 次 session.create）。
+        return Promise.resolve(true);
       }
-      setItems((current) => [
-        ...current,
-        { kind: "message", id: nextId(), role: "user", text },
-      ]);
-      setRunning(true);
-      setStatus({ phase: "thinking" });
-      const base: Record<string, unknown> = { text };
-      if (attachments.length > 0) {
-        base.attachments = attachments.map((attachment) => attachment.id);
-      }
-      setAttachments([]);
+      sendingRef.current = true;
       const msg = (error: unknown) => String((error as Error)?.message ?? "发送失败");
-      void (async () => {
+      return (async (): Promise<boolean> => {
+        const storedId = activeIdRef.current;
+        if (storedId === null) {
+          // hero：延迟绑定 create → attach* → submit（REQ-006）。
+          let result: unknown;
+          try {
+            result = await gateway.request("session.create", { ...buildCreateParams() });
+          } catch (createError) {
+            setError(msg(createError));
+            return false;
+          }
+          const ids = normalizeCreatedIdentity(result);
+          if (!ids) {
+            setError("无法新建会话");
+            return false;
+          }
+          setActiveId(ids.storedId);
+          activeIdRef.current = ids.storedId;
+          setIdentity(ids);
+          identityRef.current = ids;
+          setSessions((current) =>
+            current.some((session) => session.id === ids.storedId)
+              ? current
+              : [{ id: ids.storedId, title: "新会话" }, ...current],
+          );
+          setItems((current) => [
+            ...current,
+            { kind: "message", id: nextId(), role: "user", text },
+          ]);
+          setRunning(true);
+          setStatus({ phase: "thinking" });
+          try {
+            await uploadAll(ids.runtimeId);
+          } catch (attachError) {
+            setRunning(false);
+            setError(msg(attachError));
+            return false;
+          }
+          try {
+            await gateway.request("prompt.submit", { text, session_id: ids.runtimeId });
+          } catch (submitError) {
+            setRunning(false);
+            setError(msg(submitError));
+            return false;
+          }
+          clearAttachments();
+          return true;
+        }
+
+        setItems((current) => [
+          ...current,
+          { kind: "message", id: nextId(), role: "user", text },
+        ]);
+        setRunning(true);
+        setStatus({ phase: "thinking" });
         let pair = activePair();
         if (!pair) {
           try {
@@ -506,41 +585,62 @@ export default function ChatPage() {
           } catch {
             setRunning(false);
             setError("无法恢复会话");
-            return;
+            return false;
           }
         }
         if (activeIdRef.current !== storedId) {
           setRunning(false);
-          return;
+          return true;
         }
         try {
-          await gateway.request("prompt.submit", { ...base, session_id: pair.runtimeId });
-        } catch (error) {
-          if (!isSessionNotFound(error)) {
+          await uploadAll(pair.runtimeId);
+        } catch (attachError) {
+          setRunning(false);
+          setError(msg(attachError));
+          return false;
+        }
+        try {
+          await gateway.request("prompt.submit", { text, session_id: pair.runtimeId });
+          clearAttachments();
+          return true;
+        } catch (submitError) {
+          if (!isSessionNotFound(submitError)) {
             setRunning(false);
-            setError(msg(error));
-            return;
+            setError(msg(submitError));
+            return false;
           }
           const next = await attachSession(storedId).catch(() => null);
           if (next && activeIdRef.current === storedId) {
             try {
-              await gateway.request("prompt.submit", { ...base, session_id: next.runtimeId });
-              return;
+              await gateway.request("prompt.submit", { text, session_id: next.runtimeId });
+              clearAttachments();
+              return true;
             } catch (retryError) {
               setRunning(false);
               setError(msg(retryError));
-              return;
+              return false;
             }
           }
           setRunning(false);
           if (activeIdRef.current !== storedId) {
-            return;
+            return true;
           }
-          setError(msg(error));
+          setError(msg(submitError));
+          return false;
         }
-      })();
+      })().finally(() => {
+        sendingRef.current = false;
+      });
     },
-    [activePair, attachSession, attachments, gateway, nextId],
+    [
+      activePair,
+      attachSession,
+      buildCreateParams,
+      clearAttachments,
+      gateway,
+      nextId,
+      uploadAll,
+    ],
   );
 
   const handleStop = useCallback(() => {
@@ -583,39 +683,18 @@ export default function ChatPage() {
     [gateway, nextId],
   );
 
-  const handleAttach = useCallback(
-    (files: File[]) => {
-      const runtimeId = activePair()?.runtimeId;
-      if (!runtimeId) {
-        setError("会话未就绪，无法添加附件");
-        return;
-      }
-      for (const file of files) {
-        const method: Attachment["method"] = file.type.startsWith("image/")
-          ? "image.attach"
-          : file.type === "application/pdf"
-            ? "pdf.attach"
-            : "file.attach";
-        const id = nextId();
-        setAttachments((current) => [
-          ...current,
-          { id, name: file.name, size: file.size, type: file.type, method },
-        ]);
-        gateway
-          .request(method, {
-            session_id: runtimeId,
-            name: file.name,
-            size: file.size,
-            type: file.type,
-          })
-          .catch(() => setError("附件上传失败"));
-      }
-    },
-    [activePair, gateway, nextId],
-  );
-
-  const removeAttachment = useCallback((id: string) => {
-    setAttachments((current) => current.filter((attachment) => attachment.id !== id));
+  const handleOpenPanel = useCallback((kind: UploadPanelKind) => {
+    if (kind === "subagents") {
+      setSubagentsOpen(true);
+    } else if (kind === "commands") {
+      setCommandOpen(true);
+    } else if (kind === "context") {
+      setContextOpen(true);
+    } else if (kind === "personality") {
+      setPersonalityOpen(true);
+    } else if (kind === "image") {
+      setImageOpen(true);
+    }
   }, []);
 
   const exportSession = useCallback(async () => {
@@ -638,13 +717,14 @@ export default function ChatPage() {
       try {
         const text = await readFileText(file);
         await api("/api/hermes/sessions/import", { method: "POST", body: text });
-        const result = await gateway.request("session.list", {});
+        const params = selectionProfile ? { profile: selectionProfile } : {};
+        const result = await gateway.request("session.list", params);
         setSessions(normalizeSessions(result));
       } catch {
         setError("导入失败");
       }
     },
-    [gateway],
+    [gateway, selectionProfile],
   );
 
   const shareSession = useCallback(async () => {
@@ -660,20 +740,6 @@ export default function ChatPage() {
     }
     setShareLink(link);
   }, []);
-
-  const handleWorkspaceChange = useCallback(
-    (value: string) => {
-      setWorkspace(value);
-      const storedId = activeIdRef.current;
-      if (!storedId || !value) {
-        return;
-      }
-      gateway
-        .request("session.workspace.move", { session_key: storedId, cwd: value })
-        .catch(() => setError("切换工作区失败"));
-    },
-    [gateway],
-  );
 
   const answerRequest = useCallback(
     (requestId: string, result: Record<string, unknown>) => {
@@ -699,30 +765,16 @@ export default function ChatPage() {
       return;
     }
     const handle = setTimeout(() => {
+      const params = selectionProfile
+        ? { q: query, profile: selectionProfile }
+        : { q: query };
       gateway
-        .request("session.list", { q: query })
+        .request("session.list", params)
         .then((result) => setSearchResults(normalizeSessions(result)))
         .catch(() => setSearchResults(null));
     }, 250);
     return () => clearTimeout(handle);
-  }, [filter, gateway]);
-
-  // 工作区列表：切换会话时刷新。
-  useEffect(() => {
-    let alive = true;
-    api<unknown>("/api/hermes/chat/workspaces")
-      .then((result) => {
-        if (alive) {
-          setWorkspaces(normalizeWorkspaces(result));
-        }
-      })
-      .catch(() => {
-        // 工作区不可用时保持空列表
-      });
-    return () => {
-      alive = false;
-    };
-  }, [activeId]);
+  }, [filter, gateway, selectionProfile]);
 
   const visible = useMemo(() => {
     if (searchResults !== null) {
@@ -736,6 +788,23 @@ export default function ChatPage() {
   }, [searchResults, sessions, filter]);
 
   const active = sessions.find((session) => session.id === activeId) ?? null;
+
+  const startRename = useCallback(() => {
+    if (!active) {
+      return;
+    }
+    setRenameDraft(active.title);
+    setRenaming(true);
+  }, [active]);
+
+  const submitRename = useCallback(() => {
+    const storedId = activeIdRef.current;
+    const title = renameDraft.trim();
+    setRenaming(false);
+    if (storedId && title) {
+      void renameSession(storedId, title);
+    }
+  }, [renameDraft, renameSession]);
 
   return (
     <div className="chat" data-narrow={narrow} data-view={view}>
@@ -755,7 +824,7 @@ export default function ChatPage() {
         />
       </aside>
 
-      <section className="chat-main">
+      <section className="chat-main" data-variant={controls.variant}>
         {narrow && active ? (
           <button
             type="button"
@@ -767,9 +836,23 @@ export default function ChatPage() {
           </button>
         ) : null}
         {error ? <p className="err chat-error">{error}</p> : null}
+        {notice ? (
+          <p className="muted chat-notice" role="status">
+            {notice}
+          </p>
+        ) : null}
         <div className="chat-header">
           <h2 className="chat-title">{active ? active.title : "对话"}</h2>
           <div className="chat-header-actions">
+            {active ? (
+              <SessionHeaderMenu
+                onConnect={() => setNotice(t("composer.header.connectUnavailable"))}
+                onImport={() => importInputRef.current?.click()}
+                onExport={() => void exportSession()}
+                onShare={() => void shareSession()}
+                onRename={startRename}
+              />
+            ) : null}
             <button
               type="button"
               className="icon-btn"
@@ -781,108 +864,69 @@ export default function ChatPage() {
             </button>
           </div>
         </div>
-        {active ? (
+        {renaming && active ? (
+          <form
+            className="chat-rename"
+            onSubmit={(event) => {
+              event.preventDefault();
+              submitRename();
+            }}
+          >
+            <input
+              className="chat-rename-input"
+              aria-label={`重命名 ${active.title}`}
+              value={renameDraft}
+              onChange={(event) => setRenameDraft(event.target.value)}
+            />
+            <button type="submit" className="ghost">
+              {t("composer.rename.confirm")}
+            </button>
+            <button type="button" className="ghost" onClick={() => setRenaming(false)}>
+              {t("composer.rename.cancel")}
+            </button>
+          </form>
+        ) : null}
+        <input
+          ref={importInputRef}
+          type="file"
+          className="visually-hidden"
+          aria-label="导入会话"
+          accept=".json,application/json"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) {
+              void importSession(file);
+            }
+            event.target.value = "";
+          }}
+        />
+        {shareLink ? <p className="muted chat-share">{shareLink}</p> : null}
+        {subagentsOpen ? (
+          <SubagentsPanel
+            sessionId={activePair()?.runtimeId ?? null}
+            onClose={() => setSubagentsOpen(false)}
+          />
+        ) : null}
+        {imageOpen ? <ImageGenAction onClose={() => setImageOpen(false)} /> : null}
+        {contextOpen ? <ContextFilesPanel onClose={() => setContextOpen(false)} /> : null}
+        {personalityOpen ? (
+          <PersonalityPanel onClose={() => setPersonalityOpen(false)} />
+        ) : null}
+        {commandOpen ? (
+          <CommandPanel
+            onClose={() => setCommandOpen(false)}
+            onResult={(text) =>
+              setItems((current) => [
+                ...current,
+                { kind: "notice", id: nextId(), level: "done", text },
+              ])
+            }
+          />
+        ) : null}
+        {controls.variant === "hero" ? (
+          <HeroIntro sessions={sessions} onSelect={selectSession} />
+        ) : (
           <>
-            <div className="chat-toolbar">
-              <label className="session-menu-btn chat-import">
-                <input
-                  type="file"
-                  className="composer-file"
-                  aria-label="导入会话"
-                  accept=".json,application/json"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) {
-                      void importSession(file);
-                    }
-                    event.target.value = "";
-                  }}
-                />
-                导入
-              </label>
-              <button type="button" className="ghost" onClick={exportSession}>
-                导出
-              </button>
-              <button type="button" className="ghost" onClick={shareSession}>
-                分享
-              </button>
-              <button
-                type="button"
-                className="ghost"
-                aria-pressed={subagentsOpen}
-                onClick={() => setSubagentsOpen((value) => !value)}
-              >
-                {t("chat.subagents")}
-              </button>
-              <button
-                type="button"
-                className="ghost"
-                aria-pressed={imageOpen}
-                onClick={() => setImageOpen((value) => !value)}
-              >
-                {t("chat.image")}
-              </button>
-              <button
-                type="button"
-                className="ghost"
-                aria-pressed={commandOpen}
-                onClick={() => setCommandOpen((value) => !value)}
-              >
-                {t("cmd.open")}
-              </button>
-              <button
-                type="button"
-                className="ghost"
-                aria-pressed={contextOpen}
-                onClick={() => setContextOpen((value) => !value)}
-              >
-                {t("context.open")}
-              </button>
-              <button
-                type="button"
-                className="ghost"
-                aria-pressed={personalityOpen}
-                onClick={() => setPersonalityOpen((value) => !value)}
-              >
-                {t("chat.personality")}
-              </button>
-              <select
-                className="chat-workspace"
-                aria-label="工作区"
-                value={workspace}
-                onChange={(event) => handleWorkspaceChange(event.target.value)}
-              >
-                <option value="">选择工作区</option>
-                {workspaces.map((path) => (
-                  <option key={path} value={path}>
-                    {path}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {shareLink ? <p className="muted chat-share">{shareLink}</p> : null}
-            {subagentsOpen ? (
-              <SubagentsPanel
-                sessionId={activePair()?.runtimeId ?? null}
-                onClose={() => setSubagentsOpen(false)}
-              />
-            ) : null}
-            {imageOpen ? <ImageGenAction onClose={() => setImageOpen(false)} /> : null}
-            {contextOpen ? <ContextFilesPanel onClose={() => setContextOpen(false)} /> : null}
-            {personalityOpen ? (
-              <PersonalityPanel onClose={() => setPersonalityOpen(false)} />
-            ) : null}
-            {commandOpen ? (
-              <CommandPanel
-                onClose={() => setCommandOpen(false)}
-                onResult={(text) =>
-                  setItems((current) => [
-                    ...current,
-                    { kind: "notice", id: nextId(), level: "done", text },
-                  ])
-                }
-              />
-            ) : null}
             <Transcript items={items} />
             {pending.length > 0 ? (
               <div className="pending-requests">
@@ -895,29 +939,52 @@ export default function ChatPage() {
                 ))}
               </div>
             ) : null}
-            <Composer
-              running={running}
-              onSend={handleSend}
-              onStop={handleStop}
-              attachments={attachments}
-              onAttach={handleAttach}
-              onRemoveAttachment={removeAttachment}
-              commands={commands}
-              onSlash={handleSlash}
-            />
-            <StatusBar status={status} />
           </>
-        ) : (
-          <EmptyState
-            title="开始你的对话"
-            description="选择左侧已有会话，或新建会话与智能体开始对话。"
-            action={
-              <Button variant="primary" onClick={createSession}>
-                新建会话
-              </Button>
-            }
-          />
         )}
+        <Composer
+          variant={controls.variant}
+          running={running}
+          onSend={handleSend}
+          onStop={handleStop}
+          attachments={controls.attachments}
+          onAttach={controls.attach}
+          onAttachFiles={controls.attach}
+          onRemoveAttachment={controls.removeAttachment}
+          attachmentCount={controls.attachments.length}
+          commands={commands}
+          onSlash={handleSlash}
+          controls={({ canSend, submit }) => (
+            <ComposerControls
+              variant={controls.variant}
+              agentOptions={controls.options.agents}
+              agentValue={controls.selection.profile}
+              onSelectAgent={controls.selectProfile}
+              agentDisabled={running}
+              workspaceOptions={controls.options.workspaces}
+              workspaceValue={controls.selection.cwd}
+              onSelectWorkspace={(path) => void controls.selectWorkspace(path)}
+              modelOptions={controls.options.models}
+              modelValue={controls.selection.model}
+              modelCurrent={{ model: controls.selection.model, provider: null }}
+              modelSwitch={controls.modelSwitch}
+              onSelectModel={(model) => void controls.selectModel(model)}
+              onConfirmModel={() => void controls.confirmModel()}
+              onCancelModelConfirm={controls.cancelModelConfirm}
+              modelDisabled={controls.variant === "docked" && !controls.identityReady}
+              permissionValue={controls.selection.yolo}
+              onSelectPermission={(mode) => void controls.selectYolo(mode)}
+              permissionDisabled={controls.variant === "docked" && !controls.identityReady}
+              onAttachFiles={controls.attach}
+              onOpenPanel={handleOpenPanel}
+              uploadDisabled={controls.variant === "docked" && !controls.identityReady}
+              running={running}
+              canSend={canSend}
+              onSend={submit}
+              onStop={handleStop}
+            />
+          )}
+        />
+        <StatusBar status={status} />
       </section>
     </div>
   );

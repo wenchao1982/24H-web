@@ -112,7 +112,7 @@ interface SessionIdentity { storedId: string; runtimeId: string }
 - **hero 态（`activeId === null`）**：模型选择**只写入待创建参数**，发送时随 `session.create{model}` 下发；**不发 `config.set`**，前端**不预判「昂贵」**（`session.create` 无 `confirm_expensive_model` 字段）。
 - **会话内**：发 `config.set{key:"model", value, session_id: runtimeId}`。回合**运行中**网关把切换 stash 到下一回合并回 `deferred:true`，前端提示「将于下一回合生效」，**不得热切**。
 - **回合结束后回正（REQ-010a）**：收到该会话 **`message.complete`** 事件后，调 **`model.options{profile: <当前 selection.profile 或 default_profile>, session_id: runtimeId}`**（参数**须同时含非空 `profile` 与 `session_id`**）并以回包 **`model`** 字段回正选中态；若 `model` ≠ 用户选择（stash 被 turn start 丢弃）则回滚并提示「切换未生效」。
-- **对齐来源**：契约**不存在 `session.info`**；`session.status` 回包仅 `{output: str}`，**不可**用于对齐。唯一结构化来源是 `model.options{session_id}` 回包的 `model` / `provider`。
+- **对齐来源**：契约**不存在 `session.info`**；`session.status` 回包仅 `{output: str}`，**不可**用于对齐。唯一结构化来源是 `model.options{profile, session_id: runtimeId}` 回包的 `model` / `provider`。
 - 昂贵模型以网关 `config.set` 回包的 `confirm_required` 为**唯一判据**：确认后以 `confirm_expensive_model:true` 重发，取消则回滚选中态。
 - `model.options` / 工作区列表请求**必须携带非空 `profile`**（租户上下文明确，REQ-019 / REQ-012）；**无可用 `profile`（未选且 `default_profile` 为空）时不得发起该请求**并展示可读错误。
 
@@ -120,17 +120,19 @@ interface SessionIdentity { storedId: string; runtimeId: string }
 
 - **唯一判据 = 解析后是否含 `method` 字符串**（不论有无 `id`、不论是否带 `result`/`error`）。凡含 `method` 一律按 request 施加守卫；**JSON 数组批帧逐元素**分类与守卫；**二进制帧与 JSON 解析失败一律拒绝**；`null`/数字/字符串/布尔拒绝。**禁止**以「无 `id`＝通知」「带 `result`/`error`＝响应」「数组/二进制放行」为由免拦。
 - **`params.profile` 守卫**：非 `super_admin` 且 `params.profile` 指向未分配 profile → 以**同 `id`** 回 `403 PROFILE_FORBIDDEN`，**不转发、不入 pending**。
-- **租户上下文注入（REQ-017，default-deny）**：非 `super_admin` 的 request 帧缺失 `params.profile` 时，**除命中显式 profile-agnostic 豁免清单外，一律注入**调用者 `default_profile`（`user_profiles.is_default`，回退任一已分配）后再转发；**无任何可用 profile → 403 不转发**；`super_admin` **不注入**。**豁免清单**（须在 `design.md` 显式枚举并逐条测试）：`ping` / `gateway.capabilities` / `client.capabilities` / `commands.catalog` / `complete.path` / `complete.slash` / `llm.oneshot`。**禁止**「包含式前缀白名单」（`session.*`/`profiles.*`/`mcp.*`/`skills.*`）——遗漏即 fail-open；须以 `docs/INTERFACES.md` 全方法清单做 MethodSweep 核对。
+- **租户上下文注入（REQ-017，default-deny）**：非 `super_admin` 的 request 帧缺失 `params.profile` 时，**豁免判据唯一 = 该方法的参数类 schema 未声明 `profile` 字段**（从官方契约派生，归档于 `contracts-evidence.md`；**不得**以「是否直继 `Params`」判断 —— `Params` 设 `ConfigDict(extra="forbid")`，向无该字段的类注入会 **4000**）；命中豁免 → **不注入**；**其余一切方法（含豁免清单外的未知方法）一律注入**调用者 `default_profile`（`user_profiles.is_default`，回退任一已分配）后再转发；**无任何可用 profile → 403 不转发**；`super_admin` **不注入**。**豁免清单（18 条，参数类无 `profile` 字段）**：`ping` / `gateway.capabilities` / `client.capabilities` / `complete.slash` / `reload.env` / `reload.mcp` / `plugins.list` / `learning.frames` / `learning.detail` / `learning.delete` / `paste.collapse` / `model.save_key` / `model.disconnect` / `diagnostics.share_nous` / `image.generate` / `tools.list` / `toolsets.list` / `tools.show`。**明确须注入**（参数类声明了 `profile`）：`commands.catalog` / `config.show` / `cron.manage` / `shell.exec` / `cli.exec` / `process.kill` / `tools.configure` / `browser.manage` / `agents.list` / `insights.get` / `session.set_hidden` / `complete.path` / `llm.oneshot`。**禁止**「包含式前缀白名单」（`session.*`/`profiles.*`/`mcp.*`/`skills.*`）——遗漏即 fail-open；MethodSweep 须**机械断言「豁免集合 == 参数类无 `profile` 字段的方法集合」**（以 `contracts/*.py` 为数据源，**不得**仅凭 `docs/INTERFACES.md` 快照）。
+- **残余（R24，未闭合）**：`tools.list` / `toolsets.list` / `tools.show` 等 `_SessionScoped` 方法 schema 无 `profile` 字段，**无法用 profile 守卫**；其 handler 缺 `session_id` 时回退**启动 profile** 的配置（`tools_mcp_plugins.py:20-21`）→ 跨租户读取。闭合依赖 session 归属校验，单开任务。
+- **REST 守卫（REQ-022）**：`/api/hermes/*` 非 `super_admin` 缺 `profile` 时（豁免路径 `/api/hermes/health` 除外）注入 `default_profile` 或 403，**禁止**提前 `return` 跳过 `assertProfileAccess`（`routes/hermes.ts:39-42` 的现状）；注入须落入**被转发的 query 字符串**（`routes/hermes.ts:94-95` 用 `request.url` 构造上游 target，仅改 `request.query` 会静默失效）。
 - **会话域显式 profile（REQ-020）**：前端在 `selection.profile !== null` 时，会话域 RPC（`session.list` / `session.most_recent` / `session.resume` / `session.events.since`）shall 携带 `params.profile = selection.profile`（多 profile 用户可访问非默认 profile 的会话）；未显式选择时不上送，由 BFF 按 REQ-017 注入 `default_profile`。
 - **响应侧过滤（REQ-015）**：对 `profiles.list` 响应按调用者 `user_profiles` 白名单过滤 `result.profiles[]` 后再下发；**仅对「成功但结构不符」fail-closed**——响应非 JSON、缺 `profiles` 键或非数组、过滤异常 → **不下发并回错误**，**绝不放行全量**；**上游错误帧（`{id, error}`）shall 原样透传**，**不得**替换为 BFF 自造错误（PR-008）；`super_admin` 不过滤。响应过滤复用 `proxy.ts` 导出的 `classifyFrame`，不得自行解析帧文本。
-- **队列与帧上限（REQ-018 / REQ-018a）**：显式设 `maxPayload`，**同时作用于客户端接入侧与上游侧两个 socket**；`pending`/`outbound` 队列上限**同时约束条数与累计字节**（`pendingBytes ≤ K × maxPayload`，K 须量化），超限回可读错误并**仅**终止该连接。
+- **队列与帧上限（REQ-018 / REQ-018b）**：显式设 `maxPayload = 16 MiB`，**同时作用于客户端接入侧与上游侧两个 socket**；`pending`/`outbound` 队列上限**同时约束条数与累计字节**（`K = 4` → `pendingBytes ≤ 64 MiB`），超限回可读错误并**仅**终止该连接。
 - **审计（REQ-021）**：守卫拒绝（WS 403）与响应过滤 fail-closed shall 向 `audit` 表（见 §4）写入一条记录（actor / profile / method / ip / 结果 / 时间戳），**不得**写 token / 密钥 / 文件字节。
 - 判据与 REST 侧 `assertProfileAccess` / `userCanAccessProfile` 同语义；前端 `me.profiles` 白名单仅作 UX 约束，**不是**安全边界。
 
 ### 7.3 10MB 单帧偏差与补偿控制
 
 - **偏差登记**：本设计允许 WS 单帧承载上传内容，base64 后 10MB ≈ 13.3MB；OWASP 建议 WS 消息 ≤64KB，本设计**显著超出**（契约无分片通道）。
-- **补偿控制**：① 前端**预筛**——单文件 >10MB、单批 >10 个在**读取内容之前**拒绝；② **REQ-018 / REQ-018a** 为 BFF WS 显式设 `maxPayload`（**双 socket**）与 `pending`/`outbound` 队列上限（**条数 AND 累计字节**，`pendingBytes ≤ K × maxPayload`，不依赖 `ws` 库默认值），超限回可读错误并**仅**终止该连接；③ 单文件 >2MB 显示等待态，失败重试**复用 identity**、不重复 `session.create`；④ 端到端可达性以**实测**为准；网关拒绝则原样透传 message。
+- **补偿控制**：① 前端**预筛**——单文件 >10MB、单批 >10 个在**读取内容之前**拒绝；② **REQ-018 / REQ-018b** 为 BFF WS 显式设 `maxPayload = 16 MiB`（**双 socket**）与 `pending`/`outbound` 队列上限（**条数 AND 累计字节**，`K = 4` → `pendingBytes ≤ 64 MiB`，不依赖 `ws` 库默认值），超限回可读错误并**仅**终止该连接；③ 单文件 >2MB 显示等待态，失败重试**复用 identity**、不重复 `session.create`；④ 端到端可达性以**实测**为准；网关拒绝则原样透传 message。
 - 服务端 magic bytes 校验落点（Hermes 或 BFF）**未定**，客户端 `File.type` 仅作 UX 预筛；列为独立任务。
 
 ## 8. 详见

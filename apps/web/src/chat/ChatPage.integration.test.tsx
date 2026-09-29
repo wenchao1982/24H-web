@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ChatPage from "./ChatPage";
 import { GatewayProvider } from "./GatewayProvider";
@@ -177,7 +177,11 @@ describe("ChatPage 集成：真实 GatewayClient 事件派发", () => {
     const user = userEvent.setup();
 
     // 1. 会话列表渲染后点选会话
-    await user.click(await screen.findByRole("button", { name: "历史会话" }));
+    await user.click(
+      await within(screen.getByRole("complementary")).findByRole("button", {
+        name: "历史会话",
+      }),
+    );
 
     // 2. session.resume 用持久化 stored id 发出
     await waitFor(() => {
@@ -236,7 +240,11 @@ describe("ChatPage 集成：真实 GatewayClient 事件派发", () => {
     const socket = activeSocket(sockets);
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "历史会话" }));
+    await user.click(
+      await within(screen.getByRole("complementary")).findByRole("button", {
+        name: "历史会话",
+      }),
+    );
     await waitFor(() => {
       expect(
         sentRequests(socket).some((entry) => entry.method === "session.resume"),

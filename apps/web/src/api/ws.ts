@@ -90,7 +90,7 @@ export class GatewayClient implements Gateway {
       id?: number | string;
       method?: string;
       result?: unknown;
-      error?: { message?: string; code?: number };
+      error?: { message?: string; code?: number; data?: { code?: unknown } };
       params?: {
         type?: string;
         payload?: Record<string, unknown>;
@@ -111,9 +111,14 @@ export class GatewayClient implements Gateway {
         this.pending.delete(frame.id);
         if (frame.error) {
           const err = new Error(String(frame.error.message ?? frame.error)) as Error & {
-            code?: number;
+            code?: number | string;
           };
-          if (typeof frame.error.code === "number") {
+          // 命名错误码（如 PROFILE_FORBIDDEN，见 BFF profileForbiddenFrame）优先；
+          // 无命名码时保持既有数字 frame.error.code 行为。
+          const namedCode = frame.error.data?.code;
+          if (typeof namedCode === "string" && namedCode !== "") {
+            err.code = namedCode;
+          } else if (typeof frame.error.code === "number") {
             err.code = frame.error.code;
           }
           pending.reject(err);

@@ -181,6 +181,90 @@ describe("profile guard", () => {
 
     expect(res.statusCode).toBe(200);
   });
+
+  it("injects the default profile into the forwarded query when missing", async () => {
+    upstream = await startMockHermes();
+    ctx = await createTestContext({ hermesBaseUrl: upstream.baseUrl });
+    const { session } = await seedAdmin(["alpha"]);
+
+    const res = await ctx.app.inject({
+      method: "GET",
+      url: "/api/hermes/skills",
+      cookies: { "24h_session": session },
+    });
+
+    expect(res.statusCode).toBe(200);
+    // 注入必须落入**被转发的 query**（仅改 request.query 会静默失效）。
+    const forwarded = upstream.requests.find((request) => request.path === "/api/skills");
+    expect(forwarded?.query).toContain("profile=alpha");
+    expect(res.json().url).toContain("profile=alpha");
+  });
+
+  it("forbids an admin with no assigned profile", async () => {
+    upstream = await startMockHermes();
+    ctx = await createTestContext({ hermesBaseUrl: upstream.baseUrl });
+    const { session } = await seedAdmin([]);
+
+    const res = await ctx.app.inject({
+      method: "GET",
+      url: "/api/hermes/skills",
+      cookies: { "24h_session": session },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().error).toBe("PROFILE_FORBIDDEN");
+    expect(upstream.requests).toHaveLength(0);
+  });
+
+  it("lets an admin reach the exempt health path without a profile", async () => {
+    upstream = await startMockHermes();
+    ctx = await createTestContext({ hermesBaseUrl: upstream.baseUrl });
+    const { session } = await seedAdmin(["alpha"]);
+
+    const res = await ctx.app.inject({
+      method: "GET",
+      url: "/api/hermes/health",
+      cookies: { "24h_session": session },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().ok).toBe(true);
+  });
+
+  it("does not inject or block for a super_admin", async () => {
+    upstream = await startMockHermes();
+    ctx = await createTestContext({ hermesBaseUrl: upstream.baseUrl });
+    const { session } = await loginAndGetCookies(ctx.app);
+
+    const res = await ctx.app.inject({
+      method: "GET",
+      url: "/api/hermes/skills",
+      cookies: { "24h_session": session },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const forwarded = upstream.requests.find((request) => request.path === "/api/skills");
+    expect(forwarded?.query ?? "").not.toContain("profile=");
+    expect(res.json().url).not.toContain("profile=");
+  });
+
+  it("writes an audit entry when a profile access is forbidden", async () => {
+    upstream = await startMockHermes();
+    ctx = await createTestContext({ hermesBaseUrl: upstream.baseUrl });
+    const { session } = await seedAdmin(["alpha"]);
+
+    const res = await ctx.app.inject({
+      method: "GET",
+      url: "/api/hermes/skills?profile=beta",
+      cookies: { "24h_session": session },
+    });
+
+    expect(res.statusCode).toBe(403);
+    const row = ctx.db
+      .prepare("SELECT COUNT(*) AS n FROM audit WHERE action = ?")
+      .get("rest.profile.forbidden") as { n: number };
+    expect(row.n).toBeGreaterThanOrEqual(1);
+  });
 });
 
 describe("proxy error normalisation", () => {

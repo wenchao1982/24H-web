@@ -11,7 +11,7 @@ import { adminRoutes } from "../routes/admin";
 import { adminConnectionsRoutes } from "../routes/adminConnections";
 import { hermesRoutes } from "../routes/hermes";
 import { systemRoutes } from "../routes/system";
-import { hermesWsRoutes } from "../hermes/proxy";
+import { hermesWsRoutes, WS_MAX_PAYLOAD } from "../hermes/proxy";
 import { integrationsRoutes } from "../routes/integrations";
 import { skillUiRoutes } from "../routes/skillUi";
 import type { GhRunner } from "../integrations/github";
@@ -47,7 +47,8 @@ export function buildApp(db: Db, options: BuildAppOptions = {}): FastifyInstance
   });
 
   app.register(cookie);
-  app.register(websocket);
+  // REQ-018：显式设 maxPayload（作用于客户端接入侧 socket；上游侧见 hermes/proxy.ts）。
+  app.register(websocket, { options: { maxPayload: WS_MAX_PAYLOAD } });
 
   app.decorate("db", db);
   registerErrorHandler(app);

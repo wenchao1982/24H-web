@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createTestContext, loginAndGetCookies, type TestContext } from "../test/helpers";
 import { startMockHermes, type MockHermes } from "../test/mockHermes";
 import { clearHermesTokenCache } from "./client";
+import { createUser } from "../users/repo";
 
 let ctx: TestContext | undefined;
 let upstream: MockHermes | undefined;
@@ -120,18 +121,20 @@ function wsAddress(app: TestContext["app"]): string {
   return `ws://127.0.0.1:${address.port}`;
 }
 
-function startEchoUpstream(): { urls: string[] } {
+function startEchoUpstream(): { urls: string[]; frames: string[] } {
   const urls: string[] = [];
+  const frames: string[] = [];
   wss = new WebSocketServer({ server: upstream!.server, path: "/api/ws" });
   wss.on("connection", (socket, request) => {
     upstreamSockets.push(socket);
     urls.push(request.url ?? "");
     socket.send("from-upstream");
     socket.on("message", (data) => {
+      frames.push(data.toString());
       socket.send(`echo:${data.toString()}`);
     });
   });
-  return { urls };
+  return { urls, frames };
 }
 
 describe("GET /api/hermes/ws", () => {
@@ -153,8 +156,9 @@ describe("GET /api/hermes/ws", () => {
     expect(await firstFrame).toBe("from-upstream");
     expect(upstreamState.urls[0]).toBe("/api/ws?token=ws-token-1");
 
-    client.send("from-client");
-    expect(await nextMessage(client)).toBe("echo:from-client");
+    const request = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping", params: {} });
+    client.send(request);
+    expect(await nextMessage(client)).toBe(`echo:${request}`);
   });
 
   it("forwards a client frame sent before the upstream connects (cold-start race)", async () => {
@@ -187,10 +191,11 @@ describe("GET /api/hermes/ws", () => {
     await waitForOpen(client);
 
     // Send immediately, without waiting for the upstream to connect.
-    client.send("early-frame");
+    const request = JSON.stringify({ jsonrpc: "2.0", id: 7, method: "ping", params: {} });
+    client.send(request);
 
     expect(await messages.next()).toBe("from-upstream");
-    expect(await messages.next()).toBe("echo:early-frame");
+    expect(await messages.next()).toBe(`echo:${request}`);
     expect(upstreamState.urls[0]).toBe("/api/ws?token=ws-race-token");
   });
 
@@ -212,5 +217,134 @@ describe("GET /api/hermes/ws", () => {
 
     expect(outcome).not.toBe("open");
     expect(upstream.requests).toHaveLength(0);
+  });
+});
+
+describe("profile guard over WS", () => {
+  async function seedAdmin(profiles: string[]): Promise<{ session: string; csrf: string }> {
+    const user = await createUser(ctx!.db, {
+      username: "ws-admin",
+      password: "ws-admin-password-123",
+      role: "admin",
+    });
+    const insert = ctx!.db.prepare(
+      "INSERT INTO user_profiles (user_id, profile_name, is_default, created_at) VALUES (?, ?, 1, ?)",
+    );
+    for (const profile of profiles) {
+      insert.run(user.id, profile, Date.now());
+    }
+    return loginAndGetCookies(ctx!.app, "ws-admin", "ws-admin-password-123");
+  }
+
+  async function connect(
+    session: string,
+  ): Promise<{ client: WebSocket; messages: MessageQueue }> {
+    const client = new WebSocket(`${wsAddress(ctx!.app)}/api/hermes/ws`, {
+      headers: { cookie: `24h_session=${session}` },
+    });
+    clients.push(client);
+    const messages = messageQueue(client);
+    await waitForOpen(client);
+    return { client, messages };
+  }
+
+  async function boot(
+    token: string,
+    seed: () => Promise<{ session: string; csrf: string }>,
+  ): Promise<{ upstreamState: { urls: string[]; frames: string[] }; client: WebSocket; messages: MessageQueue }> {
+    upstream = await startMockHermes({ token });
+    ctx = await createTestContext({ hermesBaseUrl: upstream.baseUrl });
+    const { session } = await seed();
+    await ctx.app.listen({ port: 0, host: "127.0.0.1" });
+    const upstreamState = startEchoUpstream();
+    const { client, messages } = await connect(session);
+    expect(await messages.next()).toBe("from-upstream");
+    return { upstreamState, client, messages };
+  }
+
+  it("rejects a frame for an unassigned profile with the same id and never forwards it", async () => {
+    const { upstreamState, client, messages } = await boot("ws-guard-token", () =>
+      seedAdmin(["alpha"]),
+    );
+
+    const frame = JSON.stringify({
+      jsonrpc: "2.0",
+      id: 42,
+      method: "session.create",
+      params: { profile: "px" },
+    });
+    client.send(frame);
+
+    const reply = JSON.parse(await messages.next());
+    expect(reply.id).toBe(42);
+    expect(reply.error.code).toBe(403);
+    expect(reply.error.data.code).toBe("PROFILE_FORBIDDEN");
+    expect(upstreamState.frames).toHaveLength(0);
+  });
+
+  it("forwards the same frame for a super_admin", async () => {
+    const { upstreamState, client, messages } = await boot("ws-super-token", () =>
+      loginAndGetCookies(ctx!.app),
+    );
+
+    const frame = JSON.stringify({
+      jsonrpc: "2.0",
+      id: 43,
+      method: "session.create",
+      params: { profile: "px" },
+    });
+    client.send(frame);
+
+    expect(await messages.next()).toBe(`echo:${frame}`);
+    expect(upstreamState.frames).toEqual([frame]);
+  });
+
+  it("injects the default profile for a non-exempt method", async () => {
+    const { upstreamState, client, messages } = await boot("ws-inject-token", () =>
+      seedAdmin(["alpha"]),
+    );
+
+    const frame = JSON.stringify({
+      jsonrpc: "2.0",
+      id: 44,
+      method: "cron.manage",
+      params: {},
+    });
+    client.send(frame);
+    await messages.next();
+
+    const forwarded = JSON.parse(upstreamState.frames[0]);
+    expect(forwarded.params.profile).toBe("alpha");
+  });
+
+  it("does not inject for an exempt method (tools.list would 4000)", async () => {
+    const { upstreamState, client, messages } = await boot("ws-exempt-token", () =>
+      seedAdmin(["alpha"]),
+    );
+
+    const frame = JSON.stringify({
+      jsonrpc: "2.0",
+      id: 45,
+      method: "tools.list",
+      params: {},
+    });
+    client.send(frame);
+    await messages.next();
+
+    expect(upstreamState.frames[0]).not.toContain("profile");
+    expect(JSON.parse(upstreamState.frames[0]).params.profile).toBeUndefined();
+  });
+
+  it("forwards a client response frame unchanged", async () => {
+    const { upstreamState, client, messages } = await boot("ws-response-token", () =>
+      seedAdmin(["alpha"]),
+    );
+
+    const frame = JSON.stringify({ id: 9, result: { choice: "once" } });
+    client.send(frame);
+    await messages.next();
+
+    expect(upstreamState.frames[0]).toBe(frame);
+    expect(JSON.parse(upstreamState.frames[0])).toEqual({ id: 9, result: { choice: "once" } });
   });
 });

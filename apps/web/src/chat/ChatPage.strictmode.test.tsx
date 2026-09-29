@@ -1,9 +1,10 @@
 import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ChatPage from "./ChatPage";
 import { GatewayProvider } from "./GatewayProvider";
+import { SessionProvider, type SessionUser } from "../auth/SessionProvider";
 import { createFakeGateway, type FakeGateway } from "../test/fakeGateway";
 
 const SESSION_ID = "s1";
@@ -46,7 +47,9 @@ async function runScenario(strict: boolean): Promise<Scenario> {
 
   const { container } = renderChat(gateway, strict);
   const user = userEvent.setup();
-  await user.click(await screen.findByRole("button", { name: "会话一" }));
+  await user.click(
+    await within(screen.getByRole("complementary")).findByRole("button", { name: "会话一" }),
+  );
 
   act(() => {
     gateway.emit("message.delta", { session_id: RUNTIME_ID, text: "你好" });
@@ -86,5 +89,105 @@ describe("ChatPage StrictMode 重复助手气泡调查", () => {
     expect.soft(texts, `StrictMode 下助手气泡文本（文本=${texts.join(" | ")}）`).toEqual([
       "你好，世界",
     ]);
+  });
+});
+
+const ADMIN: SessionUser = {
+  id: 1,
+  username: "admin",
+  role: "admin",
+  must_change_password: false,
+  profiles: ["alpha"],
+  default_profile: "alpha",
+};
+
+const CATALOG = {
+  model: "m1",
+  provider: "p",
+  providers: [{ slug: "p", models: [{ id: "m1", label: "Model 1" }] }],
+};
+
+function stubWorkspaces() {
+  const mock = vi.fn(
+    async () =>
+      ({
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ workspaces: [] }),
+      }) as Response,
+  );
+  vi.stubGlobal("fetch", mock);
+  return mock;
+}
+
+describe("ChatPage StrictMode hero/docked 与附件幂等（REQ-001 / REQ-005 / REQ-006）", () => {
+  it("hero→docked 切换不丢草稿（同一 Composer 实例）", async () => {
+    const gateway = createFakeGateway((method) =>
+      method === "session.list" ? { sessions: [{ id: SESSION_ID, title: "会话一" }] } : {},
+    );
+    render(
+      <StrictMode>
+        <GatewayProvider gateway={gateway}>
+          <ChatPage />
+        </GatewayProvider>
+      </StrictMode>,
+    );
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("消息"), "草稿不丢");
+    await user.click(
+      await within(screen.getByRole("complementary")).findByRole("button", { name: "会话一" }),
+    );
+
+    expect(screen.getByLabelText("消息")).toHaveValue("草稿不丢");
+  });
+
+  it("StrictMode 下同一附件只入 chip 一次（去重幂等）", async () => {
+    stubWorkspaces();
+    render(
+      <StrictMode>
+        <SessionProvider initialUser={ADMIN}>
+          <GatewayProvider gateway={createFakeGateway((method) => (method === "session.list" ? { sessions: [] } : {}))}>
+            <ChatPage />
+          </GatewayProvider>
+        </SessionProvider>
+      </StrictMode>,
+    );
+    const user = userEvent.setup();
+    const file = new File(["hi"], "a.txt", { type: "text/plain" });
+    await user.upload(screen.getByLabelText("文件"), file);
+    expect(screen.getAllByText("a.txt")).toHaveLength(1);
+
+    await user.upload(screen.getByLabelText("文件"), file);
+    expect(screen.getAllByText("a.txt")).toHaveLength(1);
+  });
+
+  it("options 缓存迁移：hero→create 后 model.options 不重载", async () => {
+    stubWorkspaces();
+    const gateway = createFakeGateway((method) => {
+      if (method === "session.list") {
+        return { sessions: [] };
+      }
+      if (method === "model.options") {
+        return CATALOG;
+      }
+      return {};
+    });
+    render(
+      <StrictMode>
+        <SessionProvider initialUser={ADMIN}>
+          <GatewayProvider gateway={gateway}>
+            <ChatPage />
+          </GatewayProvider>
+        </SessionProvider>
+      </StrictMode>,
+    );
+    const user = userEvent.setup();
+    await waitFor(() => expect(gateway.paramsOf("model.options")).toHaveLength(1));
+
+    await user.type(screen.getByLabelText("消息"), "你好");
+    await user.click(screen.getByRole("button", { name: "发送" }));
+    await waitFor(() => expect(gateway.paramsOf("prompt.submit")).toHaveLength(1));
+
+    expect(gateway.paramsOf("model.options")).toHaveLength(1);
   });
 });

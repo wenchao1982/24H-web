@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useRef, useState } from "react";
 import { Button, ConfirmDialog, EmptyState, IconButton } from "../ui";
 import type { SessionSummary } from "./types";
 
@@ -48,6 +48,12 @@ function SessionRow({
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(session.title);
+  const menuId = useId();
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
+  const closeRowMenu = () => {
+    setMenuOpen(false);
+    menuTriggerRef.current?.focus();
+  };
 
   if (editing) {
     return (
@@ -128,15 +134,28 @@ function SessionRow({
         <>
           <button
             type="button"
+            ref={menuTriggerRef}
             className="icon-btn session-menu-btn"
             aria-label={`会话操作 ${session.title}`}
+            aria-haspopup="menu"
             aria-expanded={menuOpen}
+            aria-controls={menuId}
             onClick={() => setMenuOpen((value) => !value)}
           >
             ⋯
           </button>
           {menuOpen ? (
-            <div className="session-menu" role="menu">
+            <div
+              className="session-menu"
+              role="menu"
+              id={menuId}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  closeRowMenu();
+                }
+              }}
+            >
               <button
                 type="button"
                 role="menuitem"
@@ -194,6 +213,12 @@ export default function SessionList({
   const [selected, setSelected] = useState<string[]>([]);
   const [moreOpen, setMoreOpen] = useState(false);
   const [confirm, setConfirm] = useState<ConfirmState>(null);
+  const moreMenuId = useId();
+  const moreWrapRef = useRef<HTMLDivElement>(null);
+  const closeMoreMenu = () => {
+    setMoreOpen(false);
+    moreWrapRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+  };
 
   const toggleSelect = (id: string) => {
     setSelected((current) =>
@@ -251,18 +276,31 @@ export default function SessionList({
           </button>
         ) : null}
         {onPrune || onBulkDelete ? (
-          <div className="session-more">
+          <div className="session-more" ref={moreWrapRef}>
             <IconButton
               className="session-more-btn"
               label="更多"
               icon="more"
+              aria-haspopup="menu"
               aria-expanded={moreOpen}
+              aria-controls={moreMenuId}
               onClick={() => setMoreOpen((value) => !value)}
             />
             {moreOpen ? (
-              <div className="session-more-menu" role="menu">
+              <div
+                className="session-more-menu"
+                role="menu"
+                id={moreMenuId}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    closeMoreMenu();
+                  }
+                }}
+              >
                 <button
                   type="button"
+                  role="menuitem"
                   onClick={() => {
                     setMoreOpen(false);
                     if (batch) {
@@ -278,6 +316,7 @@ export default function SessionList({
                 {onPrune ? (
                   <button
                     type="button"
+                    role="menuitem"
                     className="danger"
                     onClick={() => {
                       setMoreOpen(false);

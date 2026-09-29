@@ -189,6 +189,48 @@ describe("GatewayClient", () => {
     await expect(pending).rejects.toMatchObject({ code: 4001, message: "session not found" });
   });
 
+  it("rejects with the named error.data.code when error.code is absent", async () => {
+    const sockets = stubWebSocket();
+    const client = new GatewayClient();
+    const connected = client.connect("ws://example.test/api/hermes/ws");
+    sockets[0].open();
+    await connected;
+
+    const pending = client.request("session.create", {});
+    sockets[0].receive(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        error: {
+          code: 403,
+          message: "无权访问该 profile",
+          data: { code: "PROFILE_FORBIDDEN" },
+        },
+      }),
+    );
+
+    await expect(pending).rejects.toMatchObject({ code: "PROFILE_FORBIDDEN" });
+  });
+
+  it("falls back to the numeric error.code when error.data.code is not a string", async () => {
+    const sockets = stubWebSocket();
+    const client = new GatewayClient();
+    const connected = client.connect("ws://example.test/api/hermes/ws");
+    sockets[0].open();
+    await connected;
+
+    const pending = client.request("session.create", {});
+    sockets[0].receive(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        error: { code: 403, message: "forbidden", data: { code: 123 } },
+      }),
+    );
+
+    await expect(pending).rejects.toMatchObject({ code: 403 });
+  });
+
   it("creates only one WebSocket when connect() is called twice", async () => {
     const sockets = stubWebSocket();
     const client = new GatewayClient();

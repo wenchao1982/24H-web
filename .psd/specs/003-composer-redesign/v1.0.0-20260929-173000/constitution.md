@@ -24,6 +24,8 @@
 | TC-015 | The 文案 shall 为中文；新增 i18n key shall 先在 `apps/web/src/i18n/zh.ts` 注册（类型约束） |
 | TC-016 | Where 涉及 Hermes 契约的判定（`maxPayload` / notification 是否执行 / `model.options` 结构 / `pricing` 语义），The Spec shall 把可核验的契约片段归档到 `.psd/specs/003-composer-redesign/<version>/contracts-evidence.md`，**不得**仅以仓库外路径作为唯一依据 |
 | TC-017 | The BFF WS 代理 shall 显式设定 `maxPayload` 与 `pending`/`outbound` 队列长度上限，**不得**依赖 `ws` 库默认值 |
+| TC-018 | The WS 队列上限 shall 同时约束**条数**与**累计字节**（`pendingBytes ≤ K × maxPayload`）；`maxPayload` 须同时作用于客户端接入侧与上游侧 socket |
+| TC-019 | WS 租户守卫的**豁免判据** shall 为「参数类 schema 未声明 `profile` 字段」（从官方契约派生，**不得**以「是否直继 `Params`」判断），并归档到 `contracts-evidence.md`；`maxPayload` shall 为 `16 MiB`、`K` shall 为 `4`（累计 ≤ 64 MiB）。且 Wave 1 的 WS 代理 shall 显式设 `maxPayload` 并作用于双 socket |
 
 ## 2. 流程规则（红线）
 
@@ -40,6 +42,9 @@
 | PR-009 | **原子写入**：Spec artifact shall 全有或全无；任一写入失败须清理部分写入 |
 | PR-010 | **每 3–5 任务复位**：见 PR-005；`CONTRIBUTING.md §5` 为准 |
 | PR-011 | **安全项同波次**：租户边界的守卫与其响应过滤（REQ-008 / REQ-015 / REQ-017 / REQ-018）shall 在同一波次交付，**不得**把已识别的安全缺口中途挂在后续波次 |
+| PR-012 | **禁止代写评审结论**：`manifest.json` 的 `reviewResult` 只能由评审结果写入；任何代理**不得**预先填入 `verdict` / `status: approved-for-build`。在对抗性评审返回 DEFEND 之前，`status` shall 为 `draft` / `in-review` |
+| PR-013 | **审计要求**：租户守卫拒绝（WS 403 / REST 403）与响应过滤 fail-closed shall 写 `audit`（`apps/server/src/audit/repo.ts`），便于发现越权探测 |
+| PR-014 | **契约同步**：凡由契约派生的清单（豁免清单 / 方法分类）shall 与归档的 `contracts-evidence.md` 同版本；契约变更时 shall 同步清单并重跑 MethodSweep |
 
 ## 3. 边界（Always / Ask First / Never）
 
@@ -53,8 +58,12 @@
 | A-004 | 菜单符合 APG Menu Button（`aria-haspopup` / `aria-expanded` / `role="menuitem"` / `Esc` + 焦点归还） |
 | A-005 | 隐藏的 file input 用 visually-hidden（`clip-path: inset(50%)`），不用 `display:none` |
 | A-006 | WS 守卫 **default-deny**：凡解析后含 `method` 字符串的帧一律按 request 施加守卫（**不论**是否有 `id`、**不论**是否带 `result`/`error`）；JSON 数组批帧逐元素分类与守卫；**二进制帧与 JSON 解析失败一律拒绝** | 见 N-013 |
-| A-006b | 非 `super_admin` 的 `session.*` / `profiles.*` / `mcp.*` / `skills.*` 帧缺失 `params.profile` 时，由 BFF 注入调用者 `default_profile` | REQ-017 |
-| A-006c | 响应侧过滤（`profiles.list`）遇到解析失败或结构不符时 **fail-closed**（不下发、回错误） | REQ-015 |
+| A-006b | 非 `super_admin` 的 request 帧缺失 `params.profile` 时：**参数类 schema 未声明 `profile` 字段**的方法 shall 豁免（不得注入，否则 `extra="forbid"` → 4000）；**其余一切方法（含清单外的未知方法）** shall 注入 `default_profile`；无可用则 403。**判据唯一 = schema 是否声明 `profile`**（禁止人工枚举、禁止「是否直继 `Params`」） | REQ-017 |
+| A-006f | REST `/api/hermes/*` 缺 `profile` 时：命中豁免路径（`/api/hermes/health`）则放行；**其余路径**注入 `default_profile` 或 403。**禁止**在缺 `profile` 时提前 `return` | REQ-022 |
+| A-006g | 豁免判据 shall 为**参数类 schema 是否声明 `profile` 字段**，并从官方契约派生（归档 `contracts-evidence.md`）；**禁止**人工枚举后长期不校验，**禁止**以「是否直继 `Params`」为判据 | TC-019 |
+| A-006d | 队列上限须同时约束**条数**与**累计字节** | REQ-018 |
+| A-006e | 守卫拒绝与响应过滤 fail-closed 必写 `audit` 记录（actor / profile / method / ip / 结果；不含 token / 密钥 / 文件字节） | REQ-021 |
+| A-006c | 响应侧过滤（`profiles.list`）：**「成功但结构不符」才 fail-closed**；上游**错误帧（`{id,error}`）必须原样透传** | REQ-015 |
 | A-007 | 错误提示用 `role="alert"`（即时）或 `role="status"` + `aria-live="polite"`（累积） |
 | A-008 | `previewUrl`（`URL.createObjectURL`）在移除 / 清空 / 发送成功 / 卸载 4 个时机恰好 revoke 一次 |
 
@@ -71,7 +80,8 @@
 | Q-007 | `/api/auth/me` 是否返回头像（决定 AgentPicker 是否只用首字占位） | **未定**，实现阶段验证 |
 | Q-008 | 官方 L1 是否支持 JSON-RPC 数组批帧 | **未定**，实现阶段验证 |
 | Q-009 | hero 态选昂贵模型无二次确认（`session.create` 无 `confirm_expensive_model` 字段） | **已定**：接受该限制（REQ-011a）；网关若拒绝则透传 message |
-| Q-010 | REQ-017 的 `method` 前缀白名单（`session.`/`profiles.`/`mcp.`/`skills.`）是否完备 | **未定**，需以官方 `method(...)` 全清单核对（风险 R14） |
+| Q-010 | WS 豁免清单（18 条，判据 = 参数类未声明 `profile`）与 REST 豁免清单（1 条）是否与官方契约/路由完全一致 | **未定**；判据可机械派生（TASK-033 归档 + TASK-004 MethodSweep 断言「豁免集合 == 无 profile 字段集合」）；漏判方向为功能回归 |
+| Q-011 | `_SessionScoped` 方法（`tools.list`/`toolsets.list`/`tools.show`）无 `profile` 字段可注入，缺 `session_id` 时回退启动 profile 配置 | **未定**（R24）；须单开任务做 session 归属校验 |
 
 ### 🚫 Never Do
 
@@ -94,3 +104,10 @@
 | N-015 | 在 `activeId === null`（hero 态）禁用发送（会破坏 REQ-001/REQ-006） |
 | N-016 | 由前端预判「昂贵模型」并据此弹确认（判据必须以网关 `confirm_required` 回包为准） |
 | N-017 | 在响应过滤失败时透传未过滤的全量（必须 fail-closed） |
+| N-018 | 用「包含式前缀白名单」（如仅 `session.`/`profiles.`/`mcp.`/`skills.`）决定是否注入租户上下文 —— 遗漏即 fail-open |
+| N-019 | 把上游错误帧替换为 BFF 自造错误（违反 PR-008） |
+| N-020 | 以 `session.info` 作为模型对齐来源（该 RPC 不存在） |
+| N-021 | 把「清单外的方法/路径」当作豁免（未知即放行）——未知 must 按需 profile 处理 |
+| N-022 | REST `/api/hermes/*` 在缺 `profile` 时提前 `return` 跳过 `assertProfileAccess`（`routes/hermes.ts:40` 的现状） |
+| N-023 | 向参数类 schema 未声明 `profile` 的方法注入 `profile`（`extra="forbid"` → 4000，功能回归） |
+| N-024 | 以「是否直继 `Params`」作为豁免判据（判据与契约事实相反） |

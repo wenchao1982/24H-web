@@ -1,9 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ChatPage from "./ChatPage";
 import { GatewayProvider } from "./GatewayProvider";
+import { SessionProvider, type SessionUser } from "../auth/SessionProvider";
 import { createFakeGateway, type FakeGateway } from "../test/fakeGateway";
+
+/** 侧栏会话列表（hero 的「最近会话」会重复标题，查询须限定在侧栏内）。 */
+function list() {
+  return within(screen.getByRole("complementary"));
+}
 
 const SESSIONS = {
   sessions: [
@@ -12,11 +18,23 @@ const SESSIONS = {
   ],
 };
 
-function renderChat(gateway: FakeGateway) {
-  return render(
+const ADMIN: SessionUser = {
+  id: 1,
+  username: "admin",
+  role: "admin",
+  must_change_password: false,
+  profiles: ["alpha"],
+  default_profile: "alpha",
+};
+
+function renderChat(gateway: FakeGateway, initialUser: SessionUser | null = null) {
+  const page = (
     <GatewayProvider gateway={gateway}>
       <ChatPage />
-    </GatewayProvider>,
+    </GatewayProvider>
+  );
+  return render(
+    initialUser ? <SessionProvider initialUser={initialUser}>{page}</SessionProvider> : page,
   );
 }
 
@@ -27,8 +45,8 @@ describe("ChatPage T6.1 会话列表", () => {
     );
     renderChat(gateway);
 
-    expect(await screen.findByText("第一会话")).toBeInTheDocument();
-    expect(screen.getByText("部署排查")).toBeInTheDocument();
+    expect(await list().findByText("第一会话")).toBeInTheDocument();
+    expect(list().getByText("部署排查")).toBeInTheDocument();
   });
 
   it("filters sessions by title", async () => {
@@ -42,13 +60,13 @@ describe("ChatPage T6.1 会话列表", () => {
       return SESSIONS;
     });
     renderChat(gateway);
-    await screen.findByText("第一会话");
+    await list().findByText("第一会话");
 
     const user = userEvent.setup();
     await user.type(screen.getByLabelText("会话搜索"), "部署");
 
-    expect(screen.queryByText("第一会话")).not.toBeInTheDocument();
-    expect(screen.getByText("部署排查")).toBeInTheDocument();
+    expect(list().queryByText("第一会话")).not.toBeInTheDocument();
+    expect(list().getByText("部署排查")).toBeInTheDocument();
   });
 
   it("selects a session from the list", async () => {
@@ -56,12 +74,12 @@ describe("ChatPage T6.1 会话列表", () => {
       method === "session.list" ? SESSIONS : {},
     );
     renderChat(gateway);
-    const item = await screen.findByRole("button", { name: "第一会话" });
+    const item = await list().findByRole("button", { name: "第一会话" });
 
     const user = userEvent.setup();
     await user.click(item);
 
-    expect(screen.getByRole("button", { name: "第一会话" })).toHaveAttribute(
+    expect(list().getByRole("button", { name: "第一会话" })).toHaveAttribute(
       "data-active",
       "true",
     );
@@ -81,15 +99,15 @@ describe("ChatPage T6.2 新建会话", () => {
       return {};
     });
     renderChat(gateway);
-    await screen.findByText("第一会话");
+    await list().findByText("第一会话");
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "新建会话" }));
+    await user.click(list().getByRole("button", { name: "新建" }));
 
     expect(gateway.paramsOf("session.create")).toHaveLength(1);
     expect(gateway.paramsOf("session.resume")).toHaveLength(0);
     expect(await screen.findByRole("heading", { name: "新会话" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "新会话" })).toHaveAttribute("data-active", "true");
+    expect(list().getByRole("button", { name: "新会话" })).toHaveAttribute("data-active", "true");
   });
 });
 
@@ -100,7 +118,7 @@ describe("ChatPage T6.3 流式消息", () => {
     );
     renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await user.click(await list().findByRole("button", { name: "会话一" }));
 
     await user.type(screen.getByLabelText("消息"), "你好");
     await user.click(screen.getByRole("button", { name: "发送" }));
@@ -130,7 +148,7 @@ describe("ChatPage T6.4 工具卡", () => {
     );
     renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await user.click(await list().findByRole("button", { name: "会话一" }));
 
     act(() => {
       gateway.emit("tool.start", { session_id: "runtime:s1", id: "t1", name: "web_search" });
@@ -169,7 +187,7 @@ describe("ChatPage T6.5 审批/澄清", () => {
     );
     renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await user.click(await list().findByRole("button", { name: "会话一" }));
 
     let respond!: ReturnType<typeof gateway.emitServerRequest>;
     act(() => {
@@ -192,7 +210,7 @@ describe("ChatPage T6.5 审批/澄清", () => {
     );
     renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await user.click(await list().findByRole("button", { name: "会话一" }));
 
     let respond!: ReturnType<typeof gateway.emitServerRequest>;
     act(() => {
@@ -214,7 +232,7 @@ describe("ChatPage T6.6 其它服务端请求", () => {
     );
     renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await user.click(await list().findByRole("button", { name: "会话一" }));
 
     let respond!: ReturnType<typeof gateway.emitServerRequest>;
     act(() => {
@@ -236,7 +254,7 @@ describe("ChatPage T6.7 中断", () => {
     );
     renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await user.click(await list().findByRole("button", { name: "会话一" }));
 
     await user.type(screen.getByLabelText("消息"), "跑起来");
     await user.click(screen.getByRole("button", { name: "发送" }));
@@ -257,7 +275,7 @@ describe("ChatPage T6.8 状态条", () => {
     );
     renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await user.click(await list().findByRole("button", { name: "会话一" }));
 
     act(() => {
       gateway.emit("thinking", {
@@ -286,7 +304,7 @@ describe("ChatPage T6.9 会话管理", () => {
     const gateway = makeGateway();
     renderChat(gateway);
     const user = userEvent.setup();
-    await screen.findByRole("button", { name: "会话一" });
+    await list().findByRole("button", { name: "会话一" });
 
     await user.click(screen.getByRole("button", { name: "会话操作 会话一" }));
     await user.click(screen.getByRole("menuitem", { name: "重命名" }));
@@ -298,34 +316,34 @@ describe("ChatPage T6.9 会话管理", () => {
     expect(gateway.paramsOf("session.title")).toEqual([
       { session_id: "runtime:s1", title: "新名字" },
     ]);
-    expect(screen.getByRole("button", { name: "新名字" })).toBeInTheDocument();
+    expect(list().getByRole("button", { name: "新名字" })).toBeInTheDocument();
   });
 
   it("resumes a session via session.resume and selects it", async () => {
     const gateway = makeGateway();
     renderChat(gateway);
     const user = userEvent.setup();
-    await screen.findByRole("button", { name: "会话一" });
+    await list().findByRole("button", { name: "会话一" });
 
     await user.click(screen.getByRole("button", { name: "会话操作 会话一" }));
     await user.click(screen.getByRole("menuitem", { name: "恢复" }));
 
     expect(gateway.paramsOf("session.resume")).toEqual([{ session_id: "s1" }]);
-    expect(screen.getByRole("button", { name: "会话一" })).toHaveAttribute("data-active", "true");
+    expect(list().getByRole("button", { name: "会话一" })).toHaveAttribute("data-active", "true");
   });
 
   it("deletes a session via session.delete", async () => {
     const gateway = makeGateway();
     renderChat(gateway);
     const user = userEvent.setup();
-    await screen.findByRole("button", { name: "会话一" });
+    await list().findByRole("button", { name: "会话一" });
 
     await user.click(screen.getByRole("button", { name: "会话操作 会话一" }));
     await user.click(screen.getByRole("menuitem", { name: "删除" }));
     await user.click(screen.getByRole("button", { name: "确认删除" }));
 
     expect(gateway.paramsOf("session.delete")).toEqual([{ session_id: "s1" }]);
-    expect(screen.queryByRole("button", { name: "会话一" })).not.toBeInTheDocument();
+    expect(list().queryByRole("button", { name: "会话一" })).not.toBeInTheDocument();
   });
 });
 
@@ -350,7 +368,7 @@ describe("ChatPage T6.10 断线重放", () => {
     });
     renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await user.click(await list().findByRole("button", { name: "会话一" }));
 
     expect(await screen.findByText("恢复的审批")).toBeInTheDocument();
     expect(gateway.paramsOf("session.events.since")).toEqual([{ session_id: "runtime:s1" }]);
@@ -358,29 +376,29 @@ describe("ChatPage T6.10 断线重放", () => {
 });
 
 describe("ChatPage T6.11 附件", () => {
-  it("attaches a file chip and includes it in the prompt", async () => {
+  it("stages a chip with zero RPC, then attaches before submitting", async () => {
     const gateway = createFakeGateway((method) =>
       method === "session.list" ? { sessions: [{ id: "s1", title: "会话一" }] } : {},
     );
     renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await user.click(await list().findByRole("button", { name: "会话一" }));
 
+    const before = gateway.requests.length;
     const file = new File(["hello"], "notes.txt", { type: "text/plain" });
-    await user.upload(screen.getByLabelText("添加附件"), file);
+    await user.upload(screen.getByLabelText("文件"), file);
 
     expect(await screen.findByText("notes.txt")).toBeInTheDocument();
-    expect(gateway.paramsOf("file.attach")).toEqual([
-      { session_id: "runtime:s1", name: "notes.txt", size: 5, type: "text/plain" },
-    ]);
+    expect(gateway.requests.length).toBe(before);
 
     await user.type(screen.getByLabelText("消息"), "带你一起");
     await user.click(screen.getByRole("button", { name: "发送" }));
 
-    const submits = gateway.paramsOf("prompt.submit");
-    expect(submits).toHaveLength(1);
-    expect(submits[0]).toMatchObject({ session_id: "runtime:s1", text: "带你一起" });
-    expect((submits[0].attachments as string[])).toHaveLength(1);
+    await waitFor(() => expect(gateway.paramsOf("file.attach")).toHaveLength(1));
+    expect(gateway.paramsOf("file.attach")[0]).toMatchObject({ name: "notes.txt" });
+    expect(gateway.paramsOf("prompt.submit")).toEqual([
+      { text: "带你一起", session_id: "runtime:s1" },
+    ]);
   });
 });
 
@@ -397,7 +415,7 @@ describe("ChatPage T6.12 会话搜索", () => {
     });
     renderChat(gateway);
     const user = userEvent.setup();
-    await screen.findByText("会话一");
+    await list().findByText("会话一");
 
     await user.type(screen.getByLabelText("会话搜索"), "匹配");
 
@@ -426,9 +444,10 @@ describe("ChatPage T6.13 导入/导出/分享", () => {
     );
     renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await user.click(await list().findByRole("button", { name: "会话一" }));
 
-    await user.click(screen.getByRole("button", { name: "导出" }));
+    await user.click(screen.getByRole("button", { name: "会话操作" }));
+    await user.click(screen.getByRole("menuitem", { name: "导出" }));
     await waitFor(() => {
       expect(
         fetchMock.mock.calls.some((call) => String(call[0]).endsWith("/api/hermes/sessions/export")),
@@ -439,6 +458,8 @@ describe("ChatPage T6.13 导入/导出/分享", () => {
     );
     expect((exportCall?.[1] as RequestInit).method).toBe("POST");
 
+    await user.click(screen.getByRole("button", { name: "会话操作" }));
+    await user.click(screen.getByRole("menuitem", { name: "导入" }));
     const file = new File(['{"id":"s1"}'], "s1.json", { type: "application/json" });
     await user.upload(screen.getByLabelText("导入会话"), file);
     await waitFor(() => {
@@ -462,10 +483,10 @@ describe("ChatPage T6.14 清理", () => {
     );
     renderChat(gateway);
     const user = userEvent.setup();
-    await screen.findByText("会话一");
+    await list().findByText("会话一");
 
     await user.click(screen.getByRole("button", { name: "更多" }));
-    await user.click(screen.getByRole("button", { name: "清理旧会话" }));
+    await user.click(screen.getByRole("menuitem", { name: "清理旧会话" }));
     await user.click(screen.getByRole("button", { name: "确认清理" }));
     await waitFor(() => {
       expect(
@@ -474,7 +495,7 @@ describe("ChatPage T6.14 清理", () => {
     });
 
     await user.click(screen.getByRole("button", { name: "更多" }));
-    await user.click(screen.getByRole("button", { name: "批量选择" }));
+    await user.click(screen.getByRole("menuitem", { name: "批量选择" }));
     await user.click(screen.getByLabelText("选择 会话一"));
     await user.click(screen.getByRole("button", { name: /批量删除/ }));
     await user.click(screen.getByRole("button", { name: "确认删除" }));
@@ -493,34 +514,39 @@ describe("ChatPage T6.14 清理", () => {
 });
 
 describe("ChatPage T6.15 工作区", () => {
-  it("lists workspaces and moves the session workspace", async () => {
+  it("lists workspaces in the hero picker and writes cwd_explicit into session.create", async () => {
     const fetchMock = vi.fn(
-      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      async (input: RequestInfo | URL, _init?: RequestInit) =>
         ({
           ok: true,
           status: 200,
           text: async () =>
-            JSON.stringify({ workspaces: [{ path: "/home/u/a" }, { path: "/home/u/b" }] }),
+            String(input).includes("/api/hermes/chat/workspaces")
+              ? JSON.stringify({ workspaces: [{ path: "/home/u/a" }, { path: "/home/u/b" }] })
+              : JSON.stringify({}),
         }) as Response,
     );
     vi.stubGlobal("fetch", fetchMock);
 
     const gateway = createFakeGateway((method) =>
-      method === "session.list" ? { sessions: [{ id: "s1", title: "会话一" }] } : {},
+      method === "session.list" ? { sessions: [] } : {},
     );
-    renderChat(gateway);
+    renderChat(gateway, ADMIN);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
 
     const select = await screen.findByLabelText("工作区");
     expect(await screen.findByRole("option", { name: "/home/u/a" })).toBeInTheDocument();
 
     await user.selectOptions(select, "/home/u/b");
-    await waitFor(() => {
-      expect(gateway.paramsOf("session.workspace.move")).toEqual([
-        { session_key: "s1", cwd: "/home/u/b" },
-      ]);
-    });
+    await user.type(screen.getByLabelText("消息"), "hi");
+    await user.click(screen.getByRole("button", { name: "发送" }));
+
+    await waitFor(() =>
+      expect(gateway.paramsOf("session.create")[0]).toMatchObject({
+        cwd: "/home/u/b",
+        cwd_explicit: true,
+      }),
+    );
   });
 });
 
@@ -540,10 +566,10 @@ describe("ChatPage T17.5 子代理观测", () => {
     });
     renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await user.click(await list().findByRole("button", { name: "会话一" }));
 
-    const toggle = screen.getByRole("button", { name: "子代理" });
-    await user.click(toggle);
+    await user.click(screen.getByRole("button", { name: "添加附件" }));
+    await user.click(screen.getByRole("menuitem", { name: "子代理" }));
 
     expect(
       await screen.findByRole("button", { name: "查看子代理 reviewer 输出" }),
@@ -573,7 +599,7 @@ describe("ChatPage T20.1 Slash 命令菜单", () => {
     });
     renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await user.click(await list().findByRole("button", { name: "会话一" }));
 
     await user.type(screen.getByLabelText("消息"), "/go");
 
@@ -594,7 +620,7 @@ describe("ChatPage 会话身份对（stored/runtime id）", () => {
     );
     renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await user.click(await list().findByRole("button", { name: "会话一" }));
 
     expect(gateway.paramsOf("session.resume")).toEqual([{ session_id: "s1" }]);
 
@@ -626,7 +652,7 @@ describe("ChatPage 会话身份对（stored/runtime id）", () => {
     });
     renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "新建会话" }));
+    await user.click(await list().findByRole("button", { name: "新建" }));
 
     await user.type(screen.getByLabelText("消息"), "你好");
     await user.click(screen.getByRole("button", { name: "发送" }));
@@ -651,7 +677,7 @@ describe("ChatPage 会话身份对（stored/runtime id）", () => {
     });
     renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await user.click(await list().findByRole("button", { name: "会话一" }));
 
     await user.type(screen.getByLabelText("消息"), "你好");
     await user.click(screen.getByRole("button", { name: "发送" }));
@@ -684,8 +710,8 @@ describe("ChatPage 会话身份对（stored/runtime id）", () => {
     });
     renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话A" }));
-    await user.click(screen.getByRole("button", { name: "会话B" }));
+    await user.click(await list().findByRole("button", { name: "会话A" }));
+    await user.click(list().getByRole("button", { name: "会话B" }));
 
     await act(async () => {
       pending.get("a")?.({ session_id: "runtime:a" });
@@ -714,10 +740,10 @@ describe("ChatPage 会话身份对（stored/runtime id）", () => {
     });
     renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "新建会话" }));
+    await user.click(await list().findByRole("button", { name: "新建" }));
 
     expect(gateway.paramsOf("session.resume")).toHaveLength(0);
-    expect(screen.getByRole("button", { name: "新会话" })).toHaveAttribute("data-active", "true");
+    expect(list().getByRole("button", { name: "新会话" })).toHaveAttribute("data-active", "true");
   });
 
   it("[REQ-002] ignores events that do not match the active runtime id", async () => {
@@ -726,7 +752,7 @@ describe("ChatPage 会话身份对（stored/runtime id）", () => {
     );
     renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await user.click(await list().findByRole("button", { name: "会话一" }));
 
     act(() => {
       gateway.emit("message.delta", { session_id: "runtime:other", text: "不应出现" });
@@ -745,7 +771,7 @@ describe("ChatPage 会话身份对（stored/runtime id）", () => {
     );
     renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await user.click(await list().findByRole("button", { name: "会话一" }));
 
     await user.type(screen.getByLabelText("消息"), "跑起来");
     await user.click(screen.getByRole("button", { name: "发送" }));
@@ -769,7 +795,7 @@ describe("ChatPage REQ-012 message.complete 结束本轮与推理渲染", () => 
     const gateway = makeGateway();
     renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await user.click(await list().findByRole("button", { name: "会话一" }));
 
     await user.type(screen.getByLabelText("消息"), "跑起来");
     await user.click(screen.getByRole("button", { name: "发送" }));
@@ -785,7 +811,7 @@ describe("ChatPage REQ-012 message.complete 结束本轮与推理渲染", () => 
     const gateway = makeGateway();
     renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await user.click(await list().findByRole("button", { name: "会话一" }));
 
     await user.type(screen.getByLabelText("消息"), "问题");
     await user.click(screen.getByRole("button", { name: "发送" }));
@@ -809,7 +835,7 @@ describe("ChatPage REQ-012 message.complete 结束本轮与推理渲染", () => 
     const gateway = makeGateway();
     renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await user.click(await list().findByRole("button", { name: "会话一" }));
 
     await user.type(screen.getByLabelText("消息"), "问题");
     await user.click(screen.getByRole("button", { name: "发送" }));
@@ -835,7 +861,7 @@ describe("ChatPage REQ-012 message.complete 结束本轮与推理渲染", () => 
     const gateway = makeGateway();
     renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await user.click(await list().findByRole("button", { name: "会话一" }));
 
     await user.type(screen.getByLabelText("消息"), "跑起来");
     await user.click(screen.getByRole("button", { name: "发送" }));
@@ -871,7 +897,7 @@ describe("ChatPage REQ-020..024 历史消息渲染", () => {
     const gateway = historyGateway();
     renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await user.click(await list().findByRole("button", { name: "会话一" }));
 
     const question = await screen.findByText("旧问");
     const answer = screen.getByText("旧答");
@@ -897,7 +923,7 @@ describe("ChatPage REQ-020..024 历史消息渲染", () => {
     });
     renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await user.click(await list().findByRole("button", { name: "会话一" }));
 
     expect(await screen.findByText("思考过程")).toBeInTheDocument();
     expect(screen.getByText("让我想想").closest(".bubble")).toHaveAttribute(
@@ -921,7 +947,7 @@ describe("ChatPage REQ-020..024 历史消息渲染", () => {
     });
     renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await user.click(await list().findByRole("button", { name: "会话一" }));
 
     expect(await screen.findByText("web_search")).toBeInTheDocument();
     expect(screen.getByText("完成")).toBeInTheDocument();
@@ -948,8 +974,8 @@ describe("ChatPage REQ-020..024 历史消息渲染", () => {
     });
     renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话A" }));
-    await user.click(screen.getByRole("button", { name: "会话B" }));
+    await user.click(await list().findByRole("button", { name: "会话A" }));
+    await user.click(list().getByRole("button", { name: "会话B" }));
 
     await act(async () => {
       pending.get("a")?.({
@@ -972,7 +998,7 @@ describe("ChatPage REQ-020..024 历史消息渲染", () => {
     const gateway = historyGateway();
     renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await user.click(await list().findByRole("button", { name: "会话一" }));
     await screen.findByText("旧答");
 
     await user.type(screen.getByLabelText("消息"), "新消息");
@@ -995,7 +1021,7 @@ describe("ChatPage REQ-002/003 中断收尾", () => {
     const gateway = makeGateway();
     const { container } = renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await user.click(await list().findByRole("button", { name: "会话一" }));
 
     act(() => {
       gateway.emit("tool.start", { session_id: "runtime:s1", id: "t1", name: "web_search" });
@@ -1020,7 +1046,7 @@ describe("ChatPage REQ-002/003 中断收尾", () => {
     const gateway = makeGateway();
     const { container } = renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await user.click(await list().findByRole("button", { name: "会话一" }));
 
     await user.type(screen.getByLabelText("消息"), "跑起来");
     await user.click(screen.getByRole("button", { name: "发送" }));
@@ -1043,7 +1069,7 @@ describe("ChatPage REQ-002/003 中断收尾", () => {
     const gateway = makeGateway();
     const { container } = renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await user.click(await list().findByRole("button", { name: "会话一" }));
 
     await user.type(screen.getByLabelText("消息"), "问题");
     await user.click(screen.getByRole("button", { name: "发送" }));
@@ -1070,7 +1096,7 @@ describe("ChatPage REQ-002/003 中断收尾", () => {
     const gateway = makeGateway();
     const { container } = renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await user.click(await list().findByRole("button", { name: "会话一" }));
 
     act(() => {
       gateway.emit("message.complete", {
@@ -1102,7 +1128,7 @@ describe("ChatPage REQ-002/003 中断收尾", () => {
     });
     renderChat(gateway);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await user.click(await list().findByRole("button", { name: "会话一" }));
 
     await user.type(screen.getByLabelText("消息"), "跑起来");
     await user.click(screen.getByRole("button", { name: "发送" }));

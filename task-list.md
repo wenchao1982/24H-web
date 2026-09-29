@@ -242,8 +242,8 @@
 
 ## M17 对话页重构（Spec 003-composer-redesign）
 
-> Spec：[`.psd/specs/003-composer-redesign/v1.0.0-20260929-173000/`](.psd/specs/003-composer-redesign/v1.0.0-20260929-173000/)（requirements / design / tasks / constitution / manifest）。
-> **唯一「下一步」入口**：按 Wave 顺序执行，前置未验收不得开启后继；安全项（REQ-008 / 015 / 017 / 018 / 018a）同波次（Wave 1）；并含 REQ-020（多 profile 自访问）/ REQ-021（守卫拒绝与过滤 fail-closed 审计）。共 34 个任务（TASK-001..034，含 006A/006B/006C）。验证命令固定 `npm run check`，e2e 单独 `npm run test:e2e`。
+> Spec：[`.psd/specs/003-composer-redesign/v1.0.0-20260929-173000/`](.psd/specs/003-composer-redesign/v1.0.0-20260929-173000/)（requirements / design / tasks / constitution / manifest；对抗性评审 5 轮后 **DEFEND**）。
+> **唯一「下一步」入口**：按 Wave 顺序执行，前置未验收不得开启后继；安全项（REQ-008 / 015 / 017 / 018 / 021 / 022）同波次（Wave 1）；并含 REQ-020（多 profile 自访问）。共 **36 个任务**（TASK-001..028 + 029..036，含 006A/006B/006C）。验证命令固定 `npm run check`，e2e 单独 `npm run test:e2e`。
 
 | 编号 | 模块 | 描述 | 前置依赖 | 验收标准 | 状态 |
 | --- | --- | --- | --- | --- | --- |
@@ -252,9 +252,11 @@
 | TASK-003 | M17 | Wave1 `proxy.ts` default-deny 帧分类（导出 `classifyFrame`）+ profile 守卫 + 注入 | TASK-001 | 单测 + 评审：4 条绕过路径拒绝 | 待开始 |
 | TASK-004 | M17 | Wave1 `proxy.test.ts` **19 例**（4 绕过 + 误拦防护 + REQ-017 注入/403 + MethodSweep + REQ-018/018a 超限 + REQ-015 过滤/fail-closed/错误帧透传 + REQ-021 审计） | TASK-003 | vitest（server）全绿 | 待开始 |
 | TASK-029 | M17 | Wave1 REQ-015 `profiles.list`/`describe` 响应白名单过滤 + 仅「成功但结构不符」fail-closed + **上游错误帧原样透传** | TASK-003 | vitest：过滤 + fail-closed + 上限清理 | 待开始 |
-| TASK-030 | M17 | Wave1 REQ-017 **default-deny**：缺 `params.profile` 的非豁免 request 帧注入 `default_profile`（**显式豁免清单**：`ping`/`gateway.capabilities`/`client.capabilities`/`commands.catalog`/`complete.path`/`complete.slash`/`llm.oneshot`；**禁止包含式前缀白名单**）+ MethodSweep | TASK-003 | vitest：豁免不注入 / 非豁免注入 / 无分配 403 / super_admin 不注入 / MethodSweep 无遗漏 | 待开始 |
+| TASK-030 | M17 | Wave1 REQ-017 **default-deny**：缺 `params.profile` 时**豁免判据唯一 = 参数类 schema 未声明 `profile` 字段**（从契约派生；**不得**用「是否直继 `Params`」）→ 不注入；**其余一切方法（含未知方法）**注入 `default_profile`。**豁免清单 18 条**：`ping`/`gateway.capabilities`/`client.capabilities`/`complete.slash`/`reload.env`/`reload.mcp`/`plugins.list`/`learning.frames`/`learning.detail`/`learning.delete`/`paste.collapse`/`model.save_key`/`model.disconnect`/`diagnostics.share_nous`/`image.generate`/`tools.list`/`toolsets.list`/`tools.show`；**须注入**含 `commands.catalog`/`config.show`/`cron.manage`/`complete.path`/`llm.oneshot` | TASK-003 | vitest：18 条豁免不注入 / 须注入方法被注入 / 未知方法被注入 / 无分配 403 / super_admin 不注入 / **MethodSweep 机械断言「豁免集合 == 无 `profile` 字段集合」** | 待开始 |
 | TASK-031 | M17 | Wave1 REQ-018 / **REQ-018a** WS `maxPayload`（**双 socket**）+ `pending`/`outbound` 队列上限（**条数 AND 累计字节**，`pendingBytes ≤ K × maxPayload`） | TASK-003 | vitest：条数超限、字节超限、仅该连接关闭 | 待开始 |
 | TASK-034 | M17 | Wave1 **REQ-021 审计接入**：守卫拒绝（WS 403 / REST 403）与响应过滤 fail-closed 写 `audit`（actor/profile/method/ip/结果/ts，不含 token/密钥/字节） | TASK-003,TASK-029 | vitest：各类事件各恰 1 条且零 token/字节泄漏 | 待开始 |
+| TASK-035 | M17 | Wave1 **REQ-022 REST 守卫**：`routes/hermes.ts` 去掉「缺 `profile` 即提前 `return`」；非 `super_admin` 除豁免路径 `/api/hermes/health` 外缺 `profile` → 注入 `default_profile`（落入**被转发的 query**）或 403 | TASK-001 | vitest：注入 / 403 / health 豁免 / super_admin 不拦 + 断言上游实际收到 `profile` | 待开始 |
+| TASK-036 | M17 | **R24 残余（独立，不阻塞主线）**：`tools.list`/`toolsets.list`/`tools.show` 无 `profile` 字段可注入，缺 `session_id` 回退**启动 profile** 配置 → 跨租户；须 session 归属校验 | TASK-030,TASK-033 | vitest：跨租户 `session_id` 被拒、本租户通过 | 待开始 |
 | TASK-005 | M17 | Wave1 `chat/composer/pendingAttachments.ts` 纯函数（预筛/kindOf/dedupe/readAsBase64） | — | vitest + 边界遍历 + 断言未读超限内容 | 待开始 |
 | TASK-006A | M17 | Wave1 `composer/controlsReducer.ts` 纯 reducer（selection/attachments/single-flight） | — | vitest：状态转移 + 回滚无残留 | 待开始 |
 | TASK-006B | M17 | Wave1 `composer/useOptions.ts` options 生命周期 + 会话键缓存迁移 | — | vitest：缓存迁移（≤1 次）+ 参数含 `profile` | 待开始 |
@@ -282,7 +284,7 @@
 | TASK-024 | M17 | Wave4 StrictMode 幂等 + 4001 有界重试回归 + hero 发送不禁用 | TASK-016,TASK-017 | vitest | 待开始 |
 | TASK-025 | M17 | Wave4 BFF 守卫端到端（帧分类视角，4 绕过 + 放行 + REQ-017 注入 + REQ-018/018a 超限 + **REQ-021 审计**） | TASK-003,TASK-004 | vitest（server） | 待开始 |
 | TASK-026 | M17 | Wave4 （可选，单独跑）e2e：hero 上传（点击 + 拖拽）→ 发送 → docked | TASK-023 | `npm run test:e2e` | 待开始 |
-| TASK-027 | M17 | Wave5 `npm run check` 全绿 + 基线一致性复核（防漂移，含 REQ-010a/011a/018a/020/021） | TASK-001..026, TASK-028..034 | `npm run check` + 人工比对清单 | 待开始 |
+| TASK-027 | M17 | Wave5 `npm run check` 全绿 + 基线一致性复核（防漂移，含 REQ-010a/011a/018a/018b/020/021/022） | TASK-001..026, TASK-028..036 | `npm run check` + 人工比对清单 | 待开始 |
 
 ## 后续任务（待开发）
 

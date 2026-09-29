@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -28,9 +29,17 @@ export interface SessionValue {
 
 const SessionContext = createContext<SessionValue | null>(null);
 
-export function SessionProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<SessionUser | null>(null);
-  const [loading, setLoading] = useState(true);
+export function SessionProvider({
+  children,
+  initialUser = null,
+}: {
+  children: ReactNode;
+  /** 测试注入：非 null 时直接采用，跳过首屏 `/api/auth/me` 请求。 */
+  initialUser?: SessionUser | null;
+}) {
+  const [user, setUser] = useState<SessionUser | null>(initialUser);
+  const [loading, setLoading] = useState(initialUser === null);
+  const seededRef = useRef(initialUser !== null);
 
   const refresh = useCallback(async () => {
     try {
@@ -44,6 +53,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (seededRef.current) {
+      return;
+    }
     let alive = true;
     api<SessionUser>("/api/auth/me")
       .then((me) => {
@@ -104,4 +116,9 @@ export function useSession(): SessionValue {
     throw new Error("useSession 必须在 SessionProvider 内使用");
   }
   return context;
+}
+
+/** 可选会话：无 `SessionProvider` 时返回 null（组件级测试可脱离会话上下文渲染）。 */
+export function useOptionalSession(): SessionValue | null {
+  return useContext(SessionContext);
 }

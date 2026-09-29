@@ -1,7 +1,7 @@
 # Specification: 对话页重构（openclaw 风格 hero + 会话控件）
 
 > Spec ID: 003-composer-redesign | Phase: requirements | Workflow: requirements-first | Version: v1.0.0-20260929-173000
-> 状态：**approved-for-build**
+> 状态：**in-review**（第 3 轮收尾 + 第 4 轮豁免判据修正已应用；终审尚待执行；未获 DEFEND 前不得进入 build）
 > 基线：`requirements-draft.md`（同目录，已获用户批准）+ Gate 2 的 6 处订正 + 2 项新增（REQ-015/016）
 
 ## 1. 业务背景
@@ -25,8 +25,9 @@
 | **① `params.profile`** | BFF WS 代理无 profile 守卫（`proxy.ts:105-111`），且帧分类 fail-open（见 §9 R13） | **REQ-008 闭合**（改为 default-deny） |
 | **② profile 元数据枚举** | `profiles.list` 不按调用者过滤，可枚举全部 profile 的 `name/path/model/description` | **REQ-015 闭合**（响应方向白名单过滤 + fail-closed） |
 | **③ 会话 ID 寻址** | `session.list` / `session.resume` / `session.events.since` 以会话 id 寻址、**不含 `params.profile`** → 落到**启动 profile** 的存储，构成跨租户读写 | **REQ-017 闭合**（服务端强制注入调用者 `default_profile`） |
+| **④ 会话 ID 寻址** | 同 ③ 的 REST 对应面 | 由 **REQ-022** 闭合 |
 
-**残余缺口（显式登记，不在本 Spec 闭合）**：`workspaces` 与 `model.options` 的授权语义已由 REQ-012 / REQ-002 要求显式携带 `profile` 参数闭合；服务端 magic bytes 校验落点（R10）与 `session.*` 白名单方法清单的完备性（R14）留待实现阶段验证。
+**残余缺口（显式登记）**：REST 路径的守卫缺口已由 **REQ-022** 闭合。**订正**：本 Spec 早前版本曾称「REST 已有 `assertProfileAccess`」——该表述不准确，`routes/hermes.ts:39-42` 在 `!profile \|\| role === "super_admin"` 时**提前 `return`**，故缺 `profile` 的请求实际未被守卫；REQ-022 已修正该行为。**仍未闭合**：`_SessionScoped` 方法的 session 归属（R24）、服务端 magic bytes 校验落点（R10）、WS 大帧端到端可达性（R15）、REST 注入的上游语义（见 §10）。
 
 ## 2. 用户故事
 
@@ -52,23 +53,24 @@
 | REQ-005 | high | 对话页已挂载 | 输入区可见 | 点击 `＋` 选文件/图片/PDF、或拖拽入框、或粘贴图片 | 上传模块 | shall 生成前端 chip 暂存（File 对象），**hero 态不得触发任何 RPC** | Given hero 态, When `＋→图片` 选 1 图, Then 出现 1 chip 且 `gateway.request` **调用数为 0**; Given 拖拽 3 文件, When drop, Then 3 chip 且无 RPC; Given 粘贴含图片的 `ClipboardEvent`, Then 走**浏览器 Clipboard API**（**非** `clipboard.paste` / `input.detect_drop`） |
 | REQ-006 | high | 对话页已挂载 | 有待发送文本或 chip，且发送流程未在进行中 | 用户发送且当前无活动会话 | 发送流程 | shall 严格按 `session.create` → `attach*`（逐附件）→ `prompt.submit` 顺序执行；任一失败中止后续并透传网关真实 message；**shall 实施 single-flight**（发送未结束时忽略重复触发，不得并发发出两次 `session.create`） | Given hero + 文本 + 2 附件, When 发送, Then 调用序为 `session.create` → `image.attach_bytes{content_base64,filename}` / `file.attach{data_url,name}` / `pdf.attach{content_base64,filename}`（逐条，runtime id）→ `prompt.submit`; Given 第 1 个 attach 报错, Then **不调用** `prompt.submit` 且展示网关 message; Given 发送进行中再次点击发送/按 Enter, Then `session.create` 调用数仍为 1 |
 | REQ-007 | medium | 对话页已挂载 | 用户选择文件 | 单文件 `size > 10MB`，或单批 > 10 个 | 上传模块 | shall **在读取内容之前**拒绝该文件并给含文件名与上限的可读错误，不影响其余合法文件 | Given 选择 12MB 文件, When 校验, Then 该 chip 被拒 + 错误含「10MB」且**未发生文件内容读取**; 同一批的 1MB 文件仍入 chip; Given 单批 11 个文件, Then 仅前 10 个入 chip |
-| **REQ-008** | **critical** | BFF WS 代理路径已建立 | 角色非 `super_admin` | 客户端 WS 帧**含 `method` 字符串**（无论是否带 `id`、无论是否带 `result`/`error`）且 `params.profile` 指向未分配 profile | **BFF WS 代理** | shall 以 **default-deny** 分类：凡含 `method` 字符串的帧一律按 request 处理并施加守卫（**不得**因缺 `id` 或存在 `result`/`error` 而以「通知/响应」名义放行）；JSON 数组批帧 shall **逐元素**分类与守卫；**二进制帧 shall 拒绝**（L1 为文本 JSON-RPC）；JSON 解析失败 shall 拒绝；越权时以同 `id`（批帧为错误数组）回 `403 PROFILE_FORBIDDEN` 且**不转发** | Given `admin` 未分配 `px`, When WS 发 `{jsonrpc,id:1,method:"session.create",params:{profile:"px"}}`, Then 收到同 `id` 的 403 且上游未收到该帧; Given 同上但**省略 `id`**（通知化）, Then **同样** 403/拒绝且不转发; Given 同上但**附带 `"error":null`** 或 `"result":null`, Then **同样**拒绝且不转发; Given 发 `[{...profile:"px"...}]`（数组批帧）, Then 逐元素守卫、越权元素被拒、上游未收到越权部分; Given 发 **二进制帧**, Then 拒绝且不转发; Given 客户端回包 `{id:9,result:{...}}`（**无 `method`**）, Then 正常转发不被拦; Given `super_admin`, Then 帧正常转发 |
+| **REQ-008** | **critical** | BFF WS 代理路径已建立 | 角色非 `super_admin` | 客户端 WS 帧**含 `method` 字符串**（无论是否带 `id`、无论是否带 `result`/`error`）且 `params.profile` 指向未分配 profile | **BFF WS 代理** | shall 以 **default-deny** 分类：凡含 `method` 字符串的帧一律按 request 处理并施加守卫（**不得**因缺 `id` 或存在 `result`/`error` 而以「通知/响应」名义放行）；JSON 数组批帧 shall **逐元素**分类与守卫；**若批中任一元素越权，shall 整批拒绝**（回 `error:{code:403, data:{code:"PROFILE_FORBIDDEN"}}`，**不转发任何元素**）——不做局部转发以避免 id 合并与上游批支持的不确定性；**二进制帧 shall 拒绝**（L1 为文本 JSON-RPC）；JSON 解析失败 shall 拒绝；越权时以同 `id`（批帧为错误数组）回 `403 PROFILE_FORBIDDEN` 且**不转发** | Given `admin` 未分配 `px`, When WS 发 `{jsonrpc,id:1,method:"session.create",params:{profile:"px"}}`, Then 收到同 `id` 的 403 且上游未收到该帧; Given 同上但**省略 `id`**（通知化）, Then **同样** 403/拒绝且不转发; Given 同上但**附带 `"error":null`** 或 `"result":null`, Then **同样**拒绝且不转发; Given 发 `[{...profile:"px"...}]`（数组批帧）, Then 逐元素守卫、越权元素被拒、上游未收到越权部分，且**整批**均未被上游收到; Given 发 **二进制帧**, Then 拒绝且不转发; Given 客户端回包 `{id:9,result:{...}}`（**无 `method`**）, Then 正常转发不被拦; Given `super_admin`, Then 帧正常转发 |
 | REQ-009 | high | 对话页已挂载 | hero 态（无 session） | 用户切换模型 pill | 模型控件 | shall **仅更新待创建会话的 `model` 参数**（不发 `config.set`）；会话内则发 `config.set{key:"model", value, session_id: runtimeId}` | Given hero + 选 `m-b`, When 发送, Then `session.create` 入参含 `model:"m-b"` 且 `config.set` 调用数为 0; Given 会话内 `runtimeId = R`, When 选 `m-b`, Then `config.set{key:"model", value:"m-b", session_id:R}` |
 | REQ-010 | high | 会话运行中 | `running === true` | 用户切换模型 | 模型控件 | shall 接受选择并显示为目标模型；网关回包 `deferred:true` 时提示「将于下一回合生效」，**不得**在回合中途热切 | Given 回合运行中, When 切模型, Then UI 目标为新模型且出现「下一回合生效」提示 |
 | REQ-010a | high | 会话已建立（`identityReady`） | `modelSwitch.status === "deferred"` | 收到该会话的 **`message.complete`** 事件（回合结束） | 模型控件 | shall 调用 **`model.options{profile: <当前 selection.profile 或 default_profile>, session_id: runtimeId}`** 并以回包 **`model`** 字段回正选中态；若 `model` ≠ 用户选择 shall 提示「切换未生效」并回滚选中态 | Given `deferred` 后收到 `message.complete`, Then 调用 `model.options` 一次且**参数同时含非空 `profile` 与 `session_id`**; Given 回包 `model === 用户选择`, Then 选中态保持且清除 pending; Given 回包 `model !== 用户选择`（stash 被丢弃）, Then 回滚选中态并提示「切换未生效」 |
 
-**注**：契约中 **不存在 `session.info`**；`session.status` 回包仅 `{output: str}`（渲染文本），不可用于对齐。唯一结构化来源是 `model.options{session_id}` 回包的 `model` 字段（`config_free_tier_control.py:273-277`，doc: "layered over the session's live provider when given"）。
+**注**：契约中 **不存在 `session.info`**；`session.status` 回包仅 `{output: str}`（渲染文本），不可用于对齐。唯一结构化来源是 `model.options{profile, session_id: runtimeId}` 回包的 `model` 字段（`config_free_tier_control.py:273-277`，doc: "layered over the session's live provider when given"）。
 | REQ-011 | high | 会话已建立 | 用户选定模型 | 用户选定模型 | 模型控件 | shall 发 `config.set{key:"model", value, session_id}`；**前端 shall 不预判「昂贵」**（以网关回包为准）；若回包 `confirm_required === true` shall 展示 `confirm_message` 并等待确认，确认后 shall 以 `confirm_expensive_model:true` 重发，取消 shall 回滚选中态 | Given 会话内选模型, When `config.set` 回 `{confirm_required:true, confirm_message:"…"}`, Then 弹确认且**尚未落库**; When 用户确认, Then 第二次 `config.set` 携带 `confirm_expensive_model:true`; When 用户取消, Then 选中态回滚且无第二次调用 |
 | REQ-011a | medium | 对话页已挂载 | hero 态（`activeId === null`） | 用户选定模型 | 模型控件 | shall **不做**前端二次确认（`session.create` 无 `confirm_expensive_model` 字段），仅写入待创建参数；若网关拒绝 shall 透传其 message | Given hero 选任意模型, When 发送, Then `session.create` 携带 `model` 且**无** `confirm_expensive_model` 相关弹窗; Given 网关拒绝, Then 展示网关 message（登记为风险 R13 / Ask First） |
 | REQ-012 | high | 对话页已挂载 | 用户在工作区 pill 选择目录 | 选择动作 | 工作区控件 | hero 态 shall 写入 `session.create` 的 `cwd` **且 `cwd_explicit:true`**；会话内 shall 用 **stored id** 发 `session.workspace.move{session_key, cwd}`；工作区列表 shall 以当前 `profile` 作查询参数请求 `/api/hermes/chat/workspaces?profile=<name>` 以使 BFF `assertProfileAccess` 生效；**若无可用 `profile`（未选且 `default_profile` 为空）shall 不发起该请求**并展示可读错误（不得发起无 `profile` 的请求）；`cwd` shall **原样透传** | Given hero + 选 `/w/a`, When 发送, Then `session.create` 含 `cwd:"/w/a", cwd_explicit:true`; Given 未选目录, Then **省略 `cwd_explicit`**（不传 `false`）; Given 会话内 + 选 `/w/b`, Then `session.workspace.move{session_key: storedId, cwd:"/w/b"}`（断言**非** runtimeId）; Given 请求工作区列表, Then URL 含 `profile=<当前选择>`; **Given 无可用 profile, Then 请求数为 0 且展示可读错误**; Given 传入相对路径 `"./x"`, Then 原样透传 |
 | REQ-013 | medium | 会话已建立 | 用户切换权限模式 | 选择非默认模式 | 权限控件 | shall 发 `config.set{key:"yolo", scope:"session"}`，且失败时**回滚 UI 选中态** | Given 会话内, When 选「自动批准」, Then `config.set{key:"yolo", scope:"session"}`; 回包错误, Then 选中态回滚并展示 message |
 | REQ-014 | medium | 对话页已挂载 | **`activeId !== null` 且**（`identity === null` 或 `identity.storedId !== activeId`），即已有会话但身份未就绪 | 渲染 / 交互 | 运行中 RPC 守卫 | shall 禁用**会话域**控件并阻止 **runtime-id** RPC 发出；**hero 态（`activeId === null`）不适用本约束**——hero 发送走 `session.create`（不需要 runtime id）**不得被禁用**；且**不改动** docked 已有会话上 `prompt.submit` 的 4001 有界重试语义 | Given 点选非活动行触发 resume 中（`activeId !== null`）, When 用户点发送, Then runtime-id RPC 被本地拦截且 `prompt.submit` 未发出; **Given hero 态（`activeId === null`）且有文本, Then 发送可用**（`session.create` 路径不受影响）; Given docked 已有会话且 submit 回 4001, Then 仍按既有有界重试一次 |
 | REQ-015 | high | BFF WS 代理路径已建立 | 角色非 `super_admin` | 上游对 `profiles.list` 的**响应帧**返回全量 profile | **BFF WS 代理** | shall 按调用者 `user_profiles` 白名单**过滤响应**后再下发；**仅对「成功但结构不符」fail-closed**（不下发并回错误）；**上游错误帧（`{id, error}`）shall 原样透传**（不得替换为 BFF 自造错误，见 PR-008）；批帧元素发起的读取 shall 同样被记录并过滤 | Given `admin` 仅分配 `alpha`, When WS 发 `profiles.list{include_sessions:false}`, Then 回包 `profiles[]` 仅含 `alpha`; Given `super_admin`, Then 回包保留全量; Given 上游返回 `{id, error:{code:500,message:"上游错误"}}`, Then **原样透传该错误**; Given 上游返回 `{id, result:{nope:1}}`（结构不符）, Then 不下发全量并回错误（fail-closed） |
-| REQ-017 | **critical** | BFF WS 代理路径已建立 | 角色非 `super_admin` | **凡含 `method` 的 request 帧未携带** `params.profile` | **BFF WS 代理** | shall **default-deny**：除命中**显式登记的 profile-agnostic 豁免清单**外，一律注入调用者的 `default_profile` 作为 `params.profile` 后再转发；若调用者无任何已分配 profile 或无 `default_profile` shall 回 `403 PROFILE_FORBIDDEN` 且不转发。**豁免清单**（须在 `design.md` 显式枚举并逐条测试）：`ping` / `gateway.capabilities` / `client.capabilities` / `commands.catalog` / `complete.path` / `complete.slash` / `llm.oneshot`。**禁止**使用「包含式前缀白名单」（如仅 `session.`/`profiles.`/`mcp.`/`skills.`）——遗漏即 fail-open | Given `admin` 分配 `alpha`（default=`alpha`）, When 发 `{method:"session.list",params:{}}`, Then 转发帧 `params.profile === "alpha"`; **Given 发 `{method:"cron.manage",params:{}}`（不在豁免清单）, Then 转发帧 `params.profile === "alpha"`**; **Given 发 `{method:"vault.list",params:{}}`, Then 转发帧 `params.profile === "alpha"`**; Given 发 `{method:"ping",params:{}}`（在豁免清单）, Then **不注入**且正常转发; Given `super_admin`, Then 不注入; Given `admin` 无任何分配 profile, When 发 `session.list`, Then 回 403 且不转发; **Given 遍历 `docs/INTERFACES.md` 的方法清单, Then 每个未被显式豁免的方法都获得注入或 403**（无遗漏） |
-| REQ-018 | medium | BFF WS 代理路径已建立 | 上行帧体积较大 | 单帧超过 `maxPayload`，或 `pending` / `outbound` 队列超过**条数上限**，或**累计字节超过字节预算** | **BFF WS 代理** | shall 显式设定 `maxPayload`（同时对**客户端接入侧**与**上游侧**两个 socket 生效）与队列上限（**条数 + 累计字节**，`pendingBytes ≤ K × maxPayload`，K 须量化）；超限 shall 以可读错误拒绝并**只**终止该连接 | Given 单帧超 `maxPayload`, Then 可读错误且仅该连接关闭; Given 队列达条数上限, Then 新帧被拒; **Given `pendingBytes` 达字节预算, Then 新帧被拒（不得无界缓存）**; Given 其他连接, Then 不受影响 |
+| REQ-017 | **critical** | BFF WS 代理路径已建立 | 角色非 `super_admin` | **凡含 `method` 的 request 帧未携带** `params.profile` | **BFF WS 代理** | shall **default-deny**：① `method` 命中**豁免清单** → 不注入直接转发；② **其余一切 `method`（含清单外的未知方法）** → 注入 `default_profile`；③ ②中若无可用 profile → `403 PROFILE_FORBIDDEN` 不转发。**豁免判据（唯一）= 该方法的参数类 schema 未声明 `profile` 字段**（须从官方契约派生，见 `contracts-evidence.md`；判据「是否直继 `Params`」**错误**，已废弃）。**豁免清单（18 条，参数类无 `profile` 字段）**：`ping` / `gateway.capabilities` / `client.capabilities` / `complete.slash` / `reload.env` / `reload.mcp` / `plugins.list` / `learning.frames` / `learning.detail` / `learning.delete` / `paste.collapse` / `model.save_key` / `model.disconnect` / `diagnostics.share_nous` / `image.generate` / `tools.list` / `toolsets.list` / `tools.show`。**明确须注入（参数类声明了 `profile`）**：`commands.catalog`、`config.show`、`cron.manage`、`shell.exec`、`cli.exec`、`process.kill`、`tools.configure`、`browser.manage`、`agents.list`、`insights.get`、`session.set_hidden`、`complete.path`、`llm.oneshot`。**禁止**包含式前缀白名单；**禁止**把未知方法当豁免。**残余**：`tools.list`/`toolsets.list`/`tools.show` 等 `_SessionScoped` 方法因 schema 无 `profile` 字段**无法用 profile 守卫**，其租户安全依赖 **session 归属**（见 §10 维度③ 残余 + R14） | Given `admin` 分配 `alpha`（default=`alpha`）, When 发 `{method:"session.list",params:{}}`, Then 转发帧 `params.profile === "alpha"`; Given 发 `{method:"cron.manage",params:{}}`, Then 注入（其参数类声明了 `profile`）; Given 发未知方法 `{method:"totally.unknown",params:{}}`, Then **注入**（不得放行）; Given 发 `{method:"ping",params:{}}`, Then **不注入**且正常转发; Given 发 `{method:"tools.list",params:{}}`, Then **不注入**（参数类无 `profile`，注入会触发 `extra="forbid"` 的 4000）; Given 发 `{method:"commands.catalog",params:{}}`, Then **注入**（参数类声明了 `profile`）; Given `super_admin`, Then 不注入; Given `admin` 无任何分配 profile, When 发 `session.list`, Then 403 且不转发; Given 未带 `id`（通知化）/ 附 `error:null` / 二进制 / 非法 JSON / 非字符串 `method`, Then 一律拒绝 |
+| REQ-018 | medium | BFF WS 代理路径已建立 | 上行帧体积较大 | 单帧超过 `maxPayload`，或 `pending` / `outbound` 队列超过**条数上限**，或**累计字节超过字节预算** | **BFF WS 代理** | shall 显式设定 `maxPayload`（同时对**客户端接入侧**与**上游侧**两个 socket 生效）与队列上限（**条数 + 累计字节**，**`maxPayload = 16 MiB`**（覆盖 10MB → ≈13.3MB base64 并留余量）、**`pendingBytes ≤ K × maxPayload`，`K = 4`**（即单连接累计 ≤ 64 MiB））；超限 shall 以可读错误拒绝并**只**终止该连接 | Given 单帧超 `maxPayload`, Then 可读错误且仅该连接关闭; Given 队列达条数上限, Then 新帧被拒; **Given `pendingBytes` 达字节预算, Then 新帧被拒（不得无界缓存）**; Given 其他连接, Then 不受影响; Given `pendingBytes` 恰好 = 64 MiB, Then 仍可接收; Given 超 1 字节, Then 拒绝新帧 |
 | REQ-019 | medium | 对话页已挂载 | 前端发起 `model.options` | 加载模型清单 | 模型控件 | shall 携带当前 `profile`（或调用者 `default_profile`）作为 `params.profile`；**若无可用 `profile` shall 不发起请求**并展示可读错误 | Given hero 态加载模型清单, Then `model.options` 参数含非空 `profile`; **Given 无可用 profile, Then 请求数为 0 且展示可读错误** |
 | REQ-020 | high | 对话页已挂载 | 用户已显式选择智能体（`selection.profile !== null`） | 发起会话域 RPC（`session.list` / `session.most_recent` / `session.resume` / `session.events.since`） | 会话域请求 | shall 携带 `params.profile = selection.profile`，使多 profile 用户可访问**非默认** profile 的会话；未显式选择时由 BFF 注入 `default_profile`（REQ-017） | Given `admin` 有 `alpha`(default) + `beta` 且 `selection.profile === "beta"`, When 发 `session.list`, Then 帧含 `params.profile === "beta"` 且返回 `beta` 的会话; Given `selection.profile === null`, Then 帧不含 `profile` 并由 BFF 注入 `default_profile`; Given 发 `session.resume{profile:"beta", session_id:<beta 的 stored id>}, Then 成功恢复（不落 `alpha` 存储） |
 | REQ-021 | high | BFF 任意路径 | 租户守卫拒绝或响应过滤 fail-closed | 发生上述事件 | BFF | shall 向 `audit` 表写入一条记录（actor / profile / method / ip / 结果 / 时间戳），**shall 不得**写入 token、密钥或文件字节 | Given `admin` 越权 `params.profile`, Then `audit` 表新增一条含 actor、目标 profile、method、结果的记录; Given REQ-015 fail-closed 触发, Then 同样写审计; 断言记录中不含 token/密钥/字节 |
+| REQ-022 | **critical** | BFF REST 路径 `/api/hermes/*` 已建立 | 角色非 `super_admin` | 请求**未携带** `profile`（query 或 body，见 `routes/hermes.ts:30-32`） | **BFF REST 代理** | shall **default-deny**：① 路径命中**豁免清单** → 放行；② **其余一切路径** → 注入调用者 `default_profile` 作为 `profile`（query 或 body，与 `requestProfile` 读取位置一致）后再执行 `assertProfileAccess`；③ ②中若无可用 profile → 回 `403 PROFILE_FORBIDDEN` 不转发。**豁免清单（profile-agnostic REST 路径）**：`/api/hermes/health`（`routes/hermes.ts:62` 为独立路由，早于 `:85` 的 `app.all("/api/hermes/*")`，本就不经 `assertProfileAccess`）。**禁止**把未知路径当豁免。**残余**：REST 侧 `profile` 注入对上游语义的影响须实测（见 §10）。 | Given `admin` 分配 `alpha`（default=`alpha`）, When `GET /api/hermes/chat/workspaces`（无 `profile`）, Then 该请求被注入 `profile=alpha` 并做守卫（未分配则不转发）; Given 未分配 `beta`, When `GET /api/hermes/skills?profile=beta`, Then 403 `PROFILE_FORBIDDEN`（既有行为保持）; Given `GET /api/hermes/health`, Then 放行（豁免）; Given `super_admin`, Then 不做注入与拦截; Given `admin` 无任何分配 profile, When `GET /api/hermes/anything`, Then 403 且不转发 |
 | REQ-016 | medium | 对话页已挂载 | 任意菜单打开（`＋` / 会话头 `···` / 三个 pill / **侧栏会话列表「更多」菜单**） | 键盘交互 | 菜单组件 | shall 符合 WAI-ARIA APG Menu Button：触发元素 `aria-haspopup="menu"` + `aria-expanded`，菜单 `role="menu"`、子项 `role="menuitem"`，`Esc` 关闭并**归还焦点**到触发元素 | Given 菜单打开, Then 触发元素 `aria-expanded="true"`; When 按 `Esc`, Then 菜单关闭且 `document.activeElement` 为触发元素; 断言子项均有 `role="menuitem"`（含侧栏会话列表「更多」菜单） |
 
 **优先级说明**：`REQ-008`/`REQ-015`/`REQ-017`/`REQ-018` 为安全边界（critical/high）；四者**全部落在 Wave 1 同波次交付**（`constitution.md` PR-011），不得跨波次。
@@ -86,20 +88,22 @@
 | REQ-007 | 已选文件 | >10MB 或 >10 个 | 拒绝 + 可读错误 |
 | REQ-008 | 非 super_admin | WS request 帧 `params.profile` 越权 | 同 id 403 `PROFILE_FORBIDDEN`，不转发 |
 | REQ-009 | hero / 会话内 | 切模型 | create 参数 / `config.set` |
-| REQ-010 | 回合运行中 | 切模型 | `deferred` 提示；回合结束后回正 |
+| REQ-010 | 回合运行中 | 切模型 | `deferred` 提示；回合结束后以 `model.options{profile, session_id}` 回正 |
 | REQ-011 | 昂贵模型 | 选定 | `confirm_expensive_model` 二次确认 |
 | REQ-012 | hero / 会话内 | 选工作区 | `cwd_explicit:true` / `workspace.move`（stored） |
 | REQ-013 | 会话内 | 切权限模式 | `config.set yolo scope:"session"` + 失败回滚 |
 | REQ-014 | resume 进行中 | 触发 RPC | 本地拦截 |
 | REQ-015 | 非 super_admin | `profiles.list` 响应 | 按白名单过滤 |
 | REQ-016 | 菜单打开 | 键盘交互 | APG 属性 + Esc 焦点归还 |
-| REQ-010a | `deferred` 后收到 `message.complete` | 回合结束 | 调 `model.options{session_id}` 并以 `model` 回正 |
+| REQ-010a | `deferred` 后收到 `message.complete` | 回合结束 | 调 `model.options{profile, session_id: runtimeId}` 并以 `model` 回正 |
 | REQ-011a | hero 态 | 选定模型 | 不弹确认，写 create 参数 |
 | REQ-017 | 非 super_admin 发无 `profile` 的 `session.*` 帧 | 转发前 | 注入 `default_profile` |
 | REQ-018 | 上行帧/队列超限 | 上限触发 | 可读错误 + 仅终止该连接 |
 | REQ-019 | 加载模型清单 | 请求 | 参数含 `profile` |
 | REQ-020 | 已选智能体 | 会话域 RPC | 帧携带 `profile` |
 | REQ-021 | 守卫拒绝 / 过滤 fail-closed | 事件发生 | 写 `audit` 记录 |
+| REQ-017 | 缺 profile 的 request 帧 | 转发前 | 参数类无 profile → 不注入；其余（含未知）注入或 403 |
+| REQ-022 | 缺 profile 的 REST 请求 | 转发前 | 命中豁免则放行；其余注入或 403 |
 
 ## 5. 非功能需求
 
@@ -111,6 +115,7 @@
 | 可测性 | 选择/状态逻辑下沉为**纯函数 / reducer**（`useSessionControls`、`pendingAttachments`、`deriveComposerVariant`、normalizers），组件仅做渲染 |
 | 安全 | 前端零 token；文件字节与 base64 **绝不进日志**；WS 守卫复用 `userCanAccessProfile` 语义且 **fail-closed**（仅在明确判定越权时拦截，无法解析的帧保持旧行为并记录） |
 | 兼容 | React 19 `StrictMode` 双调用下 hero↔docked 与上传流程**幂等**；`previewUrl`（`URL.createObjectURL`）在 4 个时机恰好 revoke 一次 |
+| 契约同步 | 守卫的豁免清单 shall 从官方契约派生并归档至 `contracts-evidence.md`；契约变更时 shall 同步清单（`PR-014`） |
 
 ## 6. 属性测试属性
 
@@ -125,17 +130,23 @@
 | REQ-007 | 入 chip 者恒 `size ≤ 10MB` 且单批 ≤ 10 | 上限不可绕过 | 恰好 10MB、10MB+1B、0 字节、第 11 个、超限混入合法 |
 | REQ-008 | 放行 ⟺ request 帧且 (`super_admin ∨ assigned`) 或帧不含 `profile` | 守卫与 REST 同语义，响应帧恒放行 | profile 缺失、空串、super_admin、多 profile、数组批帧 |
 | REQ-009 | hero 路径恒不产生 `config.set`；会话路径恒带 `session_id = runtimeId` | 两级语义不混用 | 无 session、身份未就绪、连续切换 |
-| REQ-010 | `running=true` 时切换恒不热切；`deferred` 后收到 `message.complete` 恒触发一次 `model.options{session_id}` 回正 | UI 最终与网关 `model` 一致；不一致须回滚并提示 | deferred 后又被覆盖、turn start 丢弃 stash（回包 `model` ≠ 选择）、interrupt 后切换 |
+| REQ-010 | `running=true` 时切换恒不热切；`deferred` 后收到 `message.complete` 恒触发一次 `model.options{profile, session_id: runtimeId}` 回正 | UI 最终与网关 `model` 一致；不一致须回滚并提示 | deferred 后又被覆盖、turn start 丢弃 stash（回包 `model` ≠ 选择）、interrupt 后切换 |
 | REQ-011 | 前端恒不预判「昂贵」；未回 `confirm_required` 前恒不弹确认；未确认恒不落库 | 以网关 `confirm_required` 为唯一判据 | `confirm_required` 后取消、连续两次选同一昂贵模型、回包无 `confirm_message` |
 | REQ-012 | hero 恒「选了目录才 `cwd_explicit:true`」；会话内恒 `session_key = storedId` | 身份键不可互换 | 空 cwd、未选目录（省略字段）、相对路径、切会话后沿用旧 cwd |
 | REQ-013 | 权限变更失败时 UI 选中态 = 变更前 | 无乐观残留 | 回包 error、scope 缺省、连续切换 |
 | REQ-014 | `activeId === null` 时恒**不**拦截发送；`activeId !== null` 且身份未就绪时恒 0 条 runtime-id RPC 外发 | hero 发送与身份守卫不冲突；4001 有界重试不变 | hero 发送、resume 中、resume 失败、快速切行 |
 | REQ-015 | 非 super_admin 收到的 profiles[] ⊆ 白名单；「成功但结构不符」恒 fail-closed；上游错误帧恒原样透传 | 无 fail-open、且不违反错误透传 | 空白名单、profile 名重复、响应非 JSON、响应缺 profiles 键、上游错误帧、super_admin |
 | REQ-016 | 菜单打开 ⟺ `aria-expanded="true"`；关闭后焦点 = 触发元素 | 焦点不丢失到 body | 无 `menuitem`、快速连开、Esc 冒泡与 slash/@ 菜单冲突 |
-| REQ-010a | `deferred` 状态下收到 `message.complete` 恒恰好触发 1 次 `model.options{session_id: runtimeId}` | 回正不可重复触发 | 同一回合多次 `message.complete`、无 `deferred` 时不触发、session_id 为空 |
-| REQ-017 | 非 `super_admin` 且帧 `method` 前缀命中白名单时，转发帧恒含 `params.profile = default_profile` | 租户上下文由服务端固定 | 已带 `profile`（不覆盖）、无任何分配 profile（403）、super_admin（不注入）、default_profile 为空 |
+| REQ-010a | `deferred` 状态下收到 `message.complete` 恒恰好触发 1 次 `model.options{profile, session_id: runtimeId}` | 回正不可重复触发 | 同一回合多次 `message.complete`、无 `deferred` 时不触发、session_id 为空 |
+| REQ-017 | 豁免集合恒 == 「参数类未声明 `profile` 字段的方法集合」（从契约派生）；其余（含未知）恒注入或 403 | 判据来自契约而非人工枚举；不注入 schema 无 profile 的方法（避免 `extra="forbid"` 的 4000） | 已带 profile（不覆盖）、无分配（403）、super_admin（不注入）、未知方法（注入）、tools.*（不注入）、commands.catalog / config.show / cron.manage（注入） |
 | REQ-018 | 任何超过上限的上行帧恒被拒且不影响其他连接 | 队列不无界增长 | 恰好等于上限、超上限 1 字节、队列满、并发连接 |
 | REQ-019 | `model.options` 参数恒含非空 `profile` | 不发起无租户上下文的请求 | hero 态、无 default_profile |
+| REQ-018a | 累计字节预算恒生效（不得仅限条数） | 队列内存有界 | 单帧≈上限 × K、队列满字节、并发连接 |
+| REQ-020 | 显式选择 profile 时帧恒含该 profile；未选时由 BFF 注入 | 多 profile 自访问可达 | selection=null / "beta" / 未分配 profile / super_admin |
+| REQ-021 | 每条守卫拒绝与 fail-closed 恒产生恰好 1 条审计记录 | 可发现越权探测 | 403 × n、fail-closed、记录中无 token/字节 |
+| REQ-018b | `pendingBytes` 上限恒为 `4 × 16 MiB = 64 MiB` | 字节预算可独立断言 | 恰 64 MiB / 超 1 字节 / 并发连接 |
+| REQ-022 | REST 路径非豁免时恒被注入 `profile` 或 403 | 与 WS 侧同语义，无 early-return 漏口 | 无 profile / 已带 profile / health 豁免 / 未知路径 / 无分配 profile / super_admin |
+| REQ-017a | 豁免集合恒 == 参数类无 profile 字段的方法集合（可用契约生成器独立断言） | 判据可机械复核 | 契约新增/删除 `profile` 字段、未知方法、`_SessionScoped` 方法 |
 
 ## 7. 边界（Always / Ask First / Never）
 
@@ -148,7 +159,10 @@
 | ✅ Always | 仅用 `--ds-*` token 手写 CSS，圆角用 `--ds-radius-*` | 不引 UI 库 |
 | ✅ Always | 拖拽之外必须提供可聚焦的文件选择按钮 | WCAG 2.5.7 |
 | ✅ Always | WS 守卫 **default-deny**：凡含 `method` 字符串的帧一律按 request 守卫；数组批帧逐元素；二进制帧与 JSON 解析失败一律拒绝 | 不得以「通知/响应/无法解析」名义放行（REQ-008） |
-| ✅ Always | 非 `super_admin` 的 `session.*` / `profiles.*` / `mcp.*` / `skills.*` 帧必带租户上下文 | 缺失时由 BFF 注入 `default_profile`（REQ-017） |
+| ✅ Always | WS 与 REST 的租户上下文均 **default-deny**：命中豁免清单则不注入，**其余一切方法/路径（含未知）** 一律注入 `default_profile` 或 403 | REQ-017, REQ-022 |
+| ✅ Always | 豁免判据唯一 = **参数类 schema 未声明 `profile` 字段**（从官方契约派生，禁止人工枚举、禁止「是否直继 `Params`」） | TC-019 |
+| ✅ Always | 守卫拒绝与响应过滤 fail-closed 必写 `audit` 记录（不含 token/密钥/字节） | REQ-021 |
+| ✅ Always | 队列上限须同时约束**条数**与**累计字节** | REQ-018 |
 | ✅ Always | 响应过滤失败时 fail-closed | 绝不下发未过滤的全量（REQ-015） |
 | ❓ Ask First | 单次上传数上限 / 拖拽文件夹（**已定**） | ≤10 个、只取顶层不递归 |
 | ❓ Ask First | `分享` 目标形态（**已定**） | 沿用现有链接 + 剪贴板 |
@@ -157,7 +171,7 @@
 | ❓ Ask First | 服务端 magic bytes 校验落点（Hermes 还是 BFF） | 见风险 R10，需实测后定 |
 | ❓ Ask First | `···` 菜单「连接」的确切语义（多实例切换 vs 状态展示） | 需产品确认落点 |
 | ❓ Ask First | hero 态选昂贵模型无二次确认（`session.create` 无 `confirm_expensive_model` 字段） | 见 R13；需产品确认是否可接受 |
-| ❓ Ask First | REQ-017 的 `method` 前缀白名单是否完备（`session.`/`profiles.`/`mcp.`/`skills.`） | 见 R14，需以官方方法清单核对 |
+| ❓ Ask First | WS 豁免清单（18 条）与 REST 豁免清单（1 条）是否与官方契约/路由一致 | 判据已可机械派生（参数类是否声明 `profile`），漏判方向为**功能回归**（错误注入 → 4000），非安全漏洞 |
 | 🚫 Never | 前端持有 Hermes token 或回显密钥 | 红线（`AGENTS.md §8`） |
 | 🚫 Never | 把文件字节 / base64 写入日志或 DOM 文本 | 红线 |
 | 🚫 Never | hero 态因上传而调用 `session.create` 等 RPC | 破坏延迟绑定（REQ-005） |
@@ -166,8 +180,16 @@
 | 🚫 Never | 用 `image.attach{path}` 传浏览器本地文件 | 浏览器无网关可见路径（REQ-006） |
 | 🚫 Never | 在 WS 守卫中拦截含 `result`/`error` 的响应帧 | 会打断审批/secret/sudo 回包（REQ-008） |
 | 🚫 Never | 以「缺少 `id`」或「存在 `result`/`error`」为由把含 `method` 的帧放行 | 这是 CRITICAL 绕过路径（REQ-008） |
+| 🚫 Never | 用「包含式前缀白名单」决定是否注入租户上下文（遗漏即 fail-open） | REQ-017 |
+| 🚫 Never | 把上游错误帧替换为 BFF 自造错误（违反 PR-008 错误透传） | REQ-015 |
+| 🚫 Never | 以 `session.info` 作为模型对齐来源（契约中不存在该 RPC；`session.status` 仅回 `output: str`） | REQ-010a |
 | 🚫 Never | 透传二进制帧或无法解析的帧而不拒绝 | 同属绕过路径（REQ-008） |
 | 🚫 Never | 在 `activeId === null`（hero 态）禁用发送 | 会破坏 REQ-001/006（N-013） |
+| 🚫 Never | 把「清单外的方法/路径」当作豁免（未知即放行） | REQ-017 / REQ-022 |
+| 🚫 Never | 用手工枚举的方法清单替代由契约派生的清单 | TC-019 |
+| 🚫 Never | REST `/api/hermes/*` 在缺 `profile` 时提前 `return` 跳过守卫（`routes/hermes.ts:40` 的现状） | REQ-022 |
+| 🚫 Never | 向参数类 schema 未声明 `profile` 的方法注入 `profile`（`extra="forbid"` → 4000） | REQ-017 |
+| 🚫 Never | 用「是否直继 `Params`」作为豁免判据 | REQ-017 |
 
 ## 8. 契约依据（官方源码）
 
@@ -181,14 +203,14 @@
 | `session.workspace.move{session_key(stored), cwd}` / `session.cwd.set{session_id(runtime), cwd}` | `contracts/sessions.py:326-349` |
 | `ConfigSetParams{key, value, session_id?, scope?, confirm_expensive_model}` | `contracts/config_free_tier_control.py:74-107` |
 | 运行中模型切换改为 stash 到下一回合，回 `deferred:true`；未确认 stash 在 turn start 被丢弃 | `methods_config_set.py:73-91` |
-| `model.options{session_id?, explicit_only, include_unconfigured, refresh}` → `{providers[], model, provider}`，provider 含 `capabilities{fast, reasoning}` / `pricing` / `authenticated` | `contracts/config_free_tier_control.py:216-280` |
+| `model.options{profile, session_id?, explicit_only, include_unconfigured, refresh}` → `{providers[], model, provider}`，provider 含 `capabilities{fast, reasoning}` / `pricing` / `authenticated` | `contracts/config_free_tier_control.py:216-280` |
 | `image.attach_bytes{content_base64\|data, filename?, ext?}` | `contracts/prompt_voice.py:120-131` |
 | `file.attach{path?\|data_url?\|name?}` → `{ref_path, ref_text, uploaded}` | `contracts/prompt_voice.py:164-183` |
 | `pdf.attach{path?\|content_base64?\|data?, filename?, first_page?, last_page?}` → PNG 页 | `contracts/prompt_voice.py:134-161` |
 | `clipboard.paste{}` = **宿主**剪贴板（浏览器不可用） | `contracts/prompt_voice.py:104-109` |
 | `input.detect_drop{text}` = 仅识别**终端**拖拽文本（浏览器不可用） | `contracts/prompt_voice.py:199-215` |
 | **不存在 `session.info`**；`session.status` 回包仅 `{output: str}`（渲染文本），**不可**用于模型对齐 | `contracts/sessions.py:431-440` |
-| 模型对齐唯一结构化来源：`model.options{session_id}` 回包的 `model` / `provider` | `contracts/config_free_tier_control.py:273-277`（doc: "layered over the session's live provider when given"） |
+| 模型对齐唯一结构化来源：`model.options{profile, session_id: runtimeId}` 回包的 `model` / `provider` | `contracts/config_free_tier_control.py:273-277`（doc: "layered over the session's live provider when given"） |
 | `message.complete` 事件（回合结束）可作为对齐触发器 | `contracts/events.py:205` |
 | 运行中 stash 的开关在 **turn start** 被应用/丢弃 | `prompt_turn.py:622`；`session_compression.py:198-206` |
 | `profiles.list` 不按调用者过滤 → 全量返回 | `methods_profiles.py:266-285` |
@@ -198,7 +220,7 @@
 
 | # | 风险 | 影响 | 缓解 |
 |---|------|------|------|
-| R1 | 运行中切模型的 `deferred` 与用户预期差；stash 可能在 turn start 被丢弃（`prompt_turn.py:622`） | 困惑、误报 bug | **已由 REQ-010a 闭合**：`message.complete` 后调 `model.options{session_id}` 回正；不一致则回滚并提示「切换未生效」；属性测试覆盖「回包 `model` ≠ 选择」 |
+| R1 | 运行中切模型的 `deferred` 与用户预期差；stash 可能在 turn start 被丢弃（`prompt_turn.py:622`） | 困惑、误报 bug | **已由 REQ-010a 闭合**：`message.complete` 后调 `model.options{profile, session_id: runtimeId}` 回正；不一致则回滚并提示「切换未生效」；属性测试覆盖「回包 `model` ≠ 选择」 |
 | R2 | `cwd_explicit` 与具名 profile `terminal.cwd` 的优先级 | 会话跑错目录 | 仅显式选目录时置 `cwd_explicit:true`；未选则**省略字段**；单测断言两种入参 |
 | R3 | base64 经 WS 的体积/超时（10MB → ≈13.3MB 单帧）；`ws` 库默认 `maxPayload` 与上游上限均**未实测** | 上传失败、连接断开 | A4：不分片、>2MB 等待态、失败复用 identity；建议给 BFF 显式设 `maxPayload`；`proxy.ts:33-46` 的 `pending`/`outbound` 数组会放大内存，需上限 |
 | R4 | WS profile 守卫可能误伤既有调用 | 智能体页/列表回归 | 守卫仅在 request 帧且 `params.profile` 非空且越权时拦截；响应帧/通知帧/无 profile 帧放行；专项回归测试 `profiles.list` |
@@ -211,10 +233,17 @@
 | R11 | 规范偏差记录：OWASP 建议 WS 消息 ≤64KB，本 Spec 选 10MB 单帧 | 评审争议 | 在 `architecture.md` 显式登记偏差与补偿控制（A4 + 等待态 + 上限 + 实测） |
 | R12 | `ws.ts` 原有错误解析只读 `error.code`(number) + `message`，读不到 `PROFILE_FORBIDDEN` 字符串 | REQ-008 无法断言命名错误码 | 已定：扩展 `ws.ts` 读取 `error.data.code`（约 5 行） |
 | R13 | **帧分类 fail-open（CRITICAL，评审发现）**：原设计以「无 `id` = 通知」「带 `result`/`error` = 响应」「数组/二进制 = 放行」为免拦理由，形成 4 条可复现绕过 | 完全击穿 REQ-008 与 N-005 | **已由 REQ-008 的 default-deny 改写闭合**：凡含 `method` 即守卫、数组逐元素、二进制与解析失败一律拒绝；`constitution.md` A-006 同步改写 |
-| R14 | REQ-017 的 `method` 前缀白名单可能不完备（漏掉其他租户作用域方法） | 残余越权 | 以官方方法清单（`contracts/*.py` 的全部 `method(...)`）核对；列为本 Spec 的「已知未闭合项」，实测后补 |
+| R14 | WS 豁免判据与清单的**契约同步性** | 漏判方向为**功能回归**（向无 `profile` 字段的方法注入 → `extra="forbid"` → 4000）；不构成 fail-open（未知方法与有 `profile` 的方法均注入） | 判据 = 参数类是否声明 `profile`；清单 18 条；须归档 `contracts-evidence.md` 并由 MethodSweep 机械断言「豁免集合 == 无 profile 字段集合」 |
 | R15 | 10MB 端到端可达性未实测（`ws` 的 `maxPayload`、上游上限、BFF 队列内存放大） | 上传失败 | **已由 REQ-018 部分闭合**（显式上限 + 队列上限）；端到端值以实测为准，REQ-007 只承诺**前端预筛** 10MB，网关拒绝则透传 message；列入 e2e/实测任务 |
 | R16 | 「昂贵」判定依据（`pricing` vs `authenticated`）与 hero 路径无确认 | 计费意外 / 需求不可验收 | **已由 REQ-011 改写闭合**（前端不预判、以网关 `confirm_required` 为唯一判据）；hero 路径无确认列为 R13'（见 Ask First）——**已是本表 R13'，即 `REQ-011a` + Ask First 两条** |
 | R17 | 契约源码路径 `/vol1/.../hermes-desktop/...` 不在本仓库，判定不可被 CI 独立复核 | 安全判据建立于外部事实 | 新增任务：把可核验的契约片段归档到本 Spec 目录（`contracts-evidence.md`） |
+| R18 | 多 profile 的 `admin` 访问**非默认** profile 的会话/历史 | 自访问回归 | **已由 REQ-020 闭合**：前端显式携带 `selection.profile`；未选时 BFF 注入 default（REQ-017） |
+| R19 | 守卫拒绝无审计 → 越权探测不可发现 | 安全可观测性缺失 | **已由 REQ-021 + TASK-034 闭合** |
+| R20 | `manifest.json` 曾由执行代理自造 `verdict: DEFEND` / `status: approved-for-build`（与实际 BREACH 不符） | 规格自称已通过，误导下游 | 已由本轮重写为真实记录；并把「禁止代写评审结论」写入 `constitution.md`（PR-012） |
+| R21 | ~~REST `/api/hermes/*` 缺 `profile` 时守卫提前 return~~ | 跨租户读写 | **已由 REQ-022 闭合**（default-deny：命中豁免路径放行，其余注入或 403）；本 Spec 早前对该缺口的误述已在 §1 订正 |
+| R22 | REST 侧原守卫缺口（`routes/hermes.ts:40` 缺 profile 即 return）曾被本 Spec 误述为「已有守卫」 | 跨租户读写 | **已由 REQ-022 闭合**；并已在 §1 订正错误表述 |
+| R23 | 豁免清单的**派生正确性**依赖 `contracts/*.py` 可读 | 若契约变更而清单未同步 → 漏判为功能回归或误判为拦截 | 归档 `contracts-evidence.md`（TASK-033）并要求清单与该文件同版本；变更契约时须同步 |
+| R24 | `_SessionScoped` 类方法（`tools.list`/`toolsets.list`/`tools.show`）schema **无 `profile` 字段**，无法用 profile 守卫；其 handler 在缺 `session_id` 时回退到**启动 profile** 的配置（`tools_mcp_plugins.py:20-21`） | 跨租户读取（工具/Toolsets 目录） | **未闭合**；依赖 **session 归属校验**（维度③ 残余）；已在 §10 登记，须单开任务 |
 
 ## 10. 已知未闭合项
 
@@ -223,13 +252,17 @@
 | `params.profile` 维度越权 | 帧分类曾有 4 条绕过 | **REQ-008 闭合**（default-deny） |
 | `profiles.list` 元数据枚举 | 不按调用者过滤 | **REQ-015 闭合**（过滤 + fail-closed） |
 | **会话 ID 维度越权** | `session.list/resume/events.since` 无 `profile` → 落启动 profile 存储 | **REQ-017 闭合**（注入 `default_profile`） |
-| REQ-017 白名单完备性 | 前缀清单是否漏方法 | **未闭合**（R14）；须以官方 `method(...)` 全清单核对 |
+| REQ-017 豁免清单完备性 | 枚举是否漏方法 | **未闭合**（R14）；须 MethodSweep 测试（TASK-030） |
 | 服务端 magic bytes 校验 | 落点未定 | **未闭合**（R10），独立任务 |
 | WS 大帧端到端可达性 | `maxPayload` / 上游上限未实测 | 部分闭合（REQ-018 显式上限）；端到端待实测（R15） |
 | hero 态昂贵模型无二次确认 | `session.create` 无该字段 | **未闭合**（REQ-011a / Ask First） |
 | 「连接」菜单语义 | 产品未定 | `❓Ask First` |
 | `/api/auth/me` 是否返回头像 | 决定 AgentPicker 是否只用首字占位 | 实现阶段验证 |
 | 契约片段不可 CI 复核 | 源码在仓库外 | R17；归档任务 |
+| `_SessionScoped` 方法的租户安全 | `tools.list` / `toolsets.list` / `tools.show` 参数类无 `profile` 字段（注入即 4000），缺 `session_id` 时回退启动 profile 配置 | **未闭合**（R24）；须单开任务做 session 归属校验 |
+| REST 注入对上游语义的影响 | REQ-022 注入 `profile` 后上游是否按租户作用域，**未实测** | **未闭合**；实测后确认或调整 |
+| 豁免清单契约同步性 | 判据已改为「参数类是否声明 `profile`」并可机械派生；契约变更须同步 | 未闭合（低危）；由 `contracts-evidence.md` 同版本约束 |
+| REST 注入的落点 | `routes/hermes.ts:94-95` 用 `request.url` 构造上游 target，而 `requestProfile` 读 `request.query`/`request.body`（`:30-32`）——若注入只改 `request.query`，守卫通过但上游不含 `profile`（静默失效） | **未闭合**；TASK-035 须断言「上游实际收到 `profile`」 |
 
 ## 11. 基线同步要求（红线 `AGENTS.md §11`）
 
