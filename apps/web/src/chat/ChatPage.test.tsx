@@ -847,3 +847,139 @@ describe("ChatPage REQ-012 message.complete 结束本轮与推理渲染", () => 
     expect(await screen.findByRole("button", { name: "发送" })).toBeInTheDocument();
   });
 });
+
+describe("ChatPage REQ-020..024 历史消息渲染", () => {
+  function historyGateway() {
+    return createFakeGateway((method) => {
+      if (method === "session.list") {
+        return { sessions: [{ id: "s1", title: "会话一" }] };
+      }
+      if (method === "session.resume") {
+        return {
+          session_id: "runtime:s1",
+          messages: [
+            { role: "user", text: "旧问", row_id: 1 },
+            { role: "assistant", text: "旧答", row_id: 2 },
+          ],
+        };
+      }
+      return {};
+    });
+  }
+
+  it("(a) renders historic user and assistant messages in order", async () => {
+    const gateway = historyGateway();
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+
+    const question = await screen.findByText("旧问");
+    const answer = screen.getByText("旧答");
+    expect(
+      question.compareDocumentPosition(answer) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("(b) renders a historic reasoning-only assistant row distinctly", async () => {
+    const gateway = createFakeGateway((method) => {
+      if (method === "session.list") {
+        return { sessions: [{ id: "s1", title: "会话一" }] };
+      }
+      if (method === "session.resume") {
+        return {
+          session_id: "runtime:s1",
+          messages: [
+            { role: "assistant", text: "让我想想", reasoning: "让我想想", row_id: 3 },
+          ],
+        };
+      }
+      return {};
+    });
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+
+    expect(await screen.findByText("思考过程")).toBeInTheDocument();
+    expect(screen.getByText("让我想想").closest(".bubble")).toHaveAttribute(
+      "data-reasoning",
+      "true",
+    );
+  });
+
+  it("(c) renders a historic tool row as a completed tool card", async () => {
+    const gateway = createFakeGateway((method) => {
+      if (method === "session.list") {
+        return { sessions: [{ id: "s1", title: "会话一" }] };
+      }
+      if (method === "session.resume") {
+        return {
+          session_id: "runtime:s1",
+          messages: [{ role: "tool", name: "web_search", context: "查询关键词", row_id: 4 }],
+        };
+      }
+      return {};
+    });
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+
+    expect(await screen.findByText("web_search")).toBeInTheDocument();
+    expect(screen.getByText("完成")).toBeInTheDocument();
+    expect(screen.getByText("查询关键词")).toBeInTheDocument();
+  });
+
+  it("(d) ignores a late history response for a previously selected session", async () => {
+    const pending = new Map<string, (value: unknown) => void>();
+    const gateway = createFakeGateway((method, params) => {
+      if (method === "session.list") {
+        return {
+          sessions: [
+            { id: "a", title: "会话A" },
+            { id: "b", title: "会话B" },
+          ],
+        };
+      }
+      if (method === "session.resume") {
+        return new Promise((resolve) => {
+          pending.set(String(params.session_id), resolve);
+        });
+      }
+      return {};
+    });
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话A" }));
+    await user.click(screen.getByRole("button", { name: "会话B" }));
+
+    await act(async () => {
+      pending.get("a")?.({
+        session_id: "runtime:a",
+        messages: [{ role: "assistant", text: "A历史", row_id: 1 }],
+      });
+    });
+    await act(async () => {
+      pending.get("b")?.({
+        session_id: "runtime:b",
+        messages: [{ role: "assistant", text: "B历史", row_id: 1 }],
+      });
+    });
+
+    expect(screen.getByText("B历史")).toBeInTheDocument();
+    expect(screen.queryByText("A历史")).not.toBeInTheDocument();
+  });
+
+  it("(e) keeps history when sending a new message", async () => {
+    const gateway = historyGateway();
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+    await screen.findByText("旧答");
+
+    await user.type(screen.getByLabelText("消息"), "新消息");
+    await user.click(screen.getByRole("button", { name: "发送" }));
+
+    expect(screen.getByText("新消息")).toBeInTheDocument();
+    expect(screen.getAllByText("旧问")).toHaveLength(1);
+    expect(screen.getAllByText("旧答")).toHaveLength(1);
+  });
+});

@@ -143,6 +143,33 @@ export function normalizeResumedId(result: unknown): string | null {
   return str((result as Record<string, unknown>).session_id) ?? null;
 }
 
+/** `session.resume` 回包 messages → transcript 项（历史渲染）。 */
+export function normalizeHistoryMessages(result: unknown): TranscriptItem[] {
+  if (!result || typeof result !== "object") return [];
+  const raw = (result as Record<string, unknown>).messages;
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((entry, index) => {
+    if (!entry || typeof entry !== "object") return [];
+    const row = entry as Record<string, unknown>;
+    if (row.display_kind === "hidden") return [];
+    const role = typeof row.role === "string" ? row.role : "";
+    const text = str(row.text) ?? (typeof row.content === "string" ? row.content : "");
+    const id = `h${str(row.row_id) ?? index}`;
+    if (role === "user") return text ? [{ kind: "message", id, role: "user", text } as TranscriptItem] : [];
+    if (role === "assistant") {
+      if (!text) return [];
+      const reasoning = typeof row.reasoning === "string" ? row.reasoning : undefined;
+      const reason = !!reasoning && reasoning.trim() === text.trim();
+      return [{ kind: "message", id, role: "assistant", text, ...(reason ? { reasoning: true } : {}) } as TranscriptItem];
+    }
+    if (role === "tool") {
+      const name = str(row.name) ?? "工具";
+      return [{ kind: "tool", id, name, status: "complete", detail: str(row.context) } as TranscriptItem];
+    }
+    return [];
+  });
+}
+
 /** `session.create` 回包的身份对：`stored_session_id` + `session_id`，两者缺一不可。 */
 export function normalizeCreatedIdentity(result: unknown): SessionIdentity | null {
   if (!result || typeof result !== "object") {

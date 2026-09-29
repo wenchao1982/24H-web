@@ -1,0 +1,16 @@
+{
+  "specId": "001-chat-session-resume",
+  "version": "1.4.4",
+  "timestamp": "2026-09-29T16:00:00Z",
+  "description": "实现 REQ-008/F2：点选历史会话时用 session.resume 回包的投影 messages 渲染往期对话（含工具卡与思考行标记），并受乱序守卫约束、不影响发送路径。",
+  "author": "spec-agent",
+  "status": "implemented",
+  "parentVersion": "1.4.3",
+  "changes": [
+    "新增 normalizeHistoryMessages（user/assistant/tool，跳过 hidden/空，reasoning 标记）",
+    "resumeSession 返回 { runtimeId, items }；attachSession 增加 applyHistory 开关",
+    "selectSession/深链 加载历史；handleSend 不加载（防覆盖）",
+    "规格证据：contracts/sessions.py、session_history.py 投影 + 真机 19 条实测"
+  ],
+  "reviewResult": null
+}

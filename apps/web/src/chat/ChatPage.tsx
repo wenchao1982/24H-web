@@ -31,6 +31,7 @@ import {
   isReasoningOnly,
   matchesRuntime,
   normalizeCreatedIdentity,
+  normalizeHistoryMessages,
   normalizeReplayed,
   normalizeResumedId,
   normalizeSessions,
@@ -51,6 +52,8 @@ import {
 } from "./types";
 
 const REQUEST_KINDS: RequestKind[] = ["approval", "clarify", "sudo", "secret", "mcp.setup"];
+
+type ResolvedSession = { runtimeId: string; items: TranscriptItem[] };
 
 /** 读取本地文件文本（用于导入会话）。 */
 function readFileText(file: File): Promise<string> {
@@ -90,7 +93,7 @@ export default function ChatPage() {
 
   const activeIdRef = useRef<string | null>(null);
   const identityRef = useRef<SessionIdentity | null>(null);
-  const attachInFlightRef = useRef<Map<string, Promise<string>>>(new Map());
+  const attachInFlightRef = useRef<Map<string, Promise<ResolvedSession>>>(new Map());
   const respondersRef = useRef(new Map<string, (result: Record<string, unknown>) => void>());
   const seqRef = useRef(0);
   const nextId = useCallback(() => `i${seqRef.current++}`, []);
@@ -304,19 +307,19 @@ export default function ChatPage() {
     };
   }, [identity?.runtimeId, activeId, gateway]);
 
-  const resumeRuntime = useCallback(
-    async (storedId: string): Promise<string> => {
+  const resumeSession = useCallback(
+    async (storedId: string): Promise<ResolvedSession> => {
       const inflight = attachInFlightRef.current.get(storedId);
       if (inflight) {
         return inflight;
       }
-      const promise = (async () => {
+      const promise = (async (): Promise<ResolvedSession> => {
         const result = await gateway.request("session.resume", { session_id: storedId });
         const runtimeId = normalizeResumedId(result);
         if (!runtimeId) {
           throw new Error("会话恢复失败：响应缺少 session_id");
         }
-        return runtimeId;
+        return { runtimeId, items: normalizeHistoryMessages(result) };
       })();
       attachInFlightRef.current.set(storedId, promise);
       try {
@@ -329,16 +332,19 @@ export default function ChatPage() {
   );
 
   const attachSession = useCallback(
-    async (storedId: string): Promise<SessionIdentity> => {
-      const runtimeId = await resumeRuntime(storedId);
+    async (storedId: string, applyHistory = false): Promise<SessionIdentity> => {
+      const { runtimeId, items } = await resumeSession(storedId);
       const pair: SessionIdentity = { storedId, runtimeId };
       if (activeIdRef.current === storedId) {
         setIdentity(pair);
         identityRef.current = pair;
+        if (applyHistory) {
+          setItems(items);
+        }
       }
       return pair;
     },
-    [resumeRuntime],
+    [resumeSession],
   );
 
   const selectSession = useCallback(
@@ -348,7 +354,7 @@ export default function ChatPage() {
       setItems([]);
       setIdentity(null);
       identityRef.current = null;
-      attachSession(id).catch(() => {
+      attachSession(id, true).catch(() => {
         if (activeIdRef.current === id) {
           setError("无法恢复会话");
         }
@@ -386,7 +392,7 @@ export default function ChatPage() {
         const runtimeId =
           active && active.storedId === targetStoredId
             ? active.runtimeId
-            : await resumeRuntime(targetStoredId);
+            : (await resumeSession(targetStoredId)).runtimeId;
         await gateway.request("session.title", { session_id: runtimeId, title });
         setSessions((current) =>
           current.map((session) =>
@@ -397,7 +403,7 @@ export default function ChatPage() {
         setError("重命名失败");
       }
     },
-    [activePair, gateway, resumeRuntime],
+    [activePair, gateway, resumeSession],
   );
 
   const deleteSession = useCallback(
