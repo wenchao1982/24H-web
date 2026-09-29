@@ -15,7 +15,7 @@ export interface SessionIdentity {
   runtimeId: string;
 }
 
-export type ToolStatus = "start" | "generating" | "complete";
+export type ToolStatus = "start" | "generating" | "complete" | "interrupted";
 
 export type RequestKind = "approval" | "clarify" | "sudo" | "secret" | "mcp.setup";
 
@@ -28,7 +28,7 @@ export interface PendingRequest {
 }
 
 export interface StatusInfo {
-  phase: "thinking" | "done" | "error";
+  phase: "thinking" | "done" | "error" | "interrupted";
   contextPercent?: number;
   tokens?: number;
   tps?: number;
@@ -60,7 +60,7 @@ export type TranscriptItem =
       detail?: string;
       result?: string;
     }
-  | { kind: "notice"; id: string; level: "done" | "error"; text: string };
+  | { kind: "notice"; id: string; level: "done" | "error" | "interrupted"; text: string };
 
 /** 非空字符串或 undefined。 */
 function str(value: unknown): string | undefined {
@@ -255,6 +255,41 @@ export function isReasoningOnly(payload: Record<string, unknown>): boolean {
   const raw = payload.reasoning;
   if (typeof raw !== "string" || raw.trim() === "") return false;
   return raw.trim() === deltaText(payload).trim();
+}
+
+/** `message.complete.status` 归一化；缺失或未知值一律按 `complete`（向后兼容旧网关）。 */
+export function turnStatus(
+  payload: Record<string, unknown>,
+): "complete" | "error" | "interrupted" {
+  const raw = payload.status;
+  if (raw === "error") {
+    return "error";
+  }
+  if (raw === "interrupted") {
+    return "interrupted";
+  }
+  return "complete";
+}
+
+/** 把所有仍处于 start/generating 的工具卡结算为终态；已 complete 的卡不动，detail/result 保留。 */
+export function settleTools(
+  items: TranscriptItem[],
+  status: "complete" | "interrupted",
+): TranscriptItem[] {
+  return items.map((item) =>
+    item.kind === "tool" && (item.status === "start" || item.status === "generating")
+      ? { ...item, status }
+      : item,
+  );
+}
+
+/** 追加「已中断」提示；若末项已是同级别提示则原样返回（幂等，防重放重复）。 */
+export function appendInterruptedNotice(items: TranscriptItem[], id: string): TranscriptItem[] {
+  const last = items[items.length - 1];
+  if (last && last.kind === "notice" && last.level === "interrupted") {
+    return items;
+  }
+  return [...items, { kind: "notice", id, level: "interrupted", text: "已中断" }];
 }
 
 /** `tool.*` 事件的工具名。 */

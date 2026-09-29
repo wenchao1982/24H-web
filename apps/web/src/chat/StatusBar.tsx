@@ -14,6 +14,7 @@ const PHASE_LABEL: Record<StatusInfo["phase"], string> = {
   thinking: "思考中",
   done: "完成",
   error: "出错",
+  interrupted: "已中断",
 };
 
 export default function StatusBar({ status }: { status: StatusInfo | null }) {

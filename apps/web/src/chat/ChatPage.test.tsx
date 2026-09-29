@@ -983,3 +983,133 @@ describe("ChatPage REQ-020..024 历史消息渲染", () => {
     expect(screen.getAllByText("旧答")).toHaveLength(1);
   });
 });
+
+describe("ChatPage REQ-002/003 中断收尾", () => {
+  function makeGateway() {
+    return createFakeGateway((method) =>
+      method === "session.list" ? { sessions: [{ id: "s1", title: "会话一" }] } : {},
+    );
+  }
+
+  it("[REQ-003] settles hanging tool cards to interrupted", async () => {
+    const gateway = makeGateway();
+    const { container } = renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+
+    act(() => {
+      gateway.emit("tool.start", { session_id: "runtime:s1", id: "t1", name: "web_search" });
+      gateway.emit("tool.generating", { session_id: "runtime:s1", id: "t1", name: "web_search" });
+    });
+    expect(container.querySelector('[data-status="generating"]')).not.toBeNull();
+
+    act(() => {
+      gateway.emit("message.complete", {
+        session_id: "runtime:s1",
+        status: "interrupted",
+        text: "",
+      });
+    });
+
+    expect(container.querySelector('[data-status="start"]')).toBeNull();
+    expect(container.querySelector('[data-status="generating"]')).toBeNull();
+    expect(container.querySelector('[data-status="interrupted"]')).not.toBeNull();
+  });
+
+  it("[REQ-002] shows 已中断 and never 完成", async () => {
+    const gateway = makeGateway();
+    const { container } = renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+
+    await user.type(screen.getByLabelText("消息"), "跑起来");
+    await user.click(screen.getByRole("button", { name: "发送" }));
+
+    act(() => {
+      gateway.emit("message.complete", {
+        session_id: "runtime:s1",
+        status: "interrupted",
+        text: "",
+      });
+    });
+
+    expect(container.querySelector('.notice[data-level="interrupted"]')).toHaveTextContent("已中断");
+    const bar = screen.getByRole("status");
+    expect(bar).toHaveTextContent("已中断");
+    expect(bar).not.toHaveTextContent("完成");
+  });
+
+  it("[REQ-005] keeps partial streamed text when interrupted with empty text", async () => {
+    const gateway = makeGateway();
+    const { container } = renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+
+    await user.type(screen.getByLabelText("消息"), "问题");
+    await user.click(screen.getByRole("button", { name: "发送" }));
+
+    act(() => {
+      gateway.emit("message.delta", { session_id: "runtime:s1", text: "你好" });
+    });
+    expect(screen.getByText("你好")).toBeInTheDocument();
+    const bubbles = container.querySelectorAll(".bubble").length;
+
+    act(() => {
+      gateway.emit("message.complete", {
+        session_id: "runtime:s1",
+        status: "interrupted",
+        text: "",
+      });
+    });
+
+    expect(screen.getByText("你好")).toBeInTheDocument();
+    expect(container.querySelectorAll(".bubble")).toHaveLength(bubbles);
+  });
+
+  it("[P1] interrupt notice is idempotent across repeated message.complete", async () => {
+    const gateway = makeGateway();
+    const { container } = renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+
+    act(() => {
+      gateway.emit("message.complete", {
+        session_id: "runtime:s1",
+        status: "interrupted",
+        text: "",
+      });
+    });
+    act(() => {
+      gateway.emit("message.complete", {
+        session_id: "runtime:s1",
+        status: "interrupted",
+        text: "",
+      });
+    });
+
+    expect(container.querySelectorAll('.notice[data-level="interrupted"]')).toHaveLength(1);
+  });
+
+  it("[REQ-001] interrupts with the runtime id and resets the primary action", async () => {
+    const gateway = createFakeGateway((method) => {
+      if (method === "session.list") {
+        return { sessions: [{ id: "s1", title: "会话一" }] };
+      }
+      if (method === "session.interrupt") {
+        return { status: "interrupted" };
+      }
+      return {};
+    });
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "会话一" }));
+
+    await user.type(screen.getByLabelText("消息"), "跑起来");
+    await user.click(screen.getByRole("button", { name: "发送" }));
+
+    await user.click(screen.getByRole("button", { name: "停止" }));
+
+    expect(gateway.paramsOf("session.interrupt")).toEqual([{ session_id: "runtime:s1" }]);
+    expect(await screen.findByRole("button", { name: "发送" })).toBeInTheDocument();
+  });
+});

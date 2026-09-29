@@ -25,6 +25,7 @@ import {
 } from "./slash";
 import {
   appendDelta,
+  appendInterruptedNotice,
   completeAssistant,
   deltaText,
   errorText,
@@ -37,10 +38,12 @@ import {
   normalizeSessions,
   normalizeWorkspaces,
   parseStatus,
+  settleTools,
   toolDetail,
   toolId,
   toolName,
   toolResult,
+  turnStatus,
   upsertTool,
   type Attachment,
   type PendingRequest,
@@ -185,11 +188,30 @@ export default function ChatPage() {
       if (!pair || !matchesRuntime(payload, pair.runtimeId)) {
         return;
       }
-      setItems((current) =>
-        completeAssistant(current, deltaText(payload), nextId(), isReasoningOnly(payload)),
-      );
+      const outcome = turnStatus(payload);
+      setItems((current) => {
+        const sealed = completeAssistant(
+          current,
+          deltaText(payload),
+          nextId(),
+          isReasoningOnly(payload),
+        );
+        if (outcome === "complete") {
+          return sealed;
+        }
+        const settled = settleTools(sealed, outcome === "error" ? "complete" : "interrupted");
+        return outcome === "interrupted"
+          ? appendInterruptedNotice(settled, nextId())
+          : settled;
+      });
       setRunning(false);
-      setStatus({ phase: "done" });
+      if (outcome === "interrupted") {
+        setStatus({ phase: "interrupted" });
+      } else if (outcome === "error") {
+        setStatus({ phase: "error", error: errorText(payload) });
+      } else {
+        setStatus({ phase: "done" });
+      }
     }),
     gateway.on("tool.start", (payload) => {
       const pair = activePair();
@@ -528,6 +550,10 @@ export default function ChatPage() {
     }
     gateway
       .request("session.interrupt", { session_id: pair.runtimeId })
+      .then((result) => {
+        // 回包 {status:"interrupted"|"not_interrupted"}：not_interrupted 表示会话已不在运行，静默即可。
+        void result;
+      })
       .catch(() => {
         setError("无法中断");
       })

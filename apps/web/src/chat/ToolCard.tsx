@@ -4,6 +4,7 @@ const STATUS_LABEL: Record<ToolStatus, string> = {
   start: "已开始",
   generating: "生成中",
   complete: "完成",
+  interrupted: "已中断",
 };
 
 export interface ToolCardProps {
@@ -15,7 +16,11 @@ export interface ToolCardProps {
 
 export default function ToolCard({ name, status, detail, result }: ToolCardProps) {
   return (
-    <details className="tool-card" data-status={status} open={status !== "complete"}>
+    <details
+      className="tool-card"
+      data-status={status}
+      open={status === "start" || status === "generating"}
+    >
       <summary className="tool-summary">
         <span className="tool-name">{name}</span>
         <span className="tool-status" data-status={status}>
