@@ -170,9 +170,31 @@ describe("decideProfileGuard", () => {
     });
   });
 
-  it("allows `tools.list` (_SessionScoped, schema without profile) to avoid a 4000", () => {
-    const frame = classify({ jsonrpc: "2.0", id: 8, method: "tools.list", params: {} });
+  it("allows `tools.list` (_SessionScoped, schema without profile) when it carries a session_id", () => {
+    const frame = classify({
+      jsonrpc: "2.0",
+      id: 8,
+      method: "tools.list",
+      params: { session_id: "runtime:s1" },
+    });
     expect(decideProfileGuard(frame, adminWithProfile, db)).toEqual({ action: "allow" });
+  });
+
+  it("denies `tools.list` without session_id (R24 fail-closed: no fallback to startup profile)", () => {
+    const frame = classify({ jsonrpc: "2.0", id: 81, method: "tools.list", params: {} });
+    expect(decideProfileGuard(frame, adminWithProfile, db)).toEqual({ action: "deny" });
+  });
+
+  it("denies `toolsets.list` / `tools.show` without session_id", () => {
+    for (const method of ["toolsets.list", "tools.show"]) {
+      const frame = classify({ jsonrpc: "2.0", id: 82, method, params: {} });
+      expect(decideProfileGuard(frame, adminWithProfile, db)).toEqual({ action: "deny" });
+    }
+  });
+
+  it("allows `tools.list` without session_id for a super_admin (no guard)", () => {
+    const frame = classify({ jsonrpc: "2.0", id: 83, method: "tools.list", params: {} });
+    expect(decideProfileGuard(frame, superAdmin, db)).toEqual({ action: "allow" });
   });
 
   it("injects for `commands.catalog` whose schema declares profile", () => {
@@ -262,6 +284,15 @@ describe("guardClientFrame", () => {
     const raw = text({ jsonrpc: "2.0", id: 1, method: "ping", params: {} });
     const outcome = guardClientFrame(raw, false, adminWithProfile, db);
     expect(outcome).toEqual({ action: "forward", text: raw, injected: false });
+  });
+
+  it("rejects `tools.list` without session_id for an admin (R24 fail-closed)", () => {
+    const raw = text({ jsonrpc: "2.0", id: 7, method: "tools.list", params: {} });
+    expect(guardClientFrame(raw, false, adminWithProfile, db)).toEqual({
+      action: "reject",
+      code: "PROFILE_FORBIDDEN",
+      id: 7,
+    });
   });
 
   it("forwards a non-exempt frame with the default profile injected", () => {

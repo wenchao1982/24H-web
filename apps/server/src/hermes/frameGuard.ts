@@ -21,6 +21,8 @@ export interface FrameClassification {
   id?: number | string;
   method?: string;
   profile?: string;
+  /** `params.session_id` 的非空字符串（`_SessionScoped` 方法 fail-closed 判据）。 */
+  sessionId?: string;
   elements?: FrameClassification[];
 }
 
@@ -47,6 +49,21 @@ export const PROFILE_AGNOSTIC_METHODS: ReadonlySet<string> = new Set([
   "model.disconnect",
   "diagnostics.share_nous",
   "image.generate",
+  "tools.list",
+  "toolsets.list",
+  "tools.show",
+]);
+
+/**
+ * `_SessionScoped` 方法（R24，TASK-036）：参数类 schema **无 `profile` 字段**
+ * （故不可注入，否则 `extra="forbid"` → 4000），但其 handler 在缺 `session_id`
+ * 时回退到**启动 profile** 的配置（`tools_mcp_plugins.py:20-21`）→ 跨租户读取。
+ *
+ * fail-closed 最小闭合：非 `super_admin` 且未带 `params.profile` 时，
+ * **无 `session_id` → 拒绝**（阻断「回退启动 profile」这条路）；带 `session_id` → 放行。
+ * **残余**：`session_id` 的归属仍未被逐条校验，彻底闭合依赖后续「session 归属校验」。
+ */
+export const SESSION_SCOPED_NO_PROFILE_METHODS: ReadonlySet<string> = new Set([
   "tools.list",
   "toolsets.list",
   "tools.show",
@@ -88,6 +105,14 @@ function readProfile(params: unknown): string | undefined {
   return typeof profile === "string" && profile.trim() !== "" ? profile.trim() : undefined;
 }
 
+function readSessionId(params: unknown): string | undefined {
+  if (!isRecord(params)) {
+    return undefined;
+  }
+  const sessionId = params.session_id;
+  return typeof sessionId === "string" && sessionId.trim() !== "" ? sessionId.trim() : undefined;
+}
+
 function classifyParsed(parsed: unknown): FrameClassification {
   if (Array.isArray(parsed)) {
     return { kind: "batch", elements: parsed.map((item) => classifyParsed(item)) };
@@ -106,6 +131,7 @@ function classifyParsed(parsed: unknown): FrameClassification {
       id: readId(parsed.id),
       method,
       profile: readProfile(parsed.params),
+      sessionId: readSessionId(parsed.params),
     };
   }
   if (parsed.id !== undefined) {
@@ -143,6 +169,7 @@ export function classifyFrame(data: string | Uint8Array, isBinary: boolean): Fra
  *
  * - `super_admin` → allow（不注入）
  * - 已带 `params.profile` → 校验归属：可访问 allow，否则 deny
+ * - 未带 profile 且命中 `_SessionScoped` 方法（R24）→ 有 `session_id` allow，否则 deny
  * - 未带 profile 且命中豁免清单 → allow
  * - 未带 profile 且未命中豁免 → 注入调用者 `default_profile`；无可用 → deny
  */
@@ -163,6 +190,12 @@ export function decideProfileGuard(
     return userCanAccessProfile(db, user.id, explicit)
       ? { action: "allow" }
       : { action: "deny" };
+  }
+
+  // R24（TASK-036）：`_SessionScoped` 无 `profile` 字段 → 先于豁免清单判定。
+  // 缺 `session_id` 时 handler 会回退「启动 profile」，故 fail-closed 拒绝。
+  if (SESSION_SCOPED_NO_PROFILE_METHODS.has(frame.method)) {
+    return frame.sessionId !== undefined ? { action: "allow" } : { action: "deny" };
   }
 
   if (PROFILE_AGNOSTIC_METHODS.has(frame.method)) {

@@ -48,7 +48,7 @@
 |----|--------|-------|-------|------|---------|------------------|-----------------|
 | REQ-001 | high | 对话页已挂载（已认证） | `activeId === null 且 itemCount === 0` | 渲染 / 追加首条消息 | 对话页 | shall 渲染**居中 hero**（大标识 + 标题 + pill 行 + 大输入框 + 最近会话）；有消息时输入区切为 **docked 贴底常驻** | Given 已登录且无活动会话, When 进入对话页, Then `.chat-hero` 存在且含大输入框与「最近会话」区; Given 已有活动会话或已有消息, When 渲染, Then hero 移除、输入区贴底常驻 |
 | REQ-002 | high | 对话页已挂载 | hero 态 | hero 渲染 | 输入区 | shall 在 pill 行渲染 `智能体 · 工作区 · 模型` 三个控件，**智能体选项仅取 `/api/auth/me` 的 `profiles[]`** | Given `me.profiles = ["p1","p2"]`, When hero 渲染, Then 智能体 pill 选项恰为 `{p1,p2}` 且**不含** `profiles.list` 的全量值 |
-| REQ-003 | high | 对话页已挂载 | 任意态 | 输入区渲染 | 输入区 | shall 在底行渲染 `＋ ｜ 权限模式 ｜（弹性空位）｜ 模型 ｜ 发送/停止`，且 **不**渲染语音与 git 分支 pill | Given 输入区渲染, When 查询 DOM, Then 底行控件集合精确匹配; 断言 `voice-live` 与 branch pill **不存在** |
+| REQ-003 | high | 对话页已挂载 | 任意态 | 输入区渲染 | 输入区 | shall 在底行渲染 `＋ ｜ 权限模式 ｜（弹性空位）｜ 模型 ｜ 发送/停止`，且 **不**渲染语音与 git 分支 pill；`＋` 菜单枚举 shall 为 `文件 / 图片 / PDF / 子代理 / 命令 / 上下文 / 人格 / 图片生成 / 工作区`（**docked 态经此切换工作区**，内联 select，`session.workspace.move{session_key: storedId}`） | Given 输入区渲染, When 查询 DOM, Then 底行控件集合精确匹配; 断言 `voice-live` 与 branch pill **不存在**; Given docked 态, When 打开 `＋` 菜单并选择工作区, Then 发出 `session.workspace.move{session_key: <storedId>}` |
 | REQ-004 | medium | 存在活动会话 | 用户点击会话头 `···` | 会话头菜单 | shall 提供 `连接 / 导入 / 导出 / 分享 / 重命名` 五项 | Given 有活动会话, When 点 `···`, Then 菜单恰含 5 项; `重命名` 走 `session.title{runtimeId}`; `分享` 沿用 `?session=<storedId>` + 剪贴板 |
 | REQ-005 | high | 对话页已挂载 | 输入区可见 | 点击 `＋` 选文件/图片/PDF、或拖拽入框、或粘贴图片 | 上传模块 | shall 生成前端 chip 暂存（File 对象），**hero 态不得触发任何 RPC** | Given hero 态, When `＋→图片` 选 1 图, Then 出现 1 chip 且 `gateway.request` **调用数为 0**; Given 拖拽 3 文件, When drop, Then 3 chip 且无 RPC; Given 粘贴含图片的 `ClipboardEvent`, Then 走**浏览器 Clipboard API**（**非** `clipboard.paste` / `input.detect_drop`） |
 | REQ-006 | high | 对话页已挂载 | 有待发送文本或 chip，且发送流程未在进行中 | 用户发送且当前无活动会话 | 发送流程 | shall 严格按 `session.create` → `attach*`（逐附件）→ `prompt.submit` 顺序执行；任一失败中止后续并透传网关真实 message；**shall 实施 single-flight**（发送未结束时忽略重复触发，不得并发发出两次 `session.create`） | Given hero + 文本 + 2 附件, When 发送, Then 调用序为 `session.create` → `image.attach_bytes{content_base64,filename}` / `file.attach{data_url,name}` / `pdf.attach{content_base64,filename}`（逐条，runtime id）→ `prompt.submit`; Given 第 1 个 attach 报错, Then **不调用** `prompt.submit` 且展示网关 message; Given 发送进行中再次点击发送/按 Enter, Then `session.create` 调用数仍为 1 |
@@ -259,7 +259,7 @@
 | 「连接」菜单语义 | 产品未定 | `❓Ask First` |
 | `/api/auth/me` 是否返回头像 | 决定 AgentPicker 是否只用首字占位 | 实现阶段验证 |
 | 契约片段不可 CI 复核 | 源码在仓库外 | R17；归档任务 |
-| `_SessionScoped` 方法的租户安全 | `tools.list` / `toolsets.list` / `tools.show` 参数类无 `profile` 字段（注入即 4000），缺 `session_id` 时回退启动 profile 配置 | **未闭合**（R24）；须单开任务做 session 归属校验 |
+| `_SessionScoped` 方法的租户安全 | `tools.list` / `toolsets.list` / `tools.show` 参数类无 `profile` 字段（注入即 4000），缺 `session_id` 时回退启动 profile 配置 | **部分闭合**（R24 / TASK-036）：缺 `session_id` 时 fail-closed 拒绝（`SESSION_SCOPED_NO_PROFILE_METHODS`，判定早于豁免清单）；带 `session_id` 时归属仍待逐条校验，彻底闭合须 session 归属校验 |
 | REST 注入对上游语义的影响 | REQ-022 注入 `profile` 后上游是否按租户作用域，**未实测** | **未闭合**；实测后确认或调整 |
 | 豁免清单契约同步性 | 判据已改为「参数类是否声明 `profile`」并可机械派生；契约变更须同步 | 未闭合（低危）；由 `contracts-evidence.md` 同版本约束 |
 | REST 注入的落点 | `routes/hermes.ts:94-95` 用 `request.url` 构造上游 target，而 `requestProfile` 读 `request.query`/`request.body`（`:30-32`）——若注入只改 `request.query`，守卫通过但上游不含 `profile`（静默失效） | **未闭合**；TASK-035 须断言「上游实际收到 `profile`」 |

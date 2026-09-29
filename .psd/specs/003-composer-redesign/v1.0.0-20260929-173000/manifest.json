@@ -20,7 +20,8 @@
     "REQ-019 model.options 携带 profile（无可用 profile 则不发起请求）",
     "REQ-020 会话域 RPC（list/most_recent/resume/events.since）显式携带 selection.profile（多 profile 自访问）",
     "REQ-021 守卫拒绝与过滤 fail-closed 写审计（不含 token / 密钥 / 字节）",
-    "Wave 0 基线订正：AGENTS.md / requirement.md / ui-spec.md / architecture.md / docs/TASKS.md / task-list.md"
+    "Wave 0 基线订正：AGENTS.md / requirement.md / ui-spec.md / architecture.md / docs/TASKS.md / task-list.md",
+    "REQ-003 对齐：`＋` 菜单追加「工作区」内联入口（docked 态可切工作区，发 `session.workspace.move{session_key: storedId}`）；同步 ui-spec.md §2/§3、requirement.md §3、spec requirements.md REQ-003"
   ],
   "reviewResult": {
     "verdict": "DEFEND",
@@ -180,7 +181,7 @@
     ]
   },
   "knownGaps": [
-    "【HIGH 待验】R24：_SessionScoped 方法（tools.list / toolsets.list / tools.show）schema 无 profile 字段，无法 profile 守卫；缺 session_id 时回退启动 profile 配置（tools_mcp_plugins.py:20-21）→ 跨租户读取；须 session 归属校验（TASK-036）",
+    "【HIGH 部分闭合】R24：_SessionScoped 方法（tools.list / toolsets.list / tools.show）schema 无 profile 字段，无法 profile 守卫；缺 session_id 时回退启动 profile 配置（tools_mcp_plugins.py:20-21）→ 跨租户读取。部分闭合（TASK-036）：缺 session_id 时 fail-closed 拒绝（SESSION_SCOPED_NO_PROFILE_METHODS，判定早于豁免清单）；带 session_id 时归属仍待逐条校验，彻底闭合须 session 归属校验",
     "WS 豁免清单（18 条）与 REST 豁免清单（1 条）的契约同步性：判据已可机械派生（参数类是否声明 profile），但契约变更须同步清单与 contracts-evidence.md",
     "REQ-022 注入 profile 后上游是否按租户作用域：未实测",
     "服务端 magic bytes 校验落点未定（R10）",

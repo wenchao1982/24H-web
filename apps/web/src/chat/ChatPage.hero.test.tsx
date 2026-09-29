@@ -227,4 +227,45 @@ describe("ChatPage REQ-020 显式 profile 随会话域 RPC", () => {
       }),
     );
   });
+
+  it("未显式选择智能体时 session.list 不上送 profile（由 BFF 注入 default）", async () => {
+    stubWorkspaces();
+    const gateway = createFakeGateway((method) =>
+      method === "session.list" ? { sessions: [{ id: "s1", title: "会话一" }] } : {},
+    );
+    renderHero(gateway);
+
+    await waitFor(() => expect(gateway.paramsOf("session.list")).toHaveLength(1));
+    expect(gateway.paramsOf("session.list")[0]).not.toHaveProperty("profile");
+  });
+
+  it("选择智能体后 session.list 与 session.events.since 均携带 params.profile", async () => {
+    stubWorkspaces();
+    const gateway = createFakeGateway((method, params) => {
+      if (method === "session.list") {
+        return { sessions: [{ id: "s1", title: "会话一" }] };
+      }
+      if (method === "model.options") {
+        return params.profile ? CATALOG : CATALOG;
+      }
+      return {};
+    });
+    renderHero(gateway);
+    const user = userEvent.setup();
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "智能体" }), "beta");
+    await waitFor(() =>
+      expect(gateway.paramsOf("session.list")).toContainEqual({
+        profile: "beta",
+      }),
+    );
+
+    await user.click(await list().findByRole("button", { name: "会话一" }));
+    await waitFor(() =>
+      expect(gateway.paramsOf("session.events.since")).toContainEqual({
+        session_id: "runtime:s1",
+        profile: "beta",
+      }),
+    );
+  });
 });

@@ -548,6 +548,41 @@ describe("ChatPage T6.15 工作区", () => {
       }),
     );
   });
+
+  it("docked 态经 ＋ 菜单切工作区，发 session.workspace.move（stored id，非 runtime）", async () => {
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, _init?: RequestInit) =>
+        ({
+          ok: true,
+          status: 200,
+          text: async () =>
+            String(input).includes("/api/hermes/chat/workspaces")
+              ? JSON.stringify({ workspaces: [{ path: "/home/u/a" }, { path: "/home/u/b" }] })
+              : JSON.stringify({}),
+        }) as Response,
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const gateway = createFakeGateway((method) =>
+      method === "session.list" ? { sessions: [{ id: "s1", title: "会话一" }] } : {},
+    );
+    renderChat(gateway, ADMIN);
+    const user = userEvent.setup();
+
+    await user.click(await list().findByRole("button", { name: "会话一" }));
+    await user.click(screen.getByRole("button", { name: "添加附件" }));
+    await user.click(screen.getByRole("menuitem", { name: "工作区" }));
+    await user.selectOptions(
+      screen.getByLabelText("工作区"),
+      await screen.findByRole("option", { name: "/home/u/b" }),
+    );
+
+    await waitFor(() =>
+      expect(gateway.paramsOf("session.workspace.move")).toEqual([
+        { session_key: "s1", cwd: "/home/u/b" },
+      ]),
+    );
+  });
 });
 
 describe("ChatPage T17.5 子代理观测", () => {

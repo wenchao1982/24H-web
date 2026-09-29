@@ -7,14 +7,21 @@ import UploadMenu, { type UploadPanelKind } from "./UploadMenu";
 function renderMenu() {
   const onAttachFiles = vi.fn();
   const onOpenPanel = vi.fn<(kind: UploadPanelKind) => void>();
+  const onSelectWorkspace = vi.fn<(path: string | null) => void>();
   const result = render(
-    <UploadMenu onAttachFiles={onAttachFiles} onOpenPanel={onOpenPanel} />,
+    <UploadMenu
+      onAttachFiles={onAttachFiles}
+      onOpenPanel={onOpenPanel}
+      workspaceOptions={["/home/u/a", "/home/u/b"]}
+      workspaceValue={null}
+      onSelectWorkspace={onSelectWorkspace}
+    />,
   );
-  return { onAttachFiles, onOpenPanel, ...result };
+  return { onAttachFiles, onOpenPanel, onSelectWorkspace, ...result };
 }
 
 describe("UploadMenu（REQ-005 / REQ-007 / REQ-016）", () => {
-  it("＋ 菜单打开后 8 项存在，含文件/图片/PDF 与五个面板入口", async () => {
+  it("＋ 菜单打开后 9 项存在，含文件/图片/PDF、五个面板入口与工作区", async () => {
     const user = userEvent.setup();
     renderMenu();
 
@@ -31,7 +38,22 @@ describe("UploadMenu（REQ-005 / REQ-007 / REQ-016）", () => {
       "上下文",
       "人格",
       "图片生成",
+      "工作区",
     ]);
+  });
+
+  it("点击「工作区」渲染内联 select，选择后回调路径；空值文案为「选择工作区」", async () => {
+    const user = userEvent.setup();
+    const { onSelectWorkspace } = renderMenu();
+    await user.click(screen.getByRole("button", { name: "添加附件" }));
+
+    expect(screen.queryByLabelText("工作区")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("menuitem", { name: "工作区" }));
+
+    const select = screen.getByLabelText("工作区");
+    expect(screen.getByRole("option", { name: "选择工作区" })).toBeInTheDocument();
+    await user.selectOptions(select, "/home/u/b");
+    expect(onSelectWorkspace).toHaveBeenCalledWith("/home/u/b");
   });
 
   it("文件选择按钮可聚焦（WCAG 2.5.7），隐藏 input 用 visually-hidden", async () => {

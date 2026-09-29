@@ -93,6 +93,8 @@ export const zh = {
   "composer.upload.context": "上下文",
   "composer.upload.personality": "人格",
   "composer.upload.imagegen": "图片生成",
+  "composer.upload.workspace": "工作区",
+  "composer.workspace.placeholder": "选择工作区",
   "composer.header.menu": "会话操作",
   "composer.header.connect": "连接",
   "composer.header.import": "导入",

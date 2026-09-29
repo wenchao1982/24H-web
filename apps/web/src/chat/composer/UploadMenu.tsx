@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { t } from "../../i18n";
 import MenuButton from "./MenuButton";
 
@@ -13,6 +13,11 @@ export type UploadPanelKind =
 export interface UploadMenuProps {
   onAttachFiles: (files: File[]) => void;
   onOpenPanel: (kind: UploadPanelKind) => void;
+  /** 工作区选项（目录路径）；由调用方注入（hero 与会话内共用）。 */
+  workspaceOptions?: string[];
+  workspaceValue?: string | null;
+  /** 选择工作区：会话内走 `session.workspace.move{session_key}`（stored id）。 */
+  onSelectWorkspace?: (path: string | null) => void;
   disabled?: boolean;
 }
 
@@ -27,11 +32,15 @@ export interface UploadMenuProps {
 export default function UploadMenu({
   onAttachFiles,
   onOpenPanel,
+  workspaceOptions = [],
+  workspaceValue = null,
+  onSelectWorkspace,
   disabled = false,
 }: UploadMenuProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLInputElement>(null);
   const pdfRef = useRef<HTMLInputElement>(null);
+  const [workspaceOpen, setWorkspaceOpen] = useState(false);
 
   const finishSelection = (input: HTMLInputElement) => {
     const files = input.files ? Array.from(input.files) : [];
@@ -139,6 +148,33 @@ export default function UploadMenu({
             >
               {t("composer.upload.imagegen")}
             </button>
+            <button
+              type="button"
+              role="menuitem"
+              className="pill-menu-item"
+              aria-expanded={workspaceOpen}
+              onClick={() => setWorkspaceOpen((value) => !value)}
+            >
+              {t("composer.upload.workspace")}
+            </button>
+            {workspaceOpen ? (
+              <select
+                className="pill-select upload-workspace-select"
+                aria-label={t("composer.workspace")}
+                value={workspaceValue ?? ""}
+                onChange={(event) => {
+                  close();
+                  onSelectWorkspace?.(event.target.value === "" ? null : event.target.value);
+                }}
+              >
+                <option value="">{t("composer.workspace.placeholder")}</option>
+                {workspaceOptions.map((path) => (
+                  <option key={path} value={path}>
+                    {path}
+                  </option>
+                ))}
+              </select>
+            ) : null}
           </>
         )}
       </MenuButton>

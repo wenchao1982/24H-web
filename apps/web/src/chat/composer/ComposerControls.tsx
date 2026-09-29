@@ -93,6 +93,9 @@ export default function ComposerControls(props: ComposerControlsProps) {
         <UploadMenu
           onAttachFiles={props.onAttachFiles}
           onOpenPanel={props.onOpenPanel}
+          workspaceOptions={props.workspaceOptions}
+          workspaceValue={props.workspaceValue}
+          onSelectWorkspace={props.onSelectWorkspace}
           disabled={props.uploadDisabled}
         />
         <PermissionPicker

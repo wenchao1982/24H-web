@@ -317,7 +317,7 @@ describe("profile guard over WS", () => {
     expect(forwarded.params.profile).toBe("alpha");
   });
 
-  it("does not inject for an exempt method (tools.list would 4000)", async () => {
+  it("does not inject for an exempt `_SessionScoped` method carrying a session_id (tools.list would 4000)", async () => {
     const { upstreamState, client, messages } = await boot("ws-exempt-token", () =>
       seedAdmin(["alpha"]),
     );
@@ -326,13 +326,32 @@ describe("profile guard over WS", () => {
       jsonrpc: "2.0",
       id: 45,
       method: "tools.list",
-      params: {},
+      params: { session_id: "runtime:s1" },
     });
     client.send(frame);
     await messages.next();
 
     expect(upstreamState.frames[0]).not.toContain("profile");
     expect(JSON.parse(upstreamState.frames[0]).params.profile).toBeUndefined();
+  });
+
+  it("rejects `tools.list` without session_id (R24 fail-closed, never forwards)", async () => {
+    const { upstreamState, client, messages } = await boot("ws-session-scoped-token", () =>
+      seedAdmin(["alpha"]),
+    );
+
+    const frame = JSON.stringify({
+      jsonrpc: "2.0",
+      id: 46,
+      method: "tools.list",
+      params: {},
+    });
+    client.send(frame);
+    const reply = await messages.next();
+
+    expect(upstreamState.frames).toHaveLength(0);
+    expect(reply).toContain("PROFILE_FORBIDDEN");
+    expect(reply).toContain(String(46));
   });
 
   it("forwards a client response frame unchanged", async () => {

@@ -256,7 +256,7 @@
 | TASK-031 | M17 | Wave1 REQ-018 / **REQ-018a** WS `maxPayload`（**双 socket**）+ `pending`/`outbound` 队列上限（**条数 AND 累计字节**，`pendingBytes ≤ K × maxPayload`） | TASK-003 | vitest：条数超限、字节超限、仅该连接关闭 | 待开始 |
 | TASK-034 | M17 | Wave1 **REQ-021 审计接入**：守卫拒绝（WS 403 / REST 403）与响应过滤 fail-closed 写 `audit`（actor/profile/method/ip/结果/ts，不含 token/密钥/字节） | TASK-003,TASK-029 | vitest：各类事件各恰 1 条且零 token/字节泄漏 | 待开始 |
 | TASK-035 | M17 | Wave1 **REQ-022 REST 守卫**：`routes/hermes.ts` 去掉「缺 `profile` 即提前 `return`」；非 `super_admin` 除豁免路径 `/api/hermes/health` 外缺 `profile` → 注入 `default_profile`（落入**被转发的 query**）或 403 | TASK-001 | vitest：注入 / 403 / health 豁免 / super_admin 不拦 + 断言上游实际收到 `profile` | 待开始 |
-| TASK-036 | M17 | **R24 残余（独立，不阻塞主线）**：`tools.list`/`toolsets.list`/`tools.show` 无 `profile` 字段可注入，缺 `session_id` 回退**启动 profile** 配置 → 跨租户；须 session 归属校验 | TASK-030,TASK-033 | vitest：跨租户 `session_id` 被拒、本租户通过 | 待开始 |
+| TASK-036 | M17 | **R24 残余（部分闭合）**：`tools.list`/`toolsets.list`/`tools.show` 无 `profile` 字段可注入，缺 `session_id` 回退**启动 profile** 配置 → 跨租户。已做 fail-closed：非 `super_admin` 缺 `session_id` 拒绝（`SESSION_SCOPED_NO_PROFILE_METHODS`，判定早于豁免清单）；带 `session_id` 时归属仍待校验 | TASK-030,TASK-033 | vitest：无 `session_id` 被拒、带 `session_id` 通过 | 已验收 |
 | TASK-005 | M17 | Wave1 `chat/composer/pendingAttachments.ts` 纯函数（预筛/kindOf/dedupe/readAsBase64） | — | vitest + 边界遍历 + 断言未读超限内容 | 待开始 |
 | TASK-006A | M17 | Wave1 `composer/controlsReducer.ts` 纯 reducer（selection/attachments/single-flight） | — | vitest：状态转移 + 回滚无残留 | 待开始 |
 | TASK-006B | M17 | Wave1 `composer/useOptions.ts` options 生命周期 + 会话键缓存迁移 | — | vitest：缓存迁移（≤1 次）+ 参数含 `profile` | 待开始 |
