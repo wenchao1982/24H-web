@@ -55,11 +55,16 @@
   （从官方契约派生；**不得**以「是否直继 `Params`」判断 —— `Params` 设 `extra="forbid"`，注入无该字段的类会 4000）；
   命中豁免 → 不注入；**其余一切方法（含清单外的未知方法）一律注入 `default_profile`**；无可用 profile → 403 不转发；
   **禁止「包含式前缀白名单」**（`session.*`/`profiles.*`/`mcp.*`/`skills.*`，遗漏即 fail-open）；
-  队列上限**条数 / 字节各自独立**（条数 `WS_MAX_PENDING_COUNT = 256`（防大量小帧）；字节 `maxPayload = 16 MiB`、`K = 4` → `pendingBytes ≤ 64 MiB`（防少量大帧），双 socket 生效）；
+  队列上限**条数 / 字节各自独立**（条数 `WS_MAX_PENDING_COUNT = 256`（防大量小帧）；字节 `maxPayload = 16 MiB`、`K = 4` → `pendingBytes ≤ 64 MiB`（防少量大帧），双 socket 生效）；`outbound`（上游→客户端）**对称**设 `WS_MAX_OUTBOUND_COUNT = 256` / `WS_MAX_OUTBOUND_BYTES = 64 MiB`，超限写 `audit(ws.outbound.overflow)` 并**仅**终止该连接；
   **守卫拒绝与响应过滤 fail-closed 必写 `audit`**（actor/profile/method/ip/结果/时间戳，不含 token/密钥/字节）；
   **REST 同语义（REQ-022）**：`/api/hermes/*` 非 `super_admin` 缺 `profile` 时（豁免路径 `/api/hermes/health` 除外）
   注入 `default_profile` 或 403，**禁止**提前 `return` 跳过 `assertProfileAccess`；注入须落入**被转发的 query**。
   豁免清单（WS 26 条 / REST 1 条）与判据见 `architecture.md §7.2` + `.psd/specs/003-composer-redesign/*/contracts-evidence.md`。
+- **上传内容类型校验（REQ-023，R10 闭合）**：BFF WS 代理对非 `super_admin` 的
+  `image.attach_bytes` / `pdf.attach` 的 base64 载荷做**前缀 magic bytes** 校验（仅解码前 **48 个 base64 字符**
+  ≈36 字节，**禁止整帧解码**；可判定格式 PNG/JPEG/GIF/BMP/WebP/TIFF/ICO/CUR + SVG 文本前缀；PDF `%PDF-`），
+  不匹配以同 `id` 回 `400 INVALID_ATTACHMENT_TYPE` + 写 `audit`（`ws.upload.invalid_type`）+ **不转发**；
+  `file.attach` 不限类型；客户端 `File.type` 仅 UX 预筛，**不是**安全边界。见 `architecture.md §7.2/§7.3`。
 - 完整清单见 `docs/INTERFACES.md`。
 
 ## 6. 验证
@@ -121,7 +126,7 @@ npm run check     # typecheck（web + server + shared）+ vitest（server + web�
 
 ## 10. 状态 / 规格来源 / 未采用
 
-- **M0–M16 已完成**；功能拆解见 `docs/TASKS.md`。
+- **M0–M17 已完成**；功能拆解见 `docs/TASKS.md`（M17 = 对话页重构，Spec 见 `.psd/specs/003-composer-redesign/`）。
 - 规格来源：`docs/{ARCHITECTURE,INTERFACES,TASKS,UI}.md`（改接口先看这些，契约为准）。
 - **未采用**：Kanban 状态列看板；可视化编排画布（节点=agent）——见 `docs/UI.md`。
 - **TODO(future)**：IdP 接入（新增 `AuthProvider` 的 `oidc` 实现）。

@@ -191,17 +191,11 @@
     ]
   },
   "knownGaps": [
-    "R24 已闭合（TASK-036，2026-09-30）：(A) 类 session 归属方法（tools.list / toolsets.list / tools.show / skills.reload / complete.slash / model.save_key / model.disconnect）schema 无 profile 字段，无法 profile 守卫，缺/未知 session_id 时回退启动 profile；缺 session_id 时 fail-closed 拒绝（SESSION_SCOPED_NO_PROFILE_METHODS，判定早于豁免清单）；带 session_id 时由 BFF WS 代理 per-connection sessionOwners 校验归属（未知/他人 403 不转发）。已复核非 (A)：browser.controller.*（(B) fail-closed）、reload.mcp（(C) 有意全局）",
-    "WS 豁免清单契约同步性：已闭合（MethodSweep 机械核验 2026-09-30）。豁免集合 == 注册表参数类未声明 profile 的方法集合（26 条，原 18 条补齐 8 条：skills.reload / learning.edit / onboarding.ensure_setup_profile / onboarding.reset_setup_profile / browser.controller.{register,heartbeat,detach,result}；无「多出」）；REST 1 条；契约变更时须重跑 MethodSweep 并同步清单与 contracts-evidence.md §4.3",
-    "REQ-022 注入 profile 后上游是否按租户作用域：**已实测（2026-09-30，直连 L2）**。`/api/chat/workspaces?profile=nonexistent_xyz` → 404 `{\"detail\":\"Profile 'nonexistent_xyz' does not exist.\"}`（`/api/sessions` 同）；带合法 `profile=default` 与不带响应一致（本机仅 1 profile）。结论：上游**消费并校验** `profile`（注入不被静默忽略）；跨 profile 内容差异因单 profile **未验证**",
     "WS 大帧端到端可达性（R15）：**部分实测（2026-09-30）**。直连网关 `image.attach_bytes` 接受 `content_base64` 13,981,016 字符（≈13.33 MiB，整帧≈13.98 MB）帧，290ms 成功（`bytes:10485760`）；**未经过 BFF 代理**，故经 BFF 端到端与 `maxPayload=16 MiB`/K=4 队列上限仍未实测",
-    "yolo 取值与前端不一致（**已修复，2026-09-30**）：实测 `config.set{key:\"yolo\",value:\"default\",scope:\"session\"}` → `value:\"1\"`（开启）。`server.py:1772-1774 _BOOL_WORDS` 无 `\"default\"`，`methods_config_set.py:278` fallback 为 `not is_session_yolo_enabled()`（**翻转**）。前端 `PermissionPicker`/`controlsReducer.DEFAULT_YOLO` 曾用 `\"default\"` 表示「默认审批」并原样上送 → 实际**打开 yolo**。现已改为 `\"off\"`（默认审批）/`\"on\"`（自动批准）。已测 `\"on\"→\"1\"`、`\"off\"→\"0\"`、`\"true\"→\"1\"`、`\"default\"`→翻转",
-    "**R10 已闭合（REQ-023，本轮）**：Hermes 端**无真正内容类型拒绝**（`_sniff_image_ext` `prompt_attachments.py:64-71` 仅推断扩展名、不拒绝；实测 `image.attach_bytes` 接受 41 字节非图片文本；`pdf.attach` 因缺 `pdftoppm` 回 5028，`%PDF-` 4017 分支不可达）。**已在 BFF 侧补**：`frameGuard.ts#validateAttachmentMagic` 对 `image.attach_bytes`/`pdf.attach` 的 base64 载荷做**前缀**魔数校验（仅解码 48 字符 ≈36 字节，禁止整帧），不匹配 → 同 `id` 400 `INVALID_ATTACHMENT_TYPE` + `audit` + 不转发；`file.attach` 不限类型；`super_admin` 不校验。可判定格式 PNG/JPEG/GIF/BMP/WebP/TIFF/ICO/CUR + SVG 文本前缀；按扩展名归并后接受集 == Hermes `_IMAGE_EXTENSIONS`（`.png .jpg .jpeg .gif .webp .bmp .tiff .tif .svg .ico`，`cli_terminal_input.py:31-34`）。证据 `contracts-evidence.md §8.5`",
     "hero 态昂贵模型无二次确认（REQ-011a / Q-009）",
     "batch 回包与上游批帧支持程度未实测（Q-008）",
     "··· 菜单「连接」语义未定（Q-006）",
     "/api/auth/me 是否返回头像未验证（Q-007）",
-    "contracts-evidence.md 尚未生成（TASK-033）",
     "reload.mcp 为有意全局操作：参数类无 profile 字段，且 session_id 不参与 home/profile 解析——`_do_full_reload` 显式绑定 {\"profile_home\": None} 后遍历全部已服务 home 重建（methods_tools.py:332-408，尤其 :370-390、:343-349；契约 doc「for every live session」，tools_mcp_plugins.py:113,137）。非 super_admin 亦可触发全 home 重载，归属校验无法闭合其全局副作用；建议后续评估是否改为 super_admin-only"
   ]
 }

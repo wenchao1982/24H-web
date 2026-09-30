@@ -5,6 +5,9 @@ import { createTestContext, loginAndGetCookies, type TestContext } from "../test
 import { startMockHermes, type MockHermes } from "../test/mockHermes";
 import { clearHermesTokenCache } from "./client";
 import {
+  shouldRejectOutbound,
+  WS_MAX_OUTBOUND_BYTES,
+  WS_MAX_OUTBOUND_COUNT,
   WS_MAX_PAYLOAD,
   WS_MAX_PENDING_BYTES,
   WS_MAX_PENDING_COUNT,
@@ -574,4 +577,36 @@ describe("WS proxy large payload (REQ-018 / REQ-018b / REQ-023)", () => {
     },
     TEST_TIMEOUT_MS,
   );
+});
+
+/**
+ * `outbound`（上游 → 客户端，仅客户端未 OPEN 时累积）的对称防御。
+ *
+ * 集成层难以稳定构造：Fastify WS 路由的客户端 socket 在 `bridge` 进入时通常已是
+ * `OPEN`，`outbound` 窗口是极短竞态。故**主覆盖为纯函数 `shouldRejectOutbound` 单测**，
+ * 判定函数与 `proxy.ts` 中 `outbound.push` 处使用**同一**导出函数（不会漂移）。
+ */
+describe("WS proxy outbound queue limits (symmetric defense)", () => {
+  it("pins the outbound limits: bytes = WS_QUEUE_FACTOR × maxPayload, count independent", () => {
+    expect(WS_MAX_OUTBOUND_BYTES).toBe(WS_QUEUE_FACTOR * WS_MAX_PAYLOAD);
+    expect(WS_MAX_OUTBOUND_BYTES).toBe(WS_MAX_PENDING_BYTES);
+    expect(WS_MAX_OUTBOUND_COUNT).toBe(256);
+    expect(WS_MAX_OUTBOUND_COUNT).not.toBe(WS_QUEUE_FACTOR);
+  });
+
+  it("accepts an empty and a small outbound queue", () => {
+    expect(shouldRejectOutbound(0, 0)).toBe(false);
+    expect(shouldRejectOutbound(1, 1024)).toBe(false);
+    expect(shouldRejectOutbound(WS_MAX_OUTBOUND_COUNT - 1, WS_MAX_OUTBOUND_BYTES)).toBe(false);
+  });
+
+  it("rejects once the COUNT limit is reached (independent of bytes)", () => {
+    expect(shouldRejectOutbound(WS_MAX_OUTBOUND_COUNT, 0)).toBe(true);
+    expect(shouldRejectOutbound(WS_MAX_OUTBOUND_COUNT + 10, 1)).toBe(true);
+  });
+
+  it("rejects once the prospective BYTE total exceeds the budget (independent of count)", () => {
+    expect(shouldRejectOutbound(0, WS_MAX_OUTBOUND_BYTES + 1)).toBe(true);
+    expect(shouldRejectOutbound(WS_MAX_OUTBOUND_COUNT - 1, WS_MAX_OUTBOUND_BYTES + 1)).toBe(true);
+  });
 });

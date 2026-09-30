@@ -39,6 +39,26 @@ export const WS_QUEUE_FACTOR = 4;
 export const WS_MAX_PENDING_COUNT = 256;
 export const WS_MAX_PENDING_BYTES = WS_QUEUE_FACTOR * WS_MAX_PAYLOAD; // 64 MiB
 
+/**
+ * 上行队列（`outbound`：上游 → 客户端）的**对称防御**上限。
+ *
+ * `outbound` 仅在客户端 socket 尚未 `OPEN` 时累积，窗口极短且帧来自**上游**
+ * （故单帧已受上游侧 `maxPayload = WS_MAX_PAYLOAD` 约束）。此处仍补上**条数 +
+ * 累计字节**双上限，与 `pending` 保持对称，避免极端竞态下无界堆积：
+ * - `WS_MAX_OUTBOUND_COUNT`：防大量小帧（与 `WS_MAX_PENDING_COUNT` 对齐）。
+ * - `WS_MAX_OUTBOUND_BYTES`：防少量大帧（与 `WS_MAX_PENDING_BYTES` 对齐，64 MiB）。
+ */
+export const WS_MAX_OUTBOUND_COUNT = 256;
+export const WS_MAX_OUTBOUND_BYTES = WS_QUEUE_FACTOR * WS_MAX_PAYLOAD; // 64 MiB
+
+/**
+ * `outbound` 超限判定（纯函数，便于单测）：给定**已入队条数**与**拟入队后累计字节**，
+ * 命中任一上限即拒绝。`bytes` 为**包含新帧**的预期总量（调用方负责先累加）。
+ */
+export function shouldRejectOutbound(count: number, bytes: number): boolean {
+  return count >= WS_MAX_OUTBOUND_COUNT || bytes > WS_MAX_OUTBOUND_BYTES;
+}
+
 /** 响应过滤待决表上限（REQ-015 兜底：伪造 id / 并发洪泛）。 */
 const MAX_PENDING_PROFILE_READS = 256;
 const PENDING_PROFILE_READ_TTL_MS = 60_000;
@@ -204,6 +224,7 @@ async function bridge(
   const pending: PendingFrame[] = [];
   const outbound: PendingFrame[] = [];
   let pendingBytes = 0;
+  let outboundBytes = 0;
   const pendingProfileReads = new Map<string, PendingProfileRead>();
   // R24：per-connection 会话归属（session_id → profile）与其待决建/附请求（requestId → profile）。
   const sessionOwners = new Map<string, string>();
@@ -469,6 +490,7 @@ async function bridge(
     for (const frame of outbound.splice(0)) {
       socket.send(frame.data, { binary: frame.isBinary });
     }
+    outboundBytes = 0;
   };
 
   ws.on("open", () => {
@@ -517,7 +539,22 @@ async function bridge(
       socket.send(outgoing, { binary: outgoingBinary });
     } else {
       // Defensive: the client may not be ready yet; replay once it opens.
-      outbound.push({ data: outgoing, isBinary: outgoingBinary, bytes: frameBytes(outgoing) });
+      const bytes = frameBytes(outgoing);
+      if (shouldRejectOutbound(outbound.length, outboundBytes + bytes)) {
+        // 对称防御（见 `WS_MAX_OUTBOUND_*` 注释）：上游帧在客户端就绪前无界堆积 → 拒绝。
+        logAudit(db, {
+          actorId: userRef.id >= 0 ? userRef.id : null,
+          action: "ws.outbound.overflow",
+          targetType: "hermes_ws",
+          targetId: null,
+          ip: request.ip,
+          detail: null,
+        });
+        socket.close(1013, "QUEUE_OVERFLOW");
+        return;
+      }
+      outbound.push({ data: outgoing, isBinary: outgoingBinary, bytes });
+      outboundBytes += bytes;
     }
   });
   ws.on("close", () => {

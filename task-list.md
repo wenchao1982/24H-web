@@ -1,7 +1,7 @@
 # 任务看板（24H Web）
 
 > 详细任务见 [`docs/TASKS.md`](./docs/TASKS.md)；本文件为**工作看板**，动态更新。
-> 状态取值：`待开始` / `进行中` / `已验收`。M0–M16 全部任务均已实现并验收。
+> 状态取值：`待开始` / `进行中` / `已验收`。M0–M17 全部任务均已实现并验收（M17 = 对话页重构，见下）。
 
 ## M0 工程基线
 
@@ -243,48 +243,49 @@
 ## M17 对话页重构（Spec 003-composer-redesign）
 
 > Spec：[`.psd/specs/003-composer-redesign/v1.0.0-20260929-173000/`](.psd/specs/003-composer-redesign/v1.0.0-20260929-173000/)（requirements / design / tasks / constitution / manifest；对抗性评审 5 轮后 **DEFEND**）。
-> **唯一「下一步」入口**：按 Wave 顺序执行，前置未验收不得开启后继；安全项（REQ-008 / 015 / 017 / 018 / 021 / 022）同波次（Wave 1）；并含 REQ-020（多 profile 自访问）。共 **36 个任务**（TASK-001..028 + 029..036，含 006A/006B/006C）。验证命令固定 `npm run check`，e2e 单独 `npm run test:e2e`。
+> **唯一「下一步」入口**：按 Wave 顺序执行，前置未验收不得开启后继；安全项（REQ-008 / 015 / 017 / 018 / 021 / 022）同波次（Wave 1）；并含 REQ-020（多 profile 自访问）。共 **39 个任务**（TASK-001..028 + 029..037，含 006A/006B/006C）。验证命令固定 `npm run check`，e2e 单独 `npm run test:e2e`。
 
 | 编号 | 模块 | 描述 | 前置依赖 | 验收标准 | 状态 |
 | --- | --- | --- | --- | --- | --- |
 | TASK-001 | M17 | Wave0 订正 4 份基线（AGENTS.md / requirement.md / ui-spec.md / architecture.md） | — | 关键词 grep（`hero`/`WS 租户守卫`/`两级模型`/`--ds-radius` 命中、`corner-shape` 零命中） | 已验收 |
 | TASK-002 | M17 | Wave0 订正 docs/TASKS.md（T8.2/T4.4/T6.11）+ 更新 task-list.md（新增 M17） | TASK-001 | `rg "T8.2\|T4.4"` 语义一致、M17 段存在 | 已验收 |
-| TASK-003 | M17 | Wave1 `proxy.ts` default-deny 帧分类（导出 `classifyFrame`）+ profile 守卫 + 注入 | TASK-001 | 单测 + 评审：4 条绕过路径拒绝 | 待开始 |
-| TASK-004 | M17 | Wave1 `proxy.test.ts` **19 例**（4 绕过 + 误拦防护 + REQ-017 注入/403 + MethodSweep + REQ-018/018a 超限 + REQ-015 过滤/fail-closed/错误帧透传 + REQ-021 审计） | TASK-003 | vitest（server）全绿 | 待开始 |
-| TASK-029 | M17 | Wave1 REQ-015 `profiles.list`/`describe` 响应白名单过滤 + 仅「成功但结构不符」fail-closed + **上游错误帧原样透传** | TASK-003 | vitest：过滤 + fail-closed + 上限清理 | 待开始 |
-| TASK-030 | M17 | Wave1 REQ-017 **default-deny**：缺 `params.profile` 时**豁免判据唯一 = 参数类 schema 未声明 `profile` 字段**（从契约派生；**不得**用「是否直继 `Params`」）→ 不注入；**其余一切方法（含未知方法）**注入 `default_profile`。**豁免清单 26 条（MethodSweep 机械核验 2026-09-30）**：`ping`/`gateway.capabilities`/`client.capabilities`/`complete.slash`/`reload.env`/`reload.mcp`/`plugins.list`/`skills.reload`/`learning.frames`/`learning.detail`/`learning.delete`/`learning.edit`/`paste.collapse`/`model.save_key`/`model.disconnect`/`diagnostics.share_nous`/`image.generate`/`onboarding.ensure_setup_profile`/`onboarding.reset_setup_profile`/`tools.list`/`toolsets.list`/`tools.show`/`browser.controller.register`/`browser.controller.heartbeat`/`browser.controller.detach`/`browser.controller.result`；**须注入**含 `commands.catalog`/`config.show`/`cron.manage`/`complete.path`/`llm.oneshot` | TASK-003 | vitest：26 条豁免不注入 / 须注入方法被注入 / 未知方法被注入 / 无分配 403 / super_admin 不注入 / **MethodSweep 机械断言「豁免集合 == 无 `profile` 字段集合」** | 待开始 |
-| TASK-031 | M17 | Wave1 REQ-018 / **REQ-018a** WS `maxPayload`（**双 socket**）+ `pending`/`outbound` 队列上限（**条数 AND 累计字节**，`pendingBytes ≤ K × maxPayload`） | TASK-003 | vitest：条数超限、字节超限、仅该连接关闭 | 待开始 |
-| TASK-034 | M17 | Wave1 **REQ-021 审计接入**：守卫拒绝（WS 403 / REST 403）与响应过滤 fail-closed 写 `audit`（actor/profile/method/ip/结果/ts，不含 token/密钥/字节） | TASK-003,TASK-029 | vitest：各类事件各恰 1 条且零 token/字节泄漏 | 待开始 |
-| TASK-035 | M17 | Wave1 **REQ-022 REST 守卫**：`routes/hermes.ts` 去掉「缺 `profile` 即提前 `return`」；非 `super_admin` 除豁免路径 `/api/hermes/health` 外缺 `profile` → 注入 `default_profile`（落入**被转发的 query**）或 403 | TASK-001 | vitest：注入 / 403 / health 豁免 / super_admin 不拦 + 断言上游实际收到 `profile` | 待开始 |
+| TASK-003 | M17 | Wave1 `proxy.ts` default-deny 帧分类（导出 `classifyFrame`）+ profile 守卫 + 注入 | TASK-001 | 单测 + 评审：4 条绕过路径拒绝 | 已验收 |
+| TASK-004 | M17 | Wave1 `proxy.test.ts` **19 例**（4 绕过 + 误拦防护 + REQ-017 注入/403 + MethodSweep + REQ-018/018a 超限 + REQ-015 过滤/fail-closed/错误帧透传 + REQ-021 审计） | TASK-003 | vitest（server）全绿 | 已验收 |
+| TASK-029 | M17 | Wave1 REQ-015 `profiles.list`/`describe` 响应白名单过滤 + 仅「成功但结构不符」fail-closed + **上游错误帧原样透传** | TASK-003 | vitest：过滤 + fail-closed + 上限清理 | 已验收 |
+| TASK-030 | M17 | Wave1 REQ-017 **default-deny**：缺 `params.profile` 时**豁免判据唯一 = 参数类 schema 未声明 `profile` 字段**（从契约派生；**不得**用「是否直继 `Params`」）→ 不注入；**其余一切方法（含未知方法）**注入 `default_profile`。**豁免清单 26 条（MethodSweep 机械核验 2026-09-30）**：`ping`/`gateway.capabilities`/`client.capabilities`/`complete.slash`/`reload.env`/`reload.mcp`/`plugins.list`/`skills.reload`/`learning.frames`/`learning.detail`/`learning.delete`/`learning.edit`/`paste.collapse`/`model.save_key`/`model.disconnect`/`diagnostics.share_nous`/`image.generate`/`onboarding.ensure_setup_profile`/`onboarding.reset_setup_profile`/`tools.list`/`toolsets.list`/`tools.show`/`browser.controller.register`/`browser.controller.heartbeat`/`browser.controller.detach`/`browser.controller.result`；**须注入**含 `commands.catalog`/`config.show`/`cron.manage`/`complete.path`/`llm.oneshot` | TASK-003 | vitest：26 条豁免不注入 / 须注入方法被注入 / 未知方法被注入 / 无分配 403 / super_admin 不注入 / **MethodSweep 机械断言「豁免集合 == 无 `profile` 字段集合」** | 已验收 |
+| TASK-031 | M17 | Wave1 REQ-018 / **REQ-018a** WS `maxPayload`（**双 socket**）+ `pending`/`outbound` 队列上限（**条数 AND 累计字节**，`pendingBytes ≤ K × maxPayload`） | TASK-003 | vitest：条数超限、字节超限、仅该连接关闭 | 已验收 |
+| TASK-034 | M17 | Wave1 **REQ-021 审计接入**：守卫拒绝（WS 403 / REST 403）与响应过滤 fail-closed 写 `audit`（actor/profile/method/ip/结果/ts，不含 token/密钥/字节） | TASK-003,TASK-029 | vitest：各类事件各恰 1 条且零 token/字节泄漏 | 已验收 |
+| TASK-035 | M17 | Wave1 **REQ-022 REST 守卫**：`routes/hermes.ts` 去掉「缺 `profile` 即提前 `return`」；非 `super_admin` 除豁免路径 `/api/hermes/health` 外缺 `profile` → 注入 `default_profile`（落入**被转发的 query**）或 403 | TASK-001 | vitest：注入 / 403 / health 豁免 / super_admin 不拦 + 断言上游实际收到 `profile` | 已验收 |
 | TASK-036 | M17 | **R24 已闭合（session 归属校验）**：`tools.list`/`toolsets.list`/`tools.show` 无 `profile` 字段可注入，缺 `session_id` 回退**启动 profile** 配置 → 跨租户。fail-closed：非 `super_admin` 缺 `session_id` 拒绝（`SESSION_SCOPED_NO_PROFILE_METHODS`，判定早于豁免清单）；BFF WS 代理维护 per-connection `sessionOwners`（建/附会话回包累积，上限 512 / TTL 10 min），带 `session_id` 须归属命中且属调用者白名单，未知/他人 403 不转发 | TASK-030,TASK-033 | vitest：无 `session_id` 被拒、归属命中通过、未知/他人被拒 | 已验收 |
-| TASK-005 | M17 | Wave1 `chat/composer/pendingAttachments.ts` 纯函数（预筛/kindOf/dedupe/readAsBase64） | — | vitest + 边界遍历 + 断言未读超限内容 | 待开始 |
-| TASK-006A | M17 | Wave1 `composer/controlsReducer.ts` 纯 reducer（selection/attachments/single-flight） | — | vitest：状态转移 + 回滚无残留 | 待开始 |
-| TASK-006B | M17 | Wave1 `composer/useOptions.ts` options 生命周期 + 会话键缓存迁移 | — | vitest：缓存迁移（≤1 次）+ 参数含 `profile` | 待开始 |
-| TASK-006C | M17 | Wave1 `composer/useSessionControls.ts` RPC + 模型状态机 + `reconcileModel` + single-flight | TASK-006A | vitest：三态 + 回正 + single-flight + hero 不被拦截 | 待开始 |
-| TASK-007 | M17 | Wave1 `composer/modelCatalog.ts` + `agentOptions.ts` 归一化（绝不回退 `profiles.list`） | — | vitest 新文件 | 待开始 |
-| TASK-008 | M17 | Wave1 `test/fakeGateway.ts` 扩展 + `api/ws.ts` 读 `error.data.code` | — | 既有测试全绿 + `ws.test.ts` 新断言 | 待开始 |
-| TASK-028 | M17 | Wave1 `composer/MenuButton.tsx` APG 原语 + 修 `SessionList` 两处菜单 | — | vitest a11y + `SessionList` 回归 | 待开始 |
-| TASK-032 | M17 | Wave1 REQ-015 过滤行为测试 | TASK-029 | vitest（server） | 待开始 |
-| TASK-033 | M17 | Wave1 归档 `contracts-evidence.md` | — | 文件存在且与官方源码逐条对应 | 待开始 |
-| TASK-009 | M17 | Wave2 `composer/ComposerControls.tsx`（hero pill 行 + 底行；无 voice/git） | TASK-006A,TASK-028 | 结构断言（DOM 集合精确匹配） | 待开始 |
-| TASK-010 | M17 | Wave2 `composer/ModelPicker.tsx`（本会话覆盖 + Flash 徽标 + deferred/confirm） | TASK-006C,TASK-007,TASK-028 | 组件测试（三态） | 待开始 |
-| TASK-011 | M17 | Wave2 `composer/AgentPicker.tsx`（选项恒 = `me.profiles`；docked 只读） | TASK-007 | 组件测试（不含 `profiles.list` 值） | 待开始 |
-| TASK-012 | M17 | Wave2 `composer/WorkspacePicker.tsx` + `PermissionPicker.tsx` | TASK-006A,TASK-006B,TASK-007 | 组件测试（回滚断言） | 待开始 |
-| TASK-013 | M17 | Wave2 `composer/UploadMenu.tsx` + 拖拽/粘贴（浏览器 API；禁 `clipboard.paste`） | TASK-005,TASK-028 | 组件测试（drop/paste；0 RPC） | 待开始 |
-| TASK-014 | M17 | Wave2 `chat/SessionHeaderMenu.tsx`（连接/导入/导出/分享/重命名） | TASK-028 | 组件测试（恰 5 项） | 待开始 |
-| TASK-015 | M17 | Wave2 改 `Composer.tsx` 双态单实例（`variant`/`data-variant`） | TASK-005,TASK-009,TASK-013 | 组件测试 + `Composer.test.tsx` 回归 | 待开始 |
-| TASK-016 | M17 | Wave3 `ChatPage.tsx` 双态渲染 + 新建 `chat/HeroIntro.tsx` | TASK-015 | 集成测试（hero/docked 互斥） | 待开始 |
-| TASK-017 | M17 | Wave3 发送编排延迟绑定（create → attach* → submit）+ single-flight + **REQ-020** 会话域 RPC（list/most_recent/resume/events.since）显式携带 `selection.profile` | TASK-008,TASK-015,TASK-030 | 集成测试（调用序 + single-flight + profile 携带） | 待开始 |
-| TASK-018 | M17 | Wave3 模型提交路径接线（hero/会话内/deferred/confirm/`message.complete` 回正） | TASK-006C,TASK-010,TASK-017 | 集成测试（三态 + 回正） | 待开始 |
-| TASK-019 | M17 | Wave3 权限模式接线（`config.set{key:"yolo",scope:"session"}` + 回滚） | TASK-006A,TASK-012,TASK-017 | 集成测试 | 待开始 |
-| TASK-020 | M17 | Wave3 会话头菜单接入 + 身份键正确性（`workspace.move`=stored） | TASK-014,TASK-017 | 集成测试（身份键断言） | 待开始 |
-| TASK-021 | M17 | Wave3 `styles.css` hero/docked/pill/chip/menu（仅 `--ds-*`，圆角 `--ds-radius-*`） | TASK-015 | token grep + 视觉自查 | 待开始 |
-| TASK-022 | M17 | Wave4 组件 a11y / 键盘测试（APG、`Esc` 焦点归还、`role`） | TASK-009..015,TASK-028 | vitest | 待开始 |
-| TASK-023 | M17 | Wave4 ChatPage 集成（顺序/single-flight/10MB/回正/confirm） | TASK-016..021 | vitest | 待开始 |
-| TASK-024 | M17 | Wave4 StrictMode 幂等 + 4001 有界重试回归 + hero 发送不禁用 | TASK-016,TASK-017 | vitest | 待开始 |
-| TASK-025 | M17 | Wave4 BFF 守卫端到端（帧分类视角，4 绕过 + 放行 + REQ-017 注入 + REQ-018/018a 超限 + **REQ-021 审计**） | TASK-003,TASK-004 | vitest（server） | 待开始 |
-| TASK-026 | M17 | Wave4 （可选，单独跑）e2e：hero 上传（点击 + 拖拽）→ 发送 → docked | TASK-023 | `npm run test:e2e` | 待开始 |
-| TASK-027 | M17 | Wave5 `npm run check` 全绿 + 基线一致性复核（防漂移，含 REQ-010a/011a/018a/018b/020/021/022） | TASK-001..026, TASK-028..036 | `npm run check` + 人工比对清单 | 待开始 |
+| TASK-037 | M17 | Wave1 **REQ-023 上传内容类型校验（R10 闭合）**：`frameGuard.ts` 新增 `validateAttachmentMagic`，非 `super_admin` 的 `image.attach_bytes`/`pdf.attach` 的 base64 载荷**仅前缀**（48 字符 ≈36 字节）魔数校验（PNG/JPEG/GIF/BMP/WebP/TIFF/ICO/CUR + SVG 文本前缀；PDF `%PDF-`），不匹配同 `id` 400 `INVALID_ATTACHMENT_TYPE` + `audit(ws.upload.invalid_type)` + 不转发；`file.attach` 不限类型 | TASK-003 | vitest：非法被拒且上游未收到 + audit 1 条；合法 PNG/PDF 转发；`Buffer.from` spy 断言仅前缀解码；proxy 集成 | 已验收 |
+| TASK-005 | M17 | Wave1 `chat/composer/pendingAttachments.ts` 纯函数（预筛/kindOf/dedupe/readAsBase64） | — | vitest + 边界遍历 + 断言未读超限内容 | 已验收 |
+| TASK-006A | M17 | Wave1 `composer/controlsReducer.ts` 纯 reducer（selection/attachments/single-flight） | — | vitest：状态转移 + 回滚无残留 | 已验收 |
+| TASK-006B | M17 | Wave1 `composer/useOptions.ts` options 生命周期 + 会话键缓存迁移 | — | vitest：缓存迁移（≤1 次）+ 参数含 `profile` | 已验收 |
+| TASK-006C | M17 | Wave1 `composer/useSessionControls.ts` RPC + 模型状态机 + `reconcileModel` + single-flight | TASK-006A | vitest：三态 + 回正 + single-flight + hero 不被拦截 | 已验收 |
+| TASK-007 | M17 | Wave1 `composer/modelCatalog.ts` + `agentOptions.ts` 归一化（绝不回退 `profiles.list`） | — | vitest 新文件 | 已验收 |
+| TASK-008 | M17 | Wave1 `test/fakeGateway.ts` 扩展 + `api/ws.ts` 读 `error.data.code` | — | 既有测试全绿 + `ws.test.ts` 新断言 | 已验收 |
+| TASK-028 | M17 | Wave1 `composer/MenuButton.tsx` APG 原语 + 修 `SessionList` 两处菜单 | — | vitest a11y + `SessionList` 回归 | 已验收 |
+| TASK-032 | M17 | Wave1 REQ-015 过滤行为测试（`handleUpstreamProfileRead` 已实现；行为测试与 TASK-004 合并追踪） | TASK-029 | vitest（server） | 已验收 |
+| TASK-033 | M17 | Wave1 归档 `contracts-evidence.md` | — | 文件存在且与官方源码逐条对应 | 已验收 |
+| TASK-009 | M17 | Wave2 `composer/ComposerControls.tsx`（hero pill 行 + 底行；无 voice/git） | TASK-006A,TASK-028 | 结构断言（DOM 集合精确匹配） | 已验收 |
+| TASK-010 | M17 | Wave2 `composer/ModelPicker.tsx`（本会话覆盖 + Flash 徽标 + deferred/confirm） | TASK-006C,TASK-007,TASK-028 | 组件测试（三态） | 已验收 |
+| TASK-011 | M17 | Wave2 `composer/AgentPicker.tsx`（选项恒 = `me.profiles`；docked 只读） | TASK-007 | 组件测试（不含 `profiles.list` 值） | 已验收 |
+| TASK-012 | M17 | Wave2 `composer/WorkspacePicker.tsx` + `PermissionPicker.tsx` | TASK-006A,TASK-006B,TASK-007 | 组件测试（回滚断言） | 已验收 |
+| TASK-013 | M17 | Wave2 `composer/UploadMenu.tsx` + 拖拽/粘贴（浏览器 API；禁 `clipboard.paste`） | TASK-005,TASK-028 | 组件测试（drop/paste；0 RPC） | 已验收 |
+| TASK-014 | M17 | Wave2 `chat/SessionHeaderMenu.tsx`（连接/导入/导出/分享/重命名） | TASK-028 | 组件测试（恰 5 项） | 已验收 |
+| TASK-015 | M17 | Wave2 改 `Composer.tsx` 双态单实例（`variant`/`data-variant`） | TASK-005,TASK-009,TASK-013 | 组件测试 + `Composer.test.tsx` 回归 | 已验收 |
+| TASK-016 | M17 | Wave3 `ChatPage.tsx` 双态渲染 + 新建 `chat/HeroIntro.tsx` | TASK-015 | 集成测试（hero/docked 互斥） | 已验收 |
+| TASK-017 | M17 | Wave3 发送编排延迟绑定（create → attach* → submit）+ single-flight + **REQ-020** 会话域 RPC（list/most_recent/resume/events.since）显式携带 `selection.profile` | TASK-008,TASK-015,TASK-030 | 集成测试（调用序 + single-flight + profile 携带） | 已验收 |
+| TASK-018 | M17 | Wave3 模型提交路径接线（hero/会话内/deferred/confirm/`message.complete` 回正） | TASK-006C,TASK-010,TASK-017 | 集成测试（三态 + 回正） | 已验收 |
+| TASK-019 | M17 | Wave3 权限模式接线（`config.set{key:"yolo",scope:"session"}` + 回滚） | TASK-006A,TASK-012,TASK-017 | 集成测试 | 已验收 |
+| TASK-020 | M17 | Wave3 会话头菜单接入 + 身份键正确性（`workspace.move`=stored） | TASK-014,TASK-017 | 集成测试（身份键断言） | 已验收 |
+| TASK-021 | M17 | Wave3 `styles.css` hero/docked/pill/chip/menu（仅 `--ds-*`，圆角 `--ds-radius-*`） | TASK-015 | token grep + 视觉自查 | 已验收 |
+| TASK-022 | M17 | Wave4 组件 a11y / 键盘测试（APG、`Esc` 焦点归还、`role`） | TASK-009..015,TASK-028 | vitest | 已验收 |
+| TASK-023 | M17 | Wave4 ChatPage 集成（顺序/single-flight/10MB/回正/confirm） | TASK-016..021 | vitest | 已验收 |
+| TASK-024 | M17 | Wave4 StrictMode 幂等 + 4001 有界重试回归 + hero 发送不禁用 | TASK-016,TASK-017 | vitest | 已验收 |
+| TASK-025 | M17 | Wave4 BFF 守卫端到端（帧分类视角，4 绕过 + 放行 + REQ-017 注入 + REQ-018/018a 超限 + **REQ-021 审计**） | TASK-003,TASK-004 | vitest（server） | 已验收 |
+| TASK-026 | M17 | Wave4 （可选，单独跑）e2e：hero 上传（点击 + 拖拽）→ 发送 → docked | TASK-023 | `npm run test:e2e` | 已验收 |
+| TASK-027 | M17 | Wave5 `npm run check` 全绿 + 基线一致性复核（防漂移，含 REQ-010a/011a/018a/018b/020/021/022） | TASK-001..026, TASK-028..037 | `npm run check` + 人工比对清单 | 已验收 |
 
 ## 后续任务（待开发）
 
@@ -305,7 +306,7 @@
 | N13 | e2e | e2e 覆盖设置/管理 CRUD 路径（建用户/改角色/分配 profile/重置密码） | T5.6 | 相关用例通过 | 待开发 |
 | N14 | 群聊 | 群聊房间成员编辑（等官方 add/remove member RPC；现为创建时固定 2–6 人） | T17.1 | 官方支持后可增删成员 | 待开发 |
 | N15 | 对话 | 会话身份对（stored/runtime id）+ 历史会话 resume（修复 prompt.submit 4001） | T6.3 | 点选历史会话可发送并收到回复；重命名/移动工作区正常 | 已验收 |
-| N16 | 对话 | 打断（停止）回合收尾：悬挂工具卡结算 + 「已中断」呈现 | N15 | 长工具打断后无悬挂 spinner、状态显示「已中断」、保留部分文本 | 进行中 |
+| N16 | 对话 | 打断（停止）回合收尾：悬挂工具卡结算 + 「已中断」呈现 | N15 | 长工具打断后无悬挂 spinner、状态显示「已中断」、保留部分文本 | 已验收 |
 | N17 | 安全/性能 | WS 队列上限解耦（`WS_MAX_PENDING_COUNT = 256` 独立于字节系数 `K = 4`，修「第 5 帧被拒」回归）＋ 大帧性能修复（`readBase64Prefix` 有界切片、`classifyParsed` 复用单次 `JSON.parse`、`recordClientRequest` 合并解析） | TASK-031 | `npm run check` 全绿；条数/字节上限分别实测触发；`frameGuard` JSON.parse 计数=1；见 `contracts-evidence.md §8.9` | 已验收 |
 
 ## 明确不做

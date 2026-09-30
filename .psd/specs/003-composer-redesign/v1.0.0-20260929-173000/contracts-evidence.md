@@ -513,5 +513,7 @@ curl ... /api/chat/workspaces?profile=nonexistent_xyz# 404 {"detail":"Profile 'n
 
 **`readBase64Prefix` 微基准**（18,175,328 字符 base64 载荷，200 次）：修复前全量 `trim()`+`replace(/\s+/g,"")` **≈565µs/次**；修复后先 `slice(0, 384)` 有界切片 **≈0.7µs/次**（≈800×）。
 
-> 结论：条数上限（256）与字节上限（64 MiB）**各自独立**且均被实测触发；大帧路径的二次 `JSON.parse` 与全量扫描均已消除，**无残余偏差**。
+**`outbound` 对称上限（本轮）**：`outbound`（上游→客户端，**仅客户端 socket 未 `OPEN` 时累积**）新增 `WS_MAX_OUTBOUND_COUNT = 256` / `WS_MAX_OUTBOUND_BYTES = K × 16 MiB = 64 MiB`，判定抽为纯函数 `shouldRejectOutbound(count, bytes)`；超限写 `audit(ws.outbound.overflow)` 并 `close(1013,"QUEUE_OVERFLOW")`，`flushOutbound()` 冲刷后清零字节计数。因该窗口为极短竞态、集成层难以稳定构造，覆盖以 `proxy.largePayload.test.ts` 的**纯函数单测**为主（常量 pinning + 条数/字节各自独立，共 4 例）。
+
+> 结论：条数上限（256）与字节上限（64 MiB）**各自独立**且均被实测触发；`pending` / `outbound` 两方向上限对称；大帧路径的二次 `JSON.parse` 与全量扫描均已消除，**无残余偏差**。
 

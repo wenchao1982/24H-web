@@ -1,7 +1,7 @@
 # Design: 对话页重构（hero/docked + 会话控件 + WS 租户守卫）
 
 > Spec ID: 003-composer-redesign | Phase: design | Version: v1.0.0-20260929-173000
-> 输入：`requirements.md`（同目录，**26 条 REQ 条目**：REQ-001..022 + 后缀 010a / 011a / 018a / 018b）+ Gate 2 已确认的 4 节设计
+> 输入：`requirements.md`（同目录，**27 条 REQ 条目**：REQ-001..023 + 后缀 010a / 011a / 018a / 018b）+ Gate 2 已确认的 4 节设计
 
 ## 1. 系统架构
 
@@ -664,6 +664,7 @@ TASK-003 负责实现并导出该函数；TASK-029（响应过滤）依赖它，
 | 契约源码在仓库外，判定不可 CI 复核（评审 LOW #16） | 所有「以官方源码为准」的断言无法被本仓库独立验证 | **TC-016**：归档可核验的契约片段到 `contracts-evidence.md`（TASK-033） |
 | 队列上限只按条数、不限字节（评审 N8） | `pending`/`outbound` 为无界数组，N 条近上限帧可堆内存 | **REQ-018 / TC-018**：同时约束条数与累计字节（`pendingBytes ≤ K × maxPayload`，K 量化）；`maxPayload` 同时作用于客户端接入侧与上游侧 socket |
 | 条数上限与字节系数耦合（大帧实测回归） | `proxy.ts` 曾把 `WS_QUEUE_FACTOR = 4` **兼作条数上限** → 冷启动（token 拉取期间）客户端发第 5 帧（哪怕极小）即回 `INVALID_FRAME` + `close(1013)`，属**过严功能回归**，且使字节预算形同虚设 | **已修复（本轮）**：解耦为 **`WS_MAX_PENDING_COUNT = 256`（条数）** 与 **`WS_MAX_PENDING_BYTES = K × maxPayload`（字节，`K = 4` → 64 MiB）**；判定 = 命中任一即拒。实测：300 小帧于第 **257** 帧触发条数上限（累计仅 0.032 MiB）；近 16 MiB 大帧于第 **4** 帧触发字节上限（累计 ≈64 MiB） |
+| `outbound` 队列无上限（与 `pending` 不对称） | `proxy.ts` 的 `outbound`（上游 → 客户端，**仅在客户端 socket 未 `OPEN` 时累积**）原为无界数组；窗口虽极短且单帧受**上游侧** `maxPayload` 约束，仍缺与 `pending` 对称的双上限 | **已修复（本轮）**：新增导出 **`WS_MAX_OUTBOUND_COUNT = 256`** / **`WS_MAX_OUTBOUND_BYTES = K × maxPayload = 64 MiB`**；超限写 `audit(action="ws.outbound.overflow")` 且 `socket.close(1013,"QUEUE_OVERFLOW")`（与 `pending` 超限一致）；`flushOutbound()` 在 `OPEN` 时冲刷并清零字节计数，语义不变。判定抽为纯函数 **`shouldRejectOutbound(count, bytes)`**（主覆盖为单测：集成层难以稳定构造该极短窗口） |
 | 大帧路径二次全量解析/扫描（实测） | `guardClientFrame` 对同一文本 `JSON.parse` **两次**；`readBase64Prefix` 对整段 13 MB base64 做 `trim()` + `replace(/\s+/g,"")` 两次全量扫描 | **已修复（本轮）**：`classifyParsed` 复用已解析值（`JSON.parse` 计数 **2 → 1**，且不随载荷增大，spy 实测 small=1 / large(4MiB)=1）；`readBase64Prefix` 改为先 `slice(0, ATTACHMENT_PREFIX_SCAN_CHARS = 384)` 有界切片再清洗（18 MB 载荷实测 ≈565µs → ≈0.7µs/次）。**无残余偏差** |
 | 守卫拒绝无审计（评审 N10） | 越权探测不可发现 | **REQ-021**：403 与 fail-closed 写 `audit`（actor / profile / method / ip / 结果；不含 token/密钥/字节） |
 | REST 侧守卫曾被误述为「已有」（评审 R3 HIGH） | 规格 §1 声称 REST「已有 `assertProfileAccess`」，但 `routes/hermes.ts:40` 缺 profile 即 return | **REQ-022 闭合**；已在 `requirements.md §1` 订正表述 |
@@ -760,6 +761,7 @@ TASK-003 负责实现并导出该函数；TASK-029（响应过滤）依赖它，
 | `cwd` 透传 | hero 恒 `cwd_explicit:true`（仅显式选目录）；相对路径恒原样透传 | `""` / `"./x"` / `/abs` / 未选 |
 | `classifyFrame`（method 非字符串） | `method` 键存在但非字符串恒为 `invalid` 并拒绝 | `method ∈ {undefined, null, 123, {}, "session.list"}` |
 | `frameQueue` 条数 / 字节上限 | 条数达 `WS_MAX_PENDING_COUNT = 256` 恒拒新帧；累计字节达 `K × maxPayload = 64 MiB` 恒拒新帧；**两者独立**（大量小帧 / 少量大帧分别触发） | 大片 = 257 条小帧触发条数、单帧≈上限 × K 于第 4 帧触发字节、并发 |
+| `shouldRejectOutbound`（`outbound` 对称防御） | `outbound` 条数达 `WS_MAX_OUTBOUND_COUNT = 256` 或累计字节超 `WS_MAX_OUTBOUND_BYTES = 64 MiB` 恒拒；**两者独立**；`= K × maxPayload` | 恰 256 条 / 257 条、恰 64 MiB / 超 1 字节 |
 | `guardClientFrame` 解析次数 | 对同一文本恒只 `JSON.parse` 一次，且计数不随载荷增大 | small vs large(4MiB)，`JSON.parse` spy 计数应相等且 ≤ 2（实测均 = 1） |
 | `reconcileModel` 参数 | 每次调用恒含非空 `profile` 与 `session_id` | 无 default_profile（应不发请求）、连续两次 `message.complete` |
 | `validateAttachmentMagic` | 任意非法魔数（image/pdf）恒 `ok:false`；合法 PNG/JPEG/GIF/BMP/WebP 与 `%PDF-` 恒 `ok:true`；恒只解码前缀（`Buffer.from` 实参长度 ≤ `ATTACHMENT_PREFIX_CHARS` = 48） | 41 字节文本冒充 image、非 `%PDF-` 冒充 pdf、`data:` 前缀、缺失载荷、20MB 假载荷 + `Buffer.from` spy |
@@ -833,6 +835,7 @@ expect(gateway.paramsOf("session.workspace.move")[0]).toEqual({ session_key: "s1
 | 28 | REST 注入后**上游实际收到的 URL** | query 字符串含 `profile=<default_profile>`（不是仅本地变量） |
 | 29 | **REQ-023**：`admin` 发 `image.attach_bytes{content_base64:<41 字节非图片文本 base64>, filename:"fake.png"}` | 同 `id` 400 `INVALID_ATTACHMENT_TYPE`；上游未收到；`audit` 恰 1 条 `ws.upload.invalid_type` |
 | 30 | **REQ-023**：`admin` 发合法 1x1 PNG `image.attach_bytes` | 转发（`profile=alpha` 注入）；非 `%PDF-` 的 `pdf.attach` 拒绝、`%PDF-` 开头转发；`file.attach`/`super_admin` 不做类型校验 |
+| 31 | **REQ-018（`outbound` 对称防御）**：`shouldRejectOutbound` 纯函数边界（集成层难以稳定构造该极短窗口，故以纯函数单测为主） | 常量 pinning（`WS_MAX_OUTBOUND_COUNT = 256`、`WS_MAX_OUTBOUND_BYTES = K × maxPayload`）；条数 / 字节**各自独立**触发 |
 
 ### 8.5 StrictMode / 幂等
 
