@@ -27,7 +27,7 @@
 | **③ 会话 ID 寻址** | `session.list` / `session.resume` / `session.events.since` 以会话 id 寻址、**不含 `params.profile`** → 落到**启动 profile** 的存储，构成跨租户读写 | **REQ-017 闭合**（服务端强制注入调用者 `default_profile`） |
 | **④ 会话 ID 寻址** | 同 ③ 的 REST 对应面 | 由 **REQ-022** 闭合 |
 
-**残余缺口（显式登记）**：REST 路径的守卫缺口已由 **REQ-022** 闭合。**订正**：本 Spec 早前版本曾称「REST 已有 `assertProfileAccess`」——该表述不准确，`routes/hermes.ts:39-42` 在 `!profile \|\| role === "super_admin"` 时**提前 `return`**，故缺 `profile` 的请求实际未被守卫；REQ-022 已修正该行为。**已闭合**：session 归属方法（(A) 类，含 `_SessionScoped` 与 `skills.reload`/`complete.slash`/`model.save_key`/`model.disconnect`）的 session 归属校验（R24）；服务端 magic bytes 校验落点（R10，落点 = Hermes，见 §8）。**仍未闭合**：WS 大帧端到端可达性（R15）、REST 注入的上游语义（见 §10）。
+**残余缺口（显式登记）**：REST 路径的守卫缺口已由 **REQ-022** 闭合。**订正**：本 Spec 早前版本曾称「REST 已有 `assertProfileAccess`」——该表述不准确，`routes/hermes.ts:39-42` 在 `!profile \|\| role === "super_admin"` 时**提前 `return`**，故缺 `profile` 的请求实际未被守卫；REQ-022 已修正该行为。**已闭合**：session 归属方法（(A) 类，含 `_SessionScoped` 与 `skills.reload`/`complete.slash`/`model.save_key`/`model.disconnect`）的 session 归属校验（R24）。**部分实测（2026-09-30，见 `contracts-evidence.md §8`）**：REST 注入的上游语义（`profile` 被上游消费/校验）；WS 大帧直连网关可达（≈13.98 MB），**经 BFF 端到端仍未测**（R15）。**R10 未闭合（本轮订正）**：服务端**无真正的内容类型拒绝**——Hermes 仅按 `_sniff_image_ext` **推断扩展名**（`prompt_attachments.py:64`，**不拒绝**；实测 41 字节非图片文本经 `image.attach_bytes` 被接受），PDF 的 `%PDF-` 校验（`methods_prompt.py:1106-1107`）被 `pdftoppm` 依赖遮蔽（`:797-798`，本机缺 poppler-utils 时先回 5028）→ 若需真正 magic bytes 拒绝，应在 **BFF** 侧补（新任务），或在网关侧补/装 poppler-utils；见 §9 R10 / §10 与 `contracts-evidence.md §8.5`。**yolo 取值（本轮已修复，原「待裁定」已结）**：前端原发 `"default"` 表示「默认审批」→ 网关翻转**开启** yolo；已改发 `"off"`（默认审批）/`"on"`（自动批准），见 §10 与 `contracts-evidence.md §8.3`。
 
 ## 2. 用户故事
 
@@ -168,7 +168,7 @@
 | ❓ Ask First | `分享` 目标形态（**已定**） | 沿用现有链接 + 剪贴板 |
 | ❓ Ask First | 会话内切智能体（**已定**） | 强开新会话，pill 只读 |
 | ❓ Ask First | WS 大 payload 降级（**已定**） | 10MB 不分片、>2MB 等待态、失败复用 identity |
-| ❓ Ask First | 服务端 magic bytes 校验落点（**已定：Hermes**） | 见风险 R10；`prompt_attachments._sniff_image_ext`（图片）+ `methods_prompt` 的 `%PDF-` 校验（PDF）；客户端 `File.type` 仅作 UX 预筛 |
+| ❓ Ask First | 服务端 magic bytes 校验落点（**R10 未闭合，需补**） | 实测：Hermes 的 `_sniff_image_ext`（图片）仅**推断扩展名、非内容类型拒绝**，PDF `%PDF-` 校验被 `pdftoppm` 依赖遮蔽（缺 poppler-utils 先回 5028）；客户端 `File.type` 仅 UX 预筛。要真正拒绝应在 **BFF** 侧补，或网关补/装 poppler-utils |
 | ❓ Ask First | `···` 菜单「连接」的确切语义（多实例切换 vs 状态展示） | 需产品确认落点 |
 | ❓ Ask First | hero 态选昂贵模型无二次确认（`session.create` 无 `confirm_expensive_model` 字段） | 见 R13；需产品确认是否可接受 |
 | ❓ Ask First | WS 豁免清单（**已定，26 条，MethodSweep 机械核验 2026-09-30**）与 REST 豁免清单（1 条）是否与官方契约/路由一致 | 判据已可机械派生（参数类是否声明 `profile`），漏判方向为**功能回归**（错误注入 → 4000），非安全漏洞 |
@@ -209,7 +209,7 @@
 | `pdf.attach{path?\|content_base64?\|data?, filename?, first_page?, last_page?}` → PNG 页 | `contracts/prompt_voice.py:134-161` |
 | `clipboard.paste{}` = **宿主**剪贴板（浏览器不可用） | `contracts/prompt_voice.py:104-109` |
 | `input.detect_drop{text}` = 仅识别**终端**拖拽文本（浏览器不可用） | `contracts/prompt_voice.py:199-215` |
-| **服务端 magic bytes 校验在 Hermes**：图片按魔数嗅探扩展名（`_sniff_image_ext`，WebP 识别 RIFF 容器）、PDF 校验 `%PDF-`；「declared mime never trusted」 | `tui_gateway/prompt_attachments.py:20/64`；`tui_gateway/methods_prompt.py:775/1106-1107`；`tui_gateway/methods_profiles.py:16` |
+| **服务端仅扩展名嗅探、非内容类型拒绝（R10 未闭合）**：`_sniff_image_ext`（`prompt_attachments.py:20/64`，filename 后缀优先，否则魔数，未知默认 `.png`）只**推断扩展名**；`methods_prompt.py:775-776` 仅判扩展名是否在允许集合，**不拒绝**（实测 41 字节非图片文本被接受）。PDF `%PDF-` 校验（`methods_prompt.py:1106-1107`）存在，但 `:797-798` 先检查 `pdftoppm`，缺 poppler-utils → 5028，该分支不可达。「declared mime never trusted」仅表示不信任声明的 MIME，**不等于**拒绝伪造内容 | `tui_gateway/prompt_attachments.py:20/64/71`；`tui_gateway/methods_prompt.py:775-776/797-798/1106-1107`；`tui_gateway/methods_profiles.py:16` |
 | **不存在 `session.info`**；`session.status` 回包仅 `{output: str}`（渲染文本），**不可**用于模型对齐 | `contracts/sessions.py:431-440` |
 | 模型对齐唯一结构化来源：`model.options{profile, session_id: runtimeId}` 回包的 `model` / `provider` | `contracts/config_free_tier_control.py:273-277`（doc: "layered over the session's live provider when given"） |
 | `message.complete` 事件（回合结束）可作为对齐触发器 | `contracts/events.py:205` |
@@ -230,12 +230,12 @@
 | R7 | 基线漂移（`requirement.md` / `ui-spec.md` / `docs/TASKS.md:102` / 「corner-shape」四处） | 后续任务反复 | Wave 0 先改 4 份基线 + `task-list.md`，Wave 5 收口复核 |
 | R8 | 昂贵模型确认与 deferred 叠加（运行中 + 昂贵） | 状态机分支爆炸 | `useSessionControls` 纯 reducer + 属性测试组合态（REQ-010×011） |
 | R9 | 现有附件实现向 attach RPC 传 `{name,size,type}`，网关很可能报错；改为延迟绑定会破坏既有测试断言（`ChatPage.test.tsx:369-384`） | 既有测试需同步改 | Wave 2/4 同步改测试；新增「hero 零 RPC」专测 |
-| R10 | ~~服务端 magic bytes 校验落点未定~~ | 伪造文件可绕过 | **已闭合（落点 = Hermes，R10 结案）**：网关已按魔数嗅探——`tui_gateway/prompt_attachments.py:64` `_sniff_image_ext`（图片，WebP 识别 RIFF 容器）+ `methods_prompt.py:1106-1107` PDF 校验 `%PDF-`；`methods_prompt.py:775` 调用；`methods_profiles.py:16` 明写「format is sniffed, the declared mime is never trusted」。客户端 `File.type` 仅作 UX 预筛，**不**作为安全边界 |
+| R10 | 服务端无真正的内容类型（magic bytes）拒绝 | 伪造文件可绕过 | **未闭合（2026-09-30 实测订正）**：Hermes `_sniff_image_ext`（`prompt_attachments.py:64-71`）仅**推断扩展名**、**不拒绝**（实测 41 字节非图片文本被 `image.attach_bytes` 接受，`attached:true`）；PDF `%PDF-` 校验（`methods_prompt.py:1106-1107`）在本机因 `pdftoppm` 缺失（`:797-798` 先检查）被遮蔽 → 5028，4017 **不可达/未验证**。故「magic bytes 校验」**非安全边界**，仅为扩展名嗅探；客户端 `File.type` 同样仅 UX 预筛。**处置**：如需真正拒绝，应在 **BFF** 侧补 magic bytes 校验（新任务），或在网关侧补/装 poppler-utils。见 `contracts-evidence.md §8.5` |
 | R11 | 规范偏差记录：OWASP 建议 WS 消息 ≤64KB，本 Spec 选 10MB 单帧 | 评审争议 | 在 `architecture.md` 显式登记偏差与补偿控制（A4 + 等待态 + 上限 + 实测） |
 | R12 | `ws.ts` 原有错误解析只读 `error.code`(number) + `message`，读不到 `PROFILE_FORBIDDEN` 字符串 | REQ-008 无法断言命名错误码 | 已定：扩展 `ws.ts` 读取 `error.data.code`（约 5 行） |
 | R13 | **帧分类 fail-open（CRITICAL，评审发现）**：原设计以「无 `id` = 通知」「带 `result`/`error` = 响应」「数组/二进制 = 放行」为免拦理由，形成 4 条可复现绕过 | 完全击穿 REQ-008 与 N-005 | **已由 REQ-008 的 default-deny 改写闭合**：凡含 `method` 即守卫、数组逐元素、二进制与解析失败一律拒绝；`constitution.md` A-006 同步改写 |
 | R14 | WS 豁免判据与清单的**契约同步性** | 漏判方向为**功能回归**（向无 `profile` 字段的方法注入 → `extra="forbid"` → 4000）；不构成 fail-open（未知方法与有 `profile` 的方法均注入） | **已闭合（MethodSweep 机械核验 2026-09-30）**：判据 = 参数类是否声明 `profile`；清单 26 条（原 18 条为真子集，补齐 8 条：`skills.reload` / `learning.edit` / `onboarding.ensure_setup_profile` / `onboarding.reset_setup_profile` / `browser.controller.{register,heartbeat,detach,result}`）；无「多出」项；结果归档 `contracts-evidence.md` MethodSweep 小节 |
-| R15 | 10MB 端到端可达性未实测（`ws` 的 `maxPayload`、上游上限、BFF 队列内存放大） | 上传失败 | **已由 REQ-018 部分闭合**（显式上限 + 队列上限）；端到端值以实测为准，REQ-007 只承诺**前端预筛** 10MB，网关拒绝则透传 message；列入 e2e/实测任务 |
+| R15 | 10MB 端到端可达性未实测（`ws` 的 `maxPayload`、上游上限、BFF 队列内存放大） | 上传失败 | **已由 REQ-018 部分闭合**（显式上限 + 队列上限）；**部分实测（2026-09-30）**：直连网关接受 ≈13.98 MB `image.attach_bytes` 帧（290ms，`bytes:10485760`）；**经 BFF 端到端仍未测**，REQ-007 只承诺**前端预筛** 10MB，网关拒绝则透传 message。见 `contracts-evidence.md §8.6` |
 | R16 | 「昂贵」判定依据（`pricing` vs `authenticated`）与 hero 路径无确认 | 计费意外 / 需求不可验收 | **已由 REQ-011 改写闭合**（前端不预判、以网关 `confirm_required` 为唯一判据）；hero 路径无确认列为 R13'（见 Ask First）——**已是本表 R13'，即 `REQ-011a` + Ask First 两条** |
 | R17 | 契约源码路径 `/vol1/.../hermes-desktop/...` 不在本仓库，判定不可被 CI 独立复核 | 安全判据建立于外部事实 | 新增任务：把可核验的契约片段归档到本 Spec 目录（`contracts-evidence.md`） |
 | R18 | 多 profile 的 `admin` 访问**非默认** profile 的会话/历史 | 自访问回归 | **已由 REQ-020 闭合**：前端显式携带 `selection.profile`；未选时 BFF 注入 default（REQ-017） |
@@ -254,14 +254,15 @@
 | `profiles.list` 元数据枚举 | 不按调用者过滤 | **REQ-015 闭合**（过滤 + fail-closed） |
 | **会话 ID 维度越权** | `session.list/resume/events.since` 无 `profile` → 落启动 profile 存储 | **REQ-017 闭合**（注入 `default_profile`） |
 | REQ-017 豁免清单完备性 | 枚举是否漏方法 | **已闭合（MethodSweep 机械核验 2026-09-30，R14）**：注册表 237 方法中 26 个参数类无 `profile` 字段，与清单完全一致；见 `contracts-evidence.md` |
-| 服务端 magic bytes 校验 | 落点已定 | **已闭合**（R10）：落点 = **Hermes**（`prompt_attachments._sniff_image_ext` + `methods_prompt` 的 `%PDF-` 校验）；客户端 `File.type` 仅 UX 预筛 |
-| WS 大帧端到端可达性 | `maxPayload` / 上游上限未实测 | 部分闭合（REQ-018 显式上限）；端到端待实测（R15） |
+| 服务端 magic bytes 校验 | **未闭合**（R10，本轮订正） | 无真正内容类型拒绝：`prompt_attachments._sniff_image_ext` 仅**推断扩展名、不拒绝**（实测接受非图片魔数字节）；`methods_prompt` 的 `%PDF-` 校验被 `pdftoppm` 依赖遮蔽（缺 poppler-utils 回 5028，4017 不可达）。客户端 `File.type` 仅 UX 预筛。**处置**：若需真正拒绝，在 **BFF** 侧补 magic bytes 校验（新任务），或网关补/装 poppler-utils。见 `contracts-evidence.md §8.5` |
+| WS 大帧端到端可达性 | `maxPayload` / 上游上限未实测 | 部分闭合（REQ-018 显式上限）；**部分实测（2026-09-30）**：直连网关接受 ≈13.98 MB `image.attach_bytes` 帧（290ms）；**经 BFF 端到端仍未测**（R15） |
 | hero 态昂贵模型无二次确认 | `session.create` 无该字段 | **未闭合**（REQ-011a / Ask First） |
 | 「连接」菜单语义 | 产品未定 | `❓Ask First` |
 | `/api/auth/me` 是否返回头像 | 决定 AgentPicker 是否只用首字占位 | 实现阶段验证 |
 | 契约片段不可 CI 复核 | 源码在仓库外 | R17；归档任务 |
 | session 归属方法的租户安全 | 参数类无 `profile` 字段（注入即 4000）且缺/未知 `session_id` 时回退启动 profile 的 (A) 类方法：`tools.list` / `toolsets.list` / `tools.show` / `skills.reload` / `complete.slash` / `model.save_key` / `model.disconnect` | **已闭合**（R24 / TASK-036）：缺 `session_id` 时 fail-closed 拒绝（`SESSION_SCOPED_NO_PROFILE_METHODS`，判定早于豁免清单）；带 `session_id` 时按 per-connection `sessionOwners` 校验归属（未知/他人 → 403 不转发） |
-| REST 注入对上游语义的影响 | REQ-022 注入 `profile` 后上游是否按租户作用域，**未实测** | **未闭合**；实测后确认或调整 |
+| REST 注入对上游语义的影响 | REQ-022 注入 `profile` 后上游是否按租户作用域 | **已闭合（2026-09-30 实测）**：直连 L2 `?profile=nonexistent_xyz` → 404 `Profile ... does not exist`（上游**消费并校验** profile，注入不被静默忽略）；单 profile 下跨租户内容差异未验证。见 `contracts-evidence.md §8.7` |
+| `yolo` 取值与前端语义不一致 | 前端曾发 `value:"default"` 表示「默认审批」，实测网关 `"default"` → `value:"1"`（**开启 yolo**；`_BOOL_WORDS` 无 `"default"`，fallback 为翻转 `methods_config_set.py:278`） | **已修复（本轮）**：`PermissionPicker` / `controlsReducer.DEFAULT_YOLO` 改为 `"off"`（默认审批）/`"on"`（自动批准），`selectYolo` 原样上送；测试断言 `config.set` 的 `value` 为 `off`/`on` 且**禁 `"default"`**。取值表见 `contracts-evidence.md §8.3` |
 | 豁免清单契约同步性 | 判据已改为「参数类是否声明 `profile`」并可机械派生；契约变更须同步 | **已闭合（MethodSweep 机械核验 2026-09-30）**；契约变更时须重跑 MethodSweep 并同步清单与 `contracts-evidence.md`（低危、流程性） |
 | REST 注入的落点 | `routes/hermes.ts:94-95` 用 `request.url` 构造上游 target，而 `requestProfile` 读 `request.query`/`request.body`（`:30-32`）——若注入只改 `request.query`，守卫通过但上游不含 `profile`（静默失效） | **未闭合**；TASK-035 须断言「上游实际收到 `profile`」 |
 | `reload.mcp` 全局重载 | 参数类无 `profile` 字段，且 `session_id` **不参与** home/profile 解析：`_do_full_reload` 显式绑定 `{"profile_home": None}` 后遍历**全部**已服务 home 重建（`methods_tools.py:332-408`，尤其 `:370-390`、`:343-349`；契约 doc「for every live session」，`tools_mcp_plugins.py:113,137`） | 非 `super_admin` 亦可触发**全 home 重载**（有意全局操作；归属校验无法闭合其全局副作用） | **已登记（未闭合）**：`reload.mcp` 为有意全局操作，非 `super_admin` 亦可触发；建议后续评估是否改为 `super_admin`-only |

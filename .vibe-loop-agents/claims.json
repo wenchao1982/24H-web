@@ -10,6 +10,7 @@
     "agentId": "spec-agent-003",
     "taskId": "mune68yfr1io",
     "claimedAt": "2026-09-30T01:27:06.675Z",
-    "status": "claimed"
+    "status": "done",
+    "result": "核验结论：交接描述已过时——spec 003 的 requirements.md REQ-017 内联清单**已是 26 条且分类正确**（commands.catalog / config.show / complete.path / llm.oneshot 均已在「须注入」列表，不再错列为豁免）；前几轮（MethodSweep 机械核验 + R24 扩展）已修正。\n\n本轮完成的唯一遗留：MethodSweep **权威口径**——design.md §8.4 #14、tasks.md TASK-004 ⑭、tasks.md 验收清单 3 处仍写「以 docs/INTERFACES.md 全清单」，已改为以 contracts/*.py（官方契约注册表）为数据源，并把断言由「注入/403/豁免三选一」升级为机械断言「豁免集合 == 参数类未声明 profile 字段的方法集合」。manifest.reviewResult.round3 的历史记录按规矩保持不动。\n\n四方一致性核验：frameGuard.ts#PROFILE_AGNOSTIC_METHODS(26) / requirements REQ-017(26) / design §7.1.2(26) / tasks TASK-030(26) 完全一致（missing=∅ extra=∅）；SESSION_SCOPED_NO_PROFILE_METHODS(7) 与 REQ-017 R24 段、frameGuard.test.ts pin 断言一致。\n\nnpm run check 全绿（93 files / 466 tests）。提交：见交接提交（docs: MethodSweep 权威数据源改为 contracts/*.py）。"
   }
 ]

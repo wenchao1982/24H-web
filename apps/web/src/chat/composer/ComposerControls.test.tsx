@@ -25,7 +25,7 @@ function renderControls(variant: "hero" | "docked", overrides: Record<string, un
     onSelectModel: vi.fn(),
     onConfirmModel: vi.fn(),
     onCancelModelConfirm: vi.fn(),
-    permissionValue: "default",
+    permissionValue: "off",
     onSelectPermission: vi.fn(),
     onAttachFiles: vi.fn(),
     onOpenPanel: vi.fn(),

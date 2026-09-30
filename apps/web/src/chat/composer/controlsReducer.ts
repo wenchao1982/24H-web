@@ -35,8 +35,15 @@ export type ControlsAction =
   | { type: "endSend" }
   | { type: "resetForNewSession"; yolo?: string };
 
-/** 默认权限模式值（config key = `yolo`，value 为模式标识）。 */
-export const DEFAULT_YOLO = "default";
+/**
+ * 默认权限模式值：「默认审批」= **不开** yolo，故取 `"off"`（config key = `yolo`）。
+ *
+ * 依据（真机实测 + 源码）：`yolo` 只接受 `_BOOL_WORDS`（`server.py:1772-1774`：
+ * `on/off/true/false/yes/no/1/0`）；任何不在表内的值（如 `"default"`）会走
+ * `methods_config_set.py:278` 的 fallback `not is_session_yolo_enabled(skey)` —— 即**翻转**
+ * 当前会话状态，导致点「默认」反而开启完全访问。**禁止使用 `"default"`。**
+ */
+export const DEFAULT_YOLO = "off";
 
 export const initialControlsState: ControlsState = {
   selection: { profile: null, model: null, cwd: null, yolo: DEFAULT_YOLO },

@@ -430,6 +430,9 @@ export function useSessionControls(args: UseSessionControlsArgs): SessionControl
         return;
       }
       try {
+        // `mode` 即 config value 原样上送（UI「默认审批」→"off"、「自动批准」→"on"）。
+        // **不得**二次映射为 "default"：它不在 `_BOOL_WORDS`（server.py:1772-1774），
+        // 会触发 `methods_config_set.py:278` 的翻转 fallback 而意外开启 yolo。
         await gateway.request("config.set", {
           key: "yolo",
           value: mode,

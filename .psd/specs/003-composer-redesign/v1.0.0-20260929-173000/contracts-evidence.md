@@ -381,3 +381,107 @@ grep -n "extra=\"forbid\"" "$SRC/contracts/base.py"                       # 35
 grep -n "class _SessionScoped" "$SRC/contracts/tools_mcp_plugins.py"      # 19
 grep -rn 'method("session.info"' "$SRC/contracts" --include=*.py          # 零命中
 ```
+
+---
+
+## 8. 真机实测（2026-09-30，网关版本 `version:"unknown"` / `release_date:"2026.9.24"`）
+
+网关进程：`hermes serve --host 127.0.0.1 --port 19119 --skip-build`（PID 2513791）。**注意**：`apps/server/src/config.ts` 默认 `HERMES_BASE_URL=http://127.0.0.1:9119`，但本机 9119 实际是 Vite dev server（返回 `24H Web` SPA），Hermes 在 **19119**。
+
+探测命令与原始输出：
+
+```bash
+curl -sS -m 3 http://127.0.0.1:19119/api/status
+# {"version":"unknown","release_date":"2026.9.24","config_version":46,...,"gateway_running":false,...}
+curl -sS -m 3 http://127.0.0.1:19119/
+# <script>window.__HERMES_SESSION_TOKEN__="vsD...";window.__HERMES_AUTH_REQUIRED__=false;</script>
+```
+
+WS 连接：`ws://127.0.0.1:19119/api/ws?token=<token>`，帧 `{"jsonrpc":"2.0","id":n,"method":...,"params":{...}}`（与 `apps/web/src/api/ws.ts` 一致）。
+
+### 8.1 `model.options{profile:"default"}` — 结构对齐（**无结构不一致**）
+
+回包顶层键：`providers`、`model`、`provider`。`providers[]` 逐字段：
+
+| 字段 | 类型 | 观测值（示例） |
+|---|---|---|
+| `slug` | string | `"moa"` / `"deepseek"` / `"custom:api.apikey.fun"` |
+| `name` | string | `"Mixture of Agents"` / `"DeepSeek"` / `"api.apikey.fun"` |
+| `models` | `string[]` | `["deepseek-flash","deepseek-v4-pro"]`（**字符串数组**） |
+| `is_current` / `is_user_defined` | bool | `true`/`false` |
+| `total_models` / `source` | number / string | `4` / `"built-in"`\|`"virtual"`\|`"user-config"` |
+| `authenticated` | bool | `true` |
+| `capabilities` | `{ [model_id]: {fast:bool, reasoning:bool} }` | `{"deepseek-v4.1-flash":{"fast":false,"reasoning":true}}` |
+| `featured_models` | array | `[]` |
+| `auth_type` / `warning` / `api_url` / `native_catalog_empty` / `aliases` | 可选 | 视 provider 出现 |
+| `pricing` | — | **本 build 未出现**（契约声明 `dict[str, ModelPricing] | None`，但此端点未回传） |
+
+顶层 `model:"deepseek-v4.1-flash"`、`provider:"custom:api.apikey.fun"`。
+
+**与 `apps/web/src/chat/composer/modelCatalog.ts#normalizeModelCatalog` 的假设对照**：`providerName`=slug、`models` 为 string 数组、`capabilities[id].fast/reasoning`、`providers[].authenticated`、顶层 `model/provider` **全部匹配**（名称与类型一致）。**不一致项：无结构性不一致**。唯二差异均为数据层：① `pricing` 本 build 未回传（实现不依赖）；② `capabilities.fast` 全为 `false`，故无 `Flash` 徽标可渲染（数据，非结构）。
+
+### 8.2 `config.set` 的 `deferred` / `confirm_required`
+
+- **idle**：`config.set{key:"model",value:"deepseek-v4-pro",session_id,scope:"session"}` →
+  `{"key":"model","value":"deepseek-v4-pro","warning":"","confirm_required":false,"confirm_message":"","scope":"session"}` —— **无 `deferred` 字段**。
+- **回合运行中**：先 `prompt.submit`（长任务）再切模型，连续 4 次均回
+  `{"key":"model","value":...,"warning":"","confirm_required":false,"confirm_message":"","scope":"session","deferred":true}` —— 确认 **`deferred:true`**。
+- `warning` 非空示例：切到 `deepseek-v4.1-flash` 时回 `"Note: ... was not found in this custom endpoint's model listing ..."`。
+- `confirm_required` 对 `deepseek-v4-pro` / `deepseek-flash` 均为 `false` → **本环境未观测到 `confirm_required:true`**（未能定位昂贵模型）；REQ-011 昂贵模型路径**未验证**。
+
+### 8.3 `yolo` 取值（**已修复**）
+
+`config.set{key:"yolo",value:<v>,session_id,scope:"session"}`（会话初始 yolo=off）：
+
+| 入参 value | 回包 `value` | 回包 `scope` | 说明 |
+|---|---|---|---|
+| `"on"` | `"1"` | `"session"` | 开启（自动批准） |
+| `"off"` | `"0"` | `"session"` | 关闭（默认审批） |
+| `"true"` | `"1"` | `"session"` | 开启 |
+| `"default"` | **`"1"`** | `"session"` | **非预期/禁用**：`"default"` 不在 `_BOOL_WORDS`，走 `not is_session_yolo_enabled()` **翻转**（会话初始 off → 变 on 开启） |
+
+依据：`server.py:1772-1774` `_BOOL_WORDS = {"1","on","true","yes" → True; "0","off","false","no" → False}`，**不含 `"default"`**；`methods_config_set.py:278` 的 fallback 是 `_BOOL_WORDS.get(raw, not is_session_yolo_enabled(skey))`（**翻转**，非固定 off）。故 `"default"` 是被禁止的上送值。
+
+**已修复（2026-09-30）**：`apps/web/src/chat/composer/PermissionPicker.tsx` 的 `PERMISSION_OPTIONS` 改为 `off`（默认审批）/`on`（自动批准），`controlsReducer.ts` 的 `DEFAULT_YOLO="off"`，`useSessionControls.ts` 的 `selectYolo(mode)` 原样上送 `value: mode`（无二次映射）。原实现用 `"default"` 表示「默认审批」并原样上送 → 网关**打开** yolo（自动批准），语义相反；该缺陷已消除。测试断言：选「默认」→ `config.set.value==="off"`；选「自动批准」→ `config.set.value==="on"`；且断言不产生 `"default"`（`PermissionPicker.test.tsx` / `useSessionControls.test.ts` / `controlsReducer.test.ts`）。
+
+### 8.4 `image.attach_bytes`（1x1 PNG）
+
+`{"attached":true,"path":".../images/upload_20260930_093746_1.png","count":1,"remainder":"","text":"[User attached image: ...]","bytes":70,"name":"...","width":1,"height":1,"token_estimate":85}`（成功）。
+
+### 8.5 magic bytes 实证（R10）— **订正：R10 未闭合**
+
+- `pdf.attach{content_base64:<非 PDF base64>, filename:"fake.pdf", session_id}` →
+  `{"error":{"code":5028,"message":"pdftoppm not installed (poppler-utils package required)"}}`
+  **并非预期 4017**。原因：`methods_prompt.py:797-798` 在执行 `_pdf_attach_source`（其 `:1106-1107` 才做 `%PDF-` 校验）**之前**先检查 `shutil.which("pdftoppm")`；本机无 poppler-utils → 一律 5028。带 `%PDF-` 头的假 PDF 同样 5028。→ **R10 的 PDF 4017 在本环境不可达、未验证**。
+- `image.attach_bytes{content_base64:<41 字节非图片文本>, filename:"fake.png", session_id}` →
+  `{"attached":true,"path":".../upload_20260930_094016_1.png","bytes":41,...}`（**被接受**，无 width/height）。原因：`prompt_attachments.py:64-71` `_sniff_image_ext` 仅**推断扩展名**（filename 后缀优先；未知魔数默认 `.png`），`methods_prompt.py:775-776` 只判扩展名是否在允许集合——**不做拒绝**。→ 「magic bytes 校验」实为**扩展名嗅探，非安全拒绝**；R10 的「服务端校验」表述**过强**。
+
+**R10 订正结论（2026-09-30）＝未闭合**：客户端 `File.type` 仅作 UX 预筛；服务端（Hermes）**只做扩展名嗅探**（`_sniff_image_ext`），**并非内容类型拒绝**（41 字节非图片文本经 `image.attach_bytes` 被接受）；PDF 的 `%PDF-` 校验存在但被 `pdftoppm` 依赖遮蔽（缺 poppler-utils 先回 5028，分支不可达）。**处置**：若需要真正的 magic bytes 拒绝，应在 **BFF** 侧补校验（新任务），或在网关侧补/装 poppler-utils。原「R10 已闭合（magic bytes 在 Hermes 校验）」表述**作废**。
+
+### 8.6 10MB 单帧可达性（R15，**直连网关**）
+
+`image.attach_bytes`，`content_base64` 长度 **13,981,016** 字符（≈13.33 MiB），整帧 ≈13,981,149 字节：
+
+```
+image.attach_bytes ~10MB -> {"attached":true,"path":".../upload_20260930_093747_2.png","count":2,"text":"...","bytes":10485760,"name":"..."} elapsedMs=290
+```
+
+→ 网关**接受**该帧（290ms，无断开）。**注意**：此路径**直连 Hermes，未经过 BFF 代理**，故「经 BFF 端到端」仍未实测；BFF `maxPayload=16 MiB`（REQ-018）未在本轮触发。
+
+### 8.7 REST 注入后上游是否按租户作用域（REQ-022）
+
+直连 L2（`x-hermes-session-token` header），`/api/chat/workspaces`：
+
+```bash
+curl ... /api/chat/workspaces                       # 200 {"projects":[],"repos":[...],"default_cwd":"..."}
+curl ... /api/chat/workspaces?profile=default        # 200 与上完全相同
+curl ... /api/chat/workspaces?profile=nonexistent_xyz# 404 {"detail":"Profile 'nonexistent_xyz' does not exist."}
+```
+
+`/api/sessions` 同样：`?profile=nonexistent_xyz` → 404 同名 detail。
+
+→ 上游**消费并校验** `profile` 查询参数（未知 profile → 404），**注入不会被静默忽略**。因本机仅 1 个 profile（`default`），带与不带内容一致，**跨租户差异无法在本环境展示**。→ REQ-022 上游作用域**已确认有效（校验观测到）**；跨 profile 隔离差异**未验证**（单 profile）。
+
+### 8.8 清理
+
+临时会话已 `session.delete`（`{"deleted":"20260930_094202_78ac9a"}`；另两条连接断开后自行消失）；`session.delete` 对活动会话回 `4023 cannot delete an active session`（须先断开连接）。三张临时上传图片（`upload_20260930_093746_1.png` / `_093747_2.png` / `_094016_1.png`）已从 `~/.hermes/images/` 删除。未改动网关配置。

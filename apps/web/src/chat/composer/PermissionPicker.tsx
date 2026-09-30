@@ -8,11 +8,16 @@ export interface PermissionOption {
 /**
  * 权限模式选项（REQ-013）。
  *
- * `yolo` 为会话级 config key；`default`（默认审批）/ `on`（自动批准）均为 setter 接受的布尔词
- * （`server.py:1772-1774 _BOOL_WORDS` / `methods_config_set.py:263-288` 的 `_set_yolo`）。
+ * `yolo` 为会话级 config key，**只接受 `_BOOL_WORDS` 中的词**（`server.py:1772-1774`：
+ * `on/off/true/false/yes/no/1/0`）。语义映射：
+ * - UI「默认审批」（按审批策略，**不开** yolo）→ `"off"`
+ * - UI「自动批准」（全自动，**开** yolo）→ `"on"`
+ *
+ * **禁止使用 `"default"`**：它不在 `_BOOL_WORDS` 内，会命中 `methods_config_set.py:278` 的
+ * fallback `not is_session_yolo_enabled(skey)`（**翻转**当前状态），使「默认」意外开启完全访问。
  */
 export const PERMISSION_OPTIONS: PermissionOption[] = [
-  { value: "default", labelKey: "composer.permission.default" },
+  { value: "off", labelKey: "composer.permission.default" },
   { value: "on", labelKey: "composer.permission.auto" },
 ];
 

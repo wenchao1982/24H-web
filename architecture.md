@@ -134,7 +134,7 @@ interface SessionIdentity { storedId: string; runtimeId: string }
 
 - **偏差登记**：本设计允许 WS 单帧承载上传内容，base64 后 10MB ≈ 13.3MB；OWASP 建议 WS 消息 ≤64KB，本设计**显著超出**（契约无分片通道）。
 - **补偿控制**：① 前端**预筛**——单文件 >10MB、单批 >10 个在**读取内容之前**拒绝；② **REQ-018 / REQ-018b** 为 BFF WS 显式设 `maxPayload = 16 MiB`（**双 socket**）与 `pending`/`outbound` 队列上限（**条数 AND 累计字节**，`K = 4` → `pendingBytes ≤ 64 MiB`，不依赖 `ws` 库默认值），超限回可读错误并**仅**终止该连接；③ 单文件 >2MB 显示等待态，失败重试**复用 identity**、不重复 `session.create`；④ 端到端可达性以**实测**为准；网关拒绝则原样透传 message。
-- 服务端 magic bytes 校验落点 **已定：Hermes**（`tui_gateway/prompt_attachments.py:64` `_sniff_image_ext` 按 CDR/RIFF 头嗅探图片扩展名，`tui_gateway/methods_prompt.py:1106-1107` 对 PDF 校验 `%PDF-`，`methods_prompt.py:775` 调用 `_sniff_image_ext`；`methods_profiles.py:16` 明写「format is sniffed, the declared mime is never trusted」）。客户端 `File.type` 仅作 UX 预筛，**不**作为安全边界。
+- **服务端内容类型校验：R10 未闭合（2026-09-30 实测订正）**。Hermes 只做**扩展名嗅探**：`tui_gateway/prompt_attachments.py:64-71` `_sniff_image_ext` 按 filename 后缀优先、否则魔数（WebP 识别 RIFF 容器）、未知默认 `.png`，**只推断扩展名、不拒绝**（实测 41 字节非图片文本经 `image.attach_bytes` 被接受，`attached:true`）；`methods_prompt.py:775-776` 仅判扩展名是否在允许集合。PDF 的 `%PDF-` 校验（`methods_prompt.py:1106-1107`）存在，但 `:797-798` 先检查 `pdftoppm`，本机缺 poppler-utils → 一律回 **5028**，该分支**不可达**。`methods_profiles.py:16` 的「declared mime never trusted」仅表示不信任声明的 MIME，**不等于**拒绝伪造内容。客户端 `File.type` 同样仅 UX 预筛，**不**作安全边界。→ **处置**：如需真正的内容类型拒绝，应在 **BFF** 侧补 magic bytes 校验（新任务），或在网关侧补/装 poppler-utils。
 
 ## 8. 详见
 

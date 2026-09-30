@@ -75,7 +75,7 @@
 | Q-002 | `分享` 目标形态 | 已定：沿用现有 `?session=<storedId>` 链接 + 剪贴板 |
 | Q-003 | 会话内切换智能体（profile） | 已定：**强开新会话**；已建会话的 pill 只读展示 |
 | Q-004 | WS 大 payload 降级策略 | 已定：保持 10MB、不分片；>2MB 显示等待态；失败重试复用 identity 不重复 create；网关拒绝原样透传 |
-| Q-005 | 服务端 magic bytes 校验落点（Hermes 还是 BFF） | **已定：Hermes**（2026-09-30）；`prompt_attachments._sniff_image_ext`（图片）+ `methods_prompt` 的 `%PDF-` 校验（PDF），`methods_profiles.py:16` 明写 mime 不被信任；R10 已闭合 |
+| Q-005 | 服务端 magic bytes 校验落点（Hermes 还是 BFF） | **R10 未闭合（2026-09-30 订正）**：Hermes 仅 `_sniff_image_ext` **推断扩展名、不做内容类型拒绝**（实测非图片字节被接受），PDF `%PDF-` 校验被 `pdftoppm` 依赖遮蔽（缺 poppler-utils 回 5028）；`methods_profiles.py:16` 仅表示不信任声明的 MIME。**处置**：如需真正拒绝，应在 **BFF** 侧补（新任务）或网关补/装 poppler-utils |
 | Q-006 | `···` 菜单「连接」的确切语义（多实例切换 vs 状态展示） | **未定**，需产品确认 |
 | Q-007 | `/api/auth/me` 是否返回头像（决定 AgentPicker 是否只用首字占位） | **未定**，实现阶段验证 |
 | Q-008 | 官方 L1 是否支持 JSON-RPC 数组批帧 | **未定**，实现阶段验证 |

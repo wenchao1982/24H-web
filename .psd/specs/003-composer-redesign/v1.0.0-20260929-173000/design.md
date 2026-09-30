@@ -659,7 +659,7 @@ TASK-003 负责实现并导出该函数；TASK-029（响应过滤）依赖它，
 | 偏差 | 说明 | 补偿控制 |
 |---|---|---|
 | WS 单帧可达 10MB（base64 ≈13.3MB），OWASP 建议 ≤64KB | 契约无分片通道 | >2MB 等待态；失败复用 identity 不重复 create；建议 BFF 显式设 `maxPayload`；`proxy.ts:33-46` 的 `pending`/`outbound` 需上限；网关上限实测（R3/R11） |
-| 服务端 magic bytes 校验落点 **已定：Hermes** | `File.type` 仅客户端声明 | 网关已按魔数嗅探（`prompt_attachments._sniff_image_ext` / `methods_prompt` 的 `%PDF-` 校验）；客户端仅作 UX 预筛；**R10 已闭合** |
+| 服务端内容类型校验 **R10 未闭合（订正）** | `File.type` 仅客户端声明 | 网关仅 `_sniff_image_ext` **推断扩展名、不拒绝**；PDF `%PDF-` 校验被 `pdftoppm` 遮蔽（缺 poppler-utils 回 5028）；客户端仅作 UX 预筛。**处置**：如需真正拒绝，在 **BFF** 侧补 magic bytes 校验（新任务）或网关补/装 poppler-utils |
 | BFF 无帧大小/队列上限（评审 MEDIUM #14） | `proxy.ts:33-34` 的 `pending`/`outbound` 为无界数组，10MB（≈13.3MB base64）单帧在冷启动队列下被放大 | **REQ-018**：显式设 `maxPayload` 与队列长度上限；超限回可读错误并仅终止该连接 |
 | 契约源码在仓库外，判定不可 CI 复核（评审 LOW #16） | 所有「以官方源码为准」的断言无法被本仓库独立验证 | **TC-016**：归档可核验的契约片段到 `contracts-evidence.md`（TASK-033） |
 | 队列上限只按条数、不限字节（评审 N8） | `pending`/`outbound` 为无界数组，N 条近上限帧可堆内存 | **REQ-018 / TC-018**：同时约束条数与累计字节（`pendingBytes ≤ K × maxPayload`，K 量化）；`maxPayload` 同时作用于客户端接入侧与上游侧 socket |

@@ -29,6 +29,10 @@ describe("initialControlsState", () => {
       sending: false,
     });
   });
+
+  it("DEFAULT_YOLO is off（默认审批不开 yolo；禁用 default 以免网关翻转）", () => {
+    expect(DEFAULT_YOLO).toBe("off");
+  });
 });
 
 describe("controlsReducer selection actions", () => {
@@ -61,8 +65,8 @@ describe("controlsReducer selection actions", () => {
   });
 
   it("selectYolo updates only the permission mode", () => {
-    const next = controlsReducer(initialControlsState, { type: "selectYolo", yolo: "auto" });
-    expect(next.selection.yolo).toBe("auto");
+    const next = controlsReducer(initialControlsState, { type: "selectYolo", yolo: "on" });
+    expect(next.selection.yolo).toBe("on");
   });
 
   it("rollbackModel restores a prior value with no residue", () => {
@@ -80,7 +84,7 @@ describe("controlsReducer selection actions", () => {
   });
 
   it("rollbackYolo restores the prior mode", () => {
-    const selected = controlsReducer(initialControlsState, { type: "selectYolo", yolo: "auto" });
+    const selected = controlsReducer(initialControlsState, { type: "selectYolo", yolo: "on" });
     const rolledBack = controlsReducer(selected, { type: "rollbackYolo", yolo: DEFAULT_YOLO });
     expect(rolledBack.selection.yolo).toBe(DEFAULT_YOLO);
   });
@@ -160,7 +164,7 @@ describe("controlsReducer single-flight flag", () => {
 describe("controlsReducer resetForNewSession", () => {
   it("resets selection, attachments and sending flag", () => {
     const dirty: ControlsState = {
-      selection: { profile: "p1", model: "m-b", cwd: "/w/a", yolo: "auto" },
+      selection: { profile: "p1", model: "m-b", cwd: "/w/a", yolo: "on" },
       attachments: [attachment("a")],
       sending: true,
     };
@@ -175,8 +179,8 @@ describe("controlsReducer resetForNewSession", () => {
   it("preserves an explicitly provided yolo", () => {
     const next = controlsReducer(initialControlsState, {
       type: "resetForNewSession",
-      yolo: "auto",
+      yolo: "on",
     });
-    expect(next.selection.yolo).toBe("auto");
+    expect(next.selection.yolo).toBe("on");
   });
 });

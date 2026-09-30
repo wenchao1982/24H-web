@@ -179,6 +179,68 @@ describe("useSessionControls TASK-006C 模型两级语义", () => {
   });
 });
 
+describe("useSessionControls TASK-019 权限模式 yolo 取值", () => {
+  it("会话内选「默认」：config.set value=off（不开 yolo）", async () => {
+    stubWorkspaces();
+    const gateway = makeGateway();
+    const { result } = renderControls(gateway, { activeId: "s1", identity: IDENTITY });
+    await waitFor(() => expect(result.current.identityReady).toBe(true));
+
+    await act(async () => {
+      await result.current.selectYolo("off");
+    });
+
+    expect(gateway.paramsOf("config.set")).toEqual([
+      { key: "yolo", value: "off", session_id: "runtime:s1", scope: "session" },
+    ]);
+    expect(result.current.selection.yolo).toBe("off");
+  });
+
+  it("会话内选「自动批准」：config.set value=on（开 yolo）", async () => {
+    stubWorkspaces();
+    const gateway = makeGateway();
+    const { result } = renderControls(gateway, { activeId: "s1", identity: IDENTITY });
+    await waitFor(() => expect(result.current.identityReady).toBe(true));
+
+    await act(async () => {
+      await result.current.selectYolo("on");
+    });
+
+    expect(gateway.paramsOf("config.set")).toEqual([
+      { key: "yolo", value: "on", session_id: "runtime:s1", scope: "session" },
+    ]);
+    expect(result.current.selection.yolo).toBe("on");
+  });
+
+  it("绝不发送 value=\"default\"（否则网关翻转 yolo）", async () => {
+    stubWorkspaces();
+    const gateway = makeGateway();
+    const { result } = renderControls(gateway, { activeId: "s1", identity: IDENTITY });
+    await waitFor(() => expect(result.current.identityReady).toBe(true));
+
+    await act(async () => {
+      await result.current.selectYolo("off");
+      await result.current.selectYolo("on");
+    });
+
+    expect(gateway.paramsOf("config.set").map((params) => params.value)).not.toContain("default");
+  });
+
+  it("hero：仅写待创建参数，0 次 config.set", async () => {
+    stubWorkspaces();
+    const gateway = makeGateway();
+    const { result } = renderControls(gateway);
+    await waitFor(() => expect(result.current.options.models).toHaveLength(1));
+
+    await act(async () => {
+      await result.current.selectYolo("on");
+    });
+
+    expect(gateway.paramsOf("config.set")).toHaveLength(0);
+    expect(result.current.selection.yolo).toBe("on");
+  });
+});
+
 describe("useSessionControls TASK-006C 附件与发送", () => {
   it("attach 不触发任何 RPC", async () => {
     stubWorkspaces();
