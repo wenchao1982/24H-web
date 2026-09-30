@@ -548,7 +548,7 @@ model.options{ profile: <当前 selection.profile 或 default_profile>, session_
 |---|---|---|
 | **二进制帧**（`isBinary === true`） | 非合法 L1 帧 | **拒绝**：回 `error:400`（可读 message），不转发 |
 | 文本帧但 JSON 解析失败 | 非法 | **拒绝**：回 `error:400`，不转发 |
-| JSON 数组（batch） | 逐元素分类 | 每个元素：含 `method` → 按 request 守卫 + 租户注入；**若任一元素越权 → 整批拒绝**（回 `error:{code:403, data:{code:"PROFILE_FORBIDDEN"}}`，**不转发任何元素**）；否则整批转发。**不做局部转发**（避免 id 合并与上游批支持的不确定性，Q-008） |
+| JSON 数组（batch） | 逐元素分类 | 每个元素：含 `method` → 按 request 守卫 + 租户注入；**若任一元素越权 → 整批拒绝**（回 `error:{code:403, data:{code:"PROFILE_FORBIDDEN"}}`，**不转发任何元素**）；**嵌套批拒绝**（批内元素为数组 → `INVALID_FRAME` 整批拒绝）；**非法元素拒绝**（批内 `invalid`/`binary` → `INVALID_FRAME` 整批拒绝）；否则整批转发，**仅对 `decision.action === "inject"` 的元素注入** `profile`（不得污染豁免方法）。**不做局部转发**（避免 id 合并与上游批支持的不确定性，Q-008） |
 | JSON 对象**含 `method` 字符串**（**无论**有无 `id`、**无论**是否带 `result`/`error`） | **request** | 施加 profile 守卫（7.1.1）与租户上下文注入（7.1.2） |
 | JSON 对象**不含 `method`** | 客户端回包/通知 | 直接转发（审批/secret/sudo 回包在此路径） |
 | 其它（`null` / 数字 / 字符串 / 布尔） | 非法 | **拒绝** |
@@ -560,6 +560,15 @@ model.options{ profile: <当前 selection.profile 或 default_profile>, session_
 4. ❌「二进制帧放行」→ 必须拒绝
 5. ❌「方法不在豁免清单里所以算豁免」→ **未知方法必须按需 profile 处理**（注入或 403）
 6. ❌「方法直继 `Params` 所以是 profile-agnostic」→ 判据是 **schema 是否声明 `profile`**
+
+**批帧细则（F1/F2/F3 修复，2026-09-30）**：
+
+- **F1 嵌套批 → 整批拒绝**：JSON-RPC 2.0 禁止嵌套批。批分支若任一元素分类为 `batch`（嵌套数组）→ 整批 `INVALID_FRAME`（单对象 `{jsonrpc,id:null,error:{code:400,...}}`）拒绝。**根因**：早期实现对嵌套数组元素调 `decideProfileGuard`，其因 `kind === "batch" !== "request"` 返回 `allow` → 嵌套越权 request 被原样转发（租户守卫绕过）。
+- **F2 按元素 decision 注入**：仅当该元素 `decision.action === "inject"` 时注入 `profile`；`allow`（含豁免方法，如 `ping`）元素**原样保留**。**根因**：早期实现只要批内任一元素需注入，就对**所有**元素调 `injectIntoElement`，而后者不看方法是否在豁免清单 → 向 `ping` 注入 → `PingParams` `extra="forbid"` → 上游 **4000**，整批失败。
+- **F3 批内非法元素 → 整批拒绝**：批内元素分类为 `invalid`（如 `{"method":null}`）或 `binary` → 整批 `INVALID_FRAME`。**根因**：同 F1，`invalid` 元素经 `decideProfileGuard` 返回 `allow` → 被转发（顶层本会拒绝）。
+- **F8 回包形状**：批帧被拒返回**单对象** `{jsonrpc,id:null,error:{...}}`（整批拒绝，不逐元素回应）——本代理不拆分批帧。
+
+**sessionOwners 缺省即 deny（F4 fail-closed 默认）**：`decideProfileGuard` / `guardClientFrame` 的 `sessionOwners` **缺省视为空表**，`_SessionScoped` 方法带任意 `session_id` 一律 `deny`；**不得**因未传归属表而放行。`proxy.ts` 始终传入 per-connection 非空 `sessionOwners`。
 
 **须在 `proxy.ts` 中导出一个稳定接口供响应侧复用**：
 

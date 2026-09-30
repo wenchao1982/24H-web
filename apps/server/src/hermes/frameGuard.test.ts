@@ -174,15 +174,24 @@ describe("decideProfileGuard", () => {
     });
   });
 
-  it("allows `tools.list` (_SessionScoped, schema without profile) when it carries a session_id", () => {
+  it("F4: denies `tools.list` with a session_id when sessionOwners is omitted (fail-closed default)", () => {
     const frame = classify({
       jsonrpc: "2.0",
       id: 8,
       method: "tools.list",
       params: { session_id: "runtime:s1" },
     });
-    expect(decideProfileGuard(frame, adminWithProfile, db)).toEqual({ action: "allow" });
+    // 缺省归属表视为空表 → session_id 无法命中 → deny（不得因未传表而放行）。
+    expect(decideProfileGuard(frame, adminWithProfile, db)).toEqual({ action: "deny" });
   });
+
+  it.each(["tools.list", "toolsets.list", "tools.show", "skills.reload", "complete.slash", "model.save_key", "model.disconnect"])(
+    "F4: denies `%s` with a session_id when sessionOwners is omitted (fail-closed default)",
+    (method) => {
+      const frame = classify({ jsonrpc: "2.0", id: 8, method, params: { session_id: "runtime:s1" } });
+      expect(decideProfileGuard(frame, adminWithProfile, db)).toEqual({ action: "deny" });
+    },
+  );
 
   it("denies `tools.list` without session_id (R24 fail-closed: no fallback to startup profile)", () => {
     const frame = classify({ jsonrpc: "2.0", id: 81, method: "tools.list", params: {} });
@@ -386,6 +395,59 @@ describe("guardClientFrame", () => {
     expect(guardClientFrame(raw, false, adminWithProfile, db)).toEqual({
       action: "reject",
       code: "PROFILE_FORBIDDEN",
+      id: null,
+    });
+  });
+
+  it("F1: rejects a nested batch frame (JSON-RPC 2.0 forbids nesting) instead of forwarding it", () => {
+    // 修复前：嵌套数组元素分类为 batch → decideProfileGuard 因 kind !== "request" 返回
+    // allow → 整帧被原样转发（未分配 profile "gamma" 的 session.create 绕过租户守卫）。
+    const raw = text([
+      [{ jsonrpc: "2.0", id: 1, method: "session.create", params: { profile: "gamma" } }],
+    ]);
+    expect(guardClientFrame(raw, false, adminWithProfile, db)).toEqual({
+      action: "reject",
+      code: "INVALID_FRAME",
+      id: null,
+    });
+  });
+
+  it("F1: rejects deeper nested batches", () => {
+    const raw = text([
+      [[{ jsonrpc: "2.0", id: 1, method: "session.create", params: { profile: "gamma" } }]],
+    ]);
+    expect(guardClientFrame(raw, false, adminWithProfile, db)).toEqual({
+      action: "reject",
+      code: "INVALID_FRAME",
+      id: null,
+    });
+  });
+
+  it("F2: injects only the elements whose decision requires injection (ping untouched, session.list injected)", () => {
+    const raw = text([
+      { jsonrpc: "2.0", id: 1, method: "ping", params: {} },
+      { jsonrpc: "2.0", id: 2, method: "session.list", params: {} },
+    ]);
+    const outcome = guardClientFrame(raw, false, adminWithProfile, db);
+    expect(outcome.action).toBe("forward");
+    if (outcome.action !== "forward") {
+      throw new Error("expected forward");
+    }
+    expect(outcome.injected).toBe(true);
+    const forwarded = JSON.parse(outcome.text) as Array<Record<string, unknown>>;
+    const pingParams = forwarded[0].params as Record<string, unknown>;
+    const listParams = forwarded[1].params as Record<string, unknown>;
+    // ping 的参数类未声明 `profile`（注入即上游 4000）→ 必须原样保留。
+    expect(pingParams.profile).toBeUndefined();
+    // session.list 需注入 → 带 default_profile。
+    expect(listParams.profile).toBe("alpha");
+  });
+
+  it("F3: rejects a batch containing an invalid element (`{\"method\":null}`)", () => {
+    // 修复前：批内 invalid 元素经 decideProfileGuard 返回 allow → 被原样转发（顶层会拒绝）。
+    expect(guardClientFrame(text([{ method: null }]), false, adminWithProfile, db)).toEqual({
+      action: "reject",
+      code: "INVALID_FRAME",
       id: null,
     });
   });
@@ -649,6 +711,38 @@ describe("validateAttachmentMagic (REQ-023)", () => {
   it("reads the `data` fallback field", () => {
     const { frame, parsed } = attach("image.attach_bytes", { data: payloadOf(PNG) });
     expect(validateAttachmentMagic(frame, parsed)).toEqual({ ok: true });
+  });
+
+  it("F7: prioritizes `content_base64` over `data` (valid content_base64 + garbage data → accept)", () => {
+    // 上游消费方 `methods_prompt.py:763`：`params.get("content_base64") or params.get("data")`
+    // → content_base64 优先。校验必须读取同一字段，否则「校验 A、消费 B」可被绕过。
+    const { frame, parsed } = attach("image.attach_bytes", {
+      content_base64: payloadOf(PNG),
+      data: Buffer.alloc(41, 0x41).toString("base64"),
+    });
+    expect(validateAttachmentMagic(frame, parsed)).toEqual({ ok: true });
+  });
+
+  it("F7: prioritizes `content_base64` over `data` (garbage content_base64 + valid data → reject)", () => {
+    const { frame, parsed } = attach("image.attach_bytes", {
+      content_base64: Buffer.alloc(41, 0x41).toString("base64"),
+      data: payloadOf(PNG),
+    });
+    expect(validateAttachmentMagic(frame, parsed).ok).toBe(false);
+  });
+
+  it("F7: prioritizes `content_base64` over `data` for pdf.attach too", () => {
+    const { frame: okFrame, parsed: okParsed } = attach("pdf.attach", {
+      content_base64: PDF.toString("base64"),
+      data: Buffer.from("not a pdf").toString("base64"),
+    });
+    expect(validateAttachmentMagic(okFrame, okParsed)).toEqual({ ok: true });
+
+    const { frame: badFrame, parsed: badParsed } = attach("pdf.attach", {
+      content_base64: Buffer.from("not a pdf").toString("base64"),
+      data: PDF.toString("base64"),
+    });
+    expect(validateAttachmentMagic(badFrame, badParsed).ok).toBe(false);
   });
 
   it("ignores whitespace/newlines inside the payload", () => {

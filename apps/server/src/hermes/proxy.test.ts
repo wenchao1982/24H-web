@@ -574,4 +574,43 @@ describe("profile guard over WS", () => {
     expect(upstreamState.frames).toHaveLength(1);
     expect(JSON.parse(upstreamState.frames[0]).params.profile).toBe("alpha");
   });
+
+  it("F2: forwards a mixed batch without polluting the exempt `ping` element", async () => {
+    const { upstreamState, client, messages } = await boot("ws-mixed-batch-token", () =>
+      seedAdmin(["alpha"]),
+    );
+
+    const frame = JSON.stringify([
+      { jsonrpc: "2.0", id: 71, method: "ping", params: {} },
+      { jsonrpc: "2.0", id: 72, method: "session.list", params: {} },
+    ]);
+    client.send(frame);
+    await messages.next();
+
+    expect(upstreamState.frames).toHaveLength(1);
+    const forwarded = JSON.parse(upstreamState.frames[0]) as Array<{
+      params: Record<string, unknown>;
+    }>;
+    // ping 的参数类无 `profile` 字段（注入即上游 4000）→ 不得被污染。
+    expect(forwarded[0].params.profile).toBeUndefined();
+    // session.list 需注入 → 带调用者 default_profile。
+    expect(forwarded[1].params.profile).toBe("alpha");
+  });
+
+  it("F1: rejects a nested batch frame and never forwards it to the upstream", async () => {
+    const { upstreamState, client, messages } = await boot("ws-nested-batch-token", () =>
+      seedAdmin(["alpha"]),
+    );
+
+    const frame = JSON.stringify([
+      [{ jsonrpc: "2.0", id: 80, method: "session.create", params: { profile: "gamma" } }],
+    ]);
+    client.send(frame);
+
+    const reply = JSON.parse(await messages.next());
+    expect(reply.id).toBeNull();
+    expect(reply.error.code).toBe(400);
+    expect(reply.error.data.code).toBe("INVALID_FRAME");
+    expect(upstreamState.frames).toHaveLength(0);
+  });
 });

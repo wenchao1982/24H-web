@@ -94,8 +94,10 @@ export const PROFILE_AGNOSTIC_METHODS: ReadonlySet<string> = new Set([
  * （per-connection：runtime/stored session_id → 所属 profile，由 `proxy.ts` 从
  * `session.create` / `session.resume` / `session.activate` 回包累积）时，
  * 带 `session_id` 的请求须**归属命中且在该调用者已分配 profile 内**才放行；
- * 未知 / 他人会话一律拒绝。未提供 `sessionOwners` 时保持旧行为（带 `session_id` 放行），
- * 兼容不维护归属表的既有单测。
+ * 未知 / 他人会话一律拒绝。
+ *
+ * **F4 fail-closed 默认**：`sessionOwners` **缺省即视为空表**（`session_id` 一律无法命中
+ * → deny），**不得**因未传归属表而放行。`proxy.ts` 始终传入非空 `sessionOwners`。
  */
 export const SESSION_SCOPED_NO_PROFILE_METHODS: ReadonlySet<string> = new Set([
   "tools.list",
@@ -254,14 +256,31 @@ function matchesSvgMagic(head: Buffer): boolean {
   return text.startsWith("<svg") || text.startsWith("<?xml");
 }
 
+/**
+ * 载荷字段取值优先级**对齐上游消费方**（F7）：
+ * - `image.attach_bytes` — `tui_gateway/methods_prompt.py:763`：
+ *   `str(params.get("content_base64") or params.get("data") or "").strip()`
+ * - `pdf.attach` — `tui_gateway/methods_prompt.py:800`：同上
+ * - 契约 `contracts/prompt_voice.py:120-127`（`ImageAttachBytesParams`）/`:134-143`（`PdfAttachParams`）：
+ *   `content_base64` 为主、`data` 为别名；**无 `data_url`**（`data_url` 属 `file.attach`，`:164-170`）。
+ *
+ * 语义（镜像 Python `or` 链）：`content_base64` 为**非空字符串**时优先；仅当其缺失/空串时
+ * 回退 `data`。校验读取的字段必须与消费方一致，否则「校验 A、消费 B」可被绕过。
+ */
 function readAttachmentPayload(params: Record<string, unknown>): string | null {
-  for (const key of ["content_base64", "data"] as const) {
-    const value = params[key];
-    if (typeof value === "string" && value.trim() !== "") {
-      return value;
-    }
+  const primary = params.content_base64;
+  const fallback = params.data;
+  const picked =
+    typeof primary === "string" && primary !== ""
+      ? primary
+      : typeof fallback === "string" && fallback !== ""
+        ? fallback
+        : null;
+  if (picked === null) {
+    return null;
   }
-  return null;
+  const trimmed = picked.trim();
+  return trimmed === "" ? null : trimmed;
 }
 
 /**
@@ -357,6 +376,12 @@ export function classifyFrame(data: string | Uint8Array, isBinary: boolean): Fra
 }
 
 /**
+ * F4 fail-closed 默认：`sessionOwners` 缺省时使用的**空归属表**。
+ * 空表下 `session_id` 一律无法命中 → `_SessionScoped` 方法 deny。
+ */
+const EMPTY_SESSION_OWNERS: ReadonlyMap<string, string> = new Map();
+
+/**
  * 对单个 request 帧决定处置（default-deny）。
  *
  * - `super_admin` → allow（不注入）
@@ -366,14 +391,16 @@ export function classifyFrame(data: string | Uint8Array, isBinary: boolean): Fra
  * - 未带 profile 且未命中豁免 → 注入调用者 `default_profile`；无可用 → deny
  *
  * R24：`sessionOwners` 提供时，`_SessionScoped` 方法须 `session_id` 归属命中且
- * 落在调用者已分配 profile 内才 allow；未知/他人会话 deny。缺 `sessionOwners` 时
- * 退化为「有 `session_id` 即 allow」（兼容既有调用方）。
+ * 落在调用者已分配 profile 内才 allow；未知/他人会话 deny。
+ *
+ * **F4 fail-closed 默认**：未提供 `sessionOwners` 时**视为空表**——带 `session_id` 的
+ * `_SessionScoped` 方法一律 deny（`session_id` 无法命中任何归属）。`proxy.ts` 始终传入非空表。
  */
 export function decideProfileGuard(
   frame: FrameClassification,
   user: GuardUser,
   db: Db,
-  sessionOwners?: ReadonlyMap<string, string>,
+  sessionOwners: ReadonlyMap<string, string> = EMPTY_SESSION_OWNERS,
 ): GuardDecision {
   if (frame.kind !== "request" || !frame.method) {
     return { action: "allow" };
@@ -395,12 +422,10 @@ export function decideProfileGuard(
     if (frame.sessionId === undefined) {
       return { action: "deny" };
     }
-    // 提供归属表时，逐条校验该 session 属于调用者已分配 profile；否则拒绝。
-    if (sessionOwners) {
-      const owner = sessionOwners.get(frame.sessionId);
-      if (owner === undefined || !userCanAccessProfile(db, user.id, owner)) {
-        return { action: "deny" };
-      }
+    // F4 fail-closed 默认：归属表缺省即为空表，`session_id` 无法命中 → deny。
+    const owner = sessionOwners.get(frame.sessionId);
+    if (owner === undefined || !userCanAccessProfile(db, user.id, owner)) {
+      return { action: "deny" };
     }
     return { action: "allow" };
   }
@@ -484,10 +509,31 @@ export function guardClientFrame(
   }
   if (classification.kind === "batch") {
     const elements = Array.isArray(parsed) ? parsed : [];
-    let profile: string | undefined;
-    let needsInject = false;
-    for (const element of elements) {
-      const elementClassification = classifyParsed(element);
+    const elementClassifications = elements.map((element) => classifyParsed(element));
+
+    // F1 / F3：JSON-RPC 2.0 **禁止嵌套批**；批内元素必须为 request/response/notification。
+    // 任一元素分类为 `batch`（嵌套数组）/ `invalid`（如 `{"method":null}`）/ `binary`
+    // → **整批拒绝**（`INVALID_FRAME`，`id:null`），**不转发任何元素**。
+    // 早期实现对嵌套批元素调用 `decideProfileGuard`，其因 `kind !== "request"` 返回
+    // `allow`，导致嵌套越权请求被原样转发（F1 安全绕过）。
+    for (const elementClassification of elementClassifications) {
+      if (
+        elementClassification.kind === "batch" ||
+        elementClassification.kind === "invalid" ||
+        elementClassification.kind === "binary"
+      ) {
+        return { action: "reject", code: "INVALID_FRAME", id: null };
+      }
+    }
+
+    // 逐元素决定处置；记录**需注入的元素索引**（F2）。
+    // 早期实现只要批内任一元素需注入，就对**所有**元素调用 `injectIntoElement`，
+    // 而后者只看该元素本地是否已有 `profile`，不看方法是否属豁免清单（schema 无
+    // `profile` 字段）→ 向 `ping` 等注入 → `extra="forbid"` → 上游 4000，整批失败。
+    const injectProfiles = new Map<number, string>();
+    for (let index = 0; index < elements.length; index += 1) {
+      const elementClassification = elementClassifications[index];
+      const element = elements[index];
       const decision = decideProfileGuard(elementClassification, user, db, sessionOwners);
       if (decision.action === "deny") {
         // 任一元素越权 → 整批拒绝，不转发任何元素。
@@ -506,15 +552,18 @@ export function guardClientFrame(
         }
       }
       if (decision.action === "inject" && decision.profile) {
-        profile = decision.profile;
-        needsInject = true;
+        injectProfiles.set(index, decision.profile);
       }
     }
-    if (needsInject && profile) {
-      const next = elements.map((element) => injectIntoElement(element, profile));
-      return { action: "forward", text: JSON.stringify(next), injected: true };
+
+    if (injectProfiles.size === 0) {
+      return { action: "forward", text, injected: false };
     }
-    return { action: "forward", text, injected: false };
+    const next = elements.map((element, index) => {
+      const profile = injectProfiles.get(index);
+      return profile === undefined ? element : injectIntoElement(element, profile);
+    });
+    return { action: "forward", text: JSON.stringify(next), injected: true };
   }
   // response / notification：服务端请求的客户端回包与通知原样转发。
   return { action: "forward", text, injected: false };

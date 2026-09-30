@@ -517,3 +517,56 @@ curl ... /api/chat/workspaces?profile=nonexistent_xyz# 404 {"detail":"Profile 'n
 
 > 结论：条数上限（256）与字节上限（64 MiB）**各自独立**且均被实测触发；`pending` / `outbound` 两方向上限对称；大帧路径的二次 `JSON.parse` 与全量扫描均已消除，**无残余偏差**。
 
+---
+
+## 9. 批帧守卫复核与修复（F1–F4 / F7，2026-09-30）
+
+独立复核 + 读码确认 `guardClientFrame` 批分支存在 4 个缺陷（F1–F4）；F7 为「校验方 vs 消费方」字段优先级一致性核对。**复现**以最小脚本（`tsx`，in-memory SQLite，`admin` 分配 `alpha`(default)）逐条打印修复前实际行为：
+
+### 9.1 F1（HIGH 安全）嵌套批帧绕过租户守卫
+
+- **载荷**：`[[{"jsonrpc":"2.0","id":1,"method":"session.create","params":{"profile":"gamma"}}]]`（`admin` 未分配 `gamma`）。
+- **修复前实际输出**：`{"action":"forward","text":"[[{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"session.create\",\"params\":{\"profile\":\"gamma\"}}]]","injected":false}` → **整帧被转发**（绕过）。
+- **根因**：批分支对每个元素调 `classifyParsed`；嵌套数组元素 → `kind === "batch"` → `decideProfileGuard` 因 `kind !== "request"` 返回 `allow` → `:517` 原样转发。
+- **修复**：批分支预扫描元素分类，任一为 `batch`/`invalid`/`binary` → 整批 `reject INVALID_FRAME`（`id:null`）。JSON-RPC 2.0 禁止嵌套批。
+- **修复后**：`{"action":"reject","code":"INVALID_FRAME","id":null}`；更深嵌套同样拒绝；**不转发**。
+
+### 9.2 F2（HIGH 功能）混合批帧误注入豁免方法 → 上游 4000
+
+- **载荷**：`[{"method":"ping","params":{}},{"method":"session.list","params":{}}]`（`admin` 有 `alpha`）。
+- **修复前实际输出**：`ping` 元素被注入 `"profile":"alpha"`（`{"method":"ping","params":{"profile":"alpha"}}`）→ `PingParams` `extra="forbid"` → 上游 **4000**，整批失败。
+- **根因**：`:513-515` 只要 `needsInject`，就对 `elements.map(injectIntoElement)`；`injectIntoElement`（`:419-428`）只看元素本地是否已有 `profile`，不看方法是否属 `PROFILE_AGNOSTIC_METHODS`。
+- **修复**：批循环按每个元素的 `decision.action` 记录**需注入的元素索引**（仅 `inject`），只对这些索引注入；`allow`（含豁免方法）元素原样保留。
+- **修复后**：`ping` 元素**不含** `profile`；`session.list` 元素含 `"profile":"alpha"`；整批 `forward` 且 `injected===true`。
+
+### 9.3 F3（安全一致性）批内非法元素未拒绝
+
+- **载荷**：`[{"method":null}]`。
+- **修复前实际输出**：`{"action":"forward","text":"[{\"method\":null}]","injected":false}` → **被转发**（顶层单帧本会 `reject INVALID_FRAME`）。
+- **根因**：同 F1，`classifyParsed` → `invalid` → `decideProfileGuard` 因 `kind !== "request"` 返回 `allow`。
+- **修复**：随 F1 一并处理（批内 `invalid`/`binary` → 整批 `INVALID_FRAME`）。
+- **修复后**：`{"action":"reject","code":"INVALID_FRAME","id":null}`。
+
+### 9.4 F4（fail-closed 默认）`sessionOwners` 可选导致安全控制默认放行
+
+- **载荷/调用**：`decideProfileGuard(classifyParsed({method:"tools.list",params:{session_id:"runtime:x"}}), admin, db)`（**不传** `sessionOwners`）。
+- **修复前实际输出**：`{"action":"allow"}` → 带任意 `session_id` 即放行（(A) 类方法缺/未知会话会回退启动 profile）。
+- **根因**：`sessionOwners?: ReadonlyMap` 可选；未传时跳过归属校验直接 `allow`。
+- **修复**：改为 fail-closed 默认——参数默认值 `EMPTY_SESSION_OWNERS`（空表），`session_id` 一律无法命中 → `deny`；JSDoc 标注「缺省即 deny」。`proxy.ts` 始终传入 per-connection 非空 `sessionOwners`（确认并保持）。同步把既有单测「不传表时 `tools.list{session_id}` → allow」改为 **deny**。
+- **修复后**：`{"action":"deny"}`；7 条 (A) 类方法在缺省表下均 deny。
+
+### 9.5 F7（校验方 vs 消费方一致性）附件载荷字段优先级
+
+- **上游证据（`tui_gateway/methods_prompt.py`）**：
+  - `image.attach_bytes` — `:763`：`raw_b64 = str(params.get("content_base64") or params.get("data") or "").strip()` → **`content_base64` 优先**、`data` 为别名。
+  - `pdf.attach` — `:800`：`raw_b64 = str(params.get("content_base64") or params.get("data") or "").strip()` → 同上。
+  - 契约：`contracts/prompt_voice.py:120-127`（`ImageAttachBytesParams`：`content_base64` / `data` 别名，**无 `data_url`**）/`:134-143`（`PdfAttachParams`：`path` / `content_base64` / `data`）。`data_url` 仅属 `file.attach`（`:164-170`）。
+- **对齐结论**：BFF 校验方 `readAttachmentPayload` 的取值顺序 `content_base64` → `data` **与上游一致**（非 `data` 优先）；不支持 `data_url` 亦与上游一致。实现镜像 Python `or` 链（`content_base64` 为非空字符串时优先，缺失/空串才回退 `data`）。
+- **修复前实际输出**（`content_base64` 为垃圾、`data` 为合法 PNG）：`{"ok":false,...}` → 读取 `content_base64`（正确），**已与上游一致**；本轮补齐「校验读取同一字段」的显式单测（正向/反向/PDF 三例）。
+
+### 9.6 未闭合项（登记，勿扩大范围）
+
+- **F5**：WS 重连后 per-connection `sessionOwners` 清空（新连接未持有旧会话归属）→ 旧会话的 (A) 类请求会被 fail-closed 拒绝（安全但功能有损）；后续可评估重连时重建归属。
+- **F6**：`model.save_key` / `model.disconnect` 的产品语义（启动 profile 凭证写入的授权边界）待产品确认。
+- **F9**：批帧逐元素 `decideProfileGuard` 的 `resolveDefaultProfile` 在超大批（数百元素）下的性能未专门优化（上限受 `maxPayload` 约束）。
+
