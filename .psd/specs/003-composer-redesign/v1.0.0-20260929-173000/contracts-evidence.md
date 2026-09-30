@@ -462,7 +462,7 @@ WS 连接：`ws://127.0.0.1:19119/api/ws?token=<token>`，帧 `{"jsonrpc":"2.0",
 
 - **权威扩展名集合（Hermes 允许）**：`hermes_cli/cli_terminal_input.py:31-34` `_IMAGE_EXTENSIONS = {.png, .jpg, .jpeg, .gif, .webp, .bmp, .tiff, .tif, .svg, .ico}`；经 `prompt_attachments.py:74-79` `_allowed_image_extensions` 消费，校验点 `methods_prompt.py:775-777`（`ext not in _allowed_image_extensions()` → 4016）。Hermes `_sniff_image_ext`（`:64-71`）**优先 filename 后缀**、仅后缀缺失时用魔数，**只推断不拒绝**。
 - **权威魔数表照抄 Hermes + 补齐**：`prompt_attachments.py:20-23` `_IMAGE_MAGIC = (PNG 89 50 4E 47 0D 0A 1A 0A, JPEG FF D8 FF, GIF87a/GIF89a「GIF8」, BMP 42 4D)`；WebP 由 `:69-70` 的 `RIFF`（0-3）+ `WEBP`（8-11）判定；PDF 魔数 `%PDF-`（`methods_prompt.py:1106`）。Hermes 允许但无魔数条目的格式由 BFF 补齐：**TIFF**（LE `49 49 2A 00` / BE `4D 4D 00 2A`）、**ICO**（`00 00 01 00`）、**CUR**（`00 00 02 00`）、**SVG**（文本前缀：去 UTF-8 BOM/前置空白后以 `<svg` 或 `<?xml` 开头，大小写不敏感）。按扩展名归并后 **BFF 接受集 == Hermes 允许集**。
-- **仅前缀解码**：剥离 `data:...;base64,` 前缀与空白后取前 **48 个 base64 字符**（≈36 字节；覆盖最长二进制魔数 WebP 12 字节，及 SVG 的 BOM 3 字节 + `<?xml` 5 字符文本判定）→ `Buffer.from(prefix,"base64")`，**禁止整帧解码**（10MB 载荷 base64 ≈13.3MB）。前缀长度由初版 24 → 48。
+- **仅前缀解码**：**先截取有界前缀切片** `raw.slice(0, ATTACHMENT_PREFIX_SCAN_CHARS = 48×8 = 384)`，再剥离 `data:...;base64,` 前缀与空白、取前 **48 个 base64 字符**（≈36 字节；覆盖最长二进制魔数 WebP 12 字节，及 SVG 的 BOM 3 字节 + `<?xml` 5 字符文本判定）→ `Buffer.from(prefix,"base64")`，**禁止整帧解码**（10MB 载荷 base64 ≈13.3MB）。前缀长度由初版 24 → 48；**清洗边界由「整段」改为「384 字符切片」**（消除对整段 13MB 的两次全量扫描，见 §8.9）。
 - **策略**：**能判定则判定、无法判定则拒绝**（fail-closed）。**已知差异**：除 SVG 用文本前缀判定、CUR 不在 Hermes 允许集但 BFF 宽容接受（更严的上游仍会拒绝，无 fail-open）外，**当前无「Hermes 允许且无法用前缀魔数判定」的格式**。
 - **拒绝形状**：同 `id` 回 `{error:{code:400,message,data:{code:"INVALID_ATTACHMENT_TYPE"}}}`，**不转发**，并写 `audit`（action=`ws.upload.invalid_type`；不含 token/密钥/字节）。
 - **范围**：仅非 `super_admin` 且 `method ∈ {image.attach_bytes, pdf.attach}`；`file.attach` **不限类型**；`path` 形态（无 base64 载荷）交由上游。
@@ -495,3 +495,23 @@ curl ... /api/chat/workspaces?profile=nonexistent_xyz# 404 {"detail":"Profile 'n
 ### 8.8 清理
 
 临时会话已 `session.delete`（`{"deleted":"20260930_094202_78ac9a"}`；另两条连接断开后自行消失）；`session.delete` 对活动会话回 `4023 cannot delete an active session`（须先断开连接）。三张临时上传图片（`upload_20260930_093746_1.png` / `_093747_2.png` / `_094016_1.png`）已从 `~/.hermes/images/` 删除。未改动网关配置。
+
+### 8.9 BFF WS 代理：队列上限与大帧路径实测（2026-09-30，mock 上游）
+
+运行：`npx vitest run src/hermes/proxy.largePayload.test.ts`（`apps/server`，mock 上游、BFF 真实体量）。所有数字为**当轮实测**（机器负载相关，供量级参考）：
+
+| 用例 | 帧字节 | 触发/断言 | 累计 | 耗时 | 备注 |
+|---|---|---|---|---|---|
+| case1 转发 ≈13.3MB PNG attach | `13981124`B（payload `13981016`B，forwarded `13981142`B） | 在 `maxPayload = 16 MiB` 内成功转发 | — | **148.2ms** | 注入 `profile=alpha` |
+| case2 超 `maxPayload` | `16781372`B | `close=1009`（message too big） | — | **25.2ms** | 上游未收到 |
+| case3a 条数上限 | `131`B/帧（小帧） | **第 257 帧**（`WS_MAX_PENDING_COUNT = 256`）命中 → `1013/QUEUE_OVERFLOW` | **33667B ≈ 0.032 MiB** | **2682.8ms** | 300 帧测；字节远未满 |
+| case3b 字节上限 | `16776192`B/帧（guarded `16778204`B） | **第 4 帧**命中 → `1013/QUEUE_OVERFLOW` | **67104768B ≈ 64 MiB**（= `K=4 × 16 MiB`） | **1299.9ms** | 条数上限 256 远未触发 |
+| case3c 冷启动 5 小帧（回归） | `133`B/帧 | 5 帧**全部通过**、连接保持 OPEN、`received=0` | — | **504.5ms** | 修复前第 5 帧即被拒 |
+| case4 13MB 非图片拒绝（REQ-023） | `13631596`B | 同 `id` `INVALID_ATTACHMENT_TYPE`，`base64Calls=1`、`maxDecodedChars=48` | — | **51.8ms** | 仅前缀解码，未整帧解码 |
+
+**JSON.parse 次数**（`frameGuard.test.ts` spy，`guardClientFrame` 单帧）：修复前 **2**（`JSON.parse` + `classifyFrame` 二次解析），修复后 **1**，且不随载荷增大（small=1 / large 4MiB=1）。
+
+**`readBase64Prefix` 微基准**（18,175,328 字符 base64 载荷，200 次）：修复前全量 `trim()`+`replace(/\s+/g,"")` **≈565µs/次**；修复后先 `slice(0, 384)` 有界切片 **≈0.7µs/次**（≈800×）。
+
+> 结论：条数上限（256）与字节上限（64 MiB）**各自独立**且均被实测触发；大帧路径的二次 `JSON.parse` 与全量扫描均已消除，**无残余偏差**。
+

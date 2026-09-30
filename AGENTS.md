@@ -55,7 +55,7 @@
   （从官方契约派生；**不得**以「是否直继 `Params`」判断 —— `Params` 设 `extra="forbid"`，注入无该字段的类会 4000）；
   命中豁免 → 不注入；**其余一切方法（含清单外的未知方法）一律注入 `default_profile`**；无可用 profile → 403 不转发；
   **禁止「包含式前缀白名单」**（`session.*`/`profiles.*`/`mcp.*`/`skills.*`，遗漏即 fail-open）；
-  队列上限同时约束**条数 + 累计字节**（`maxPayload = 16 MiB`、`K = 4` → `pendingBytes ≤ 64 MiB`，双 socket 生效）；
+  队列上限**条数 / 字节各自独立**（条数 `WS_MAX_PENDING_COUNT = 256`（防大量小帧）；字节 `maxPayload = 16 MiB`、`K = 4` → `pendingBytes ≤ 64 MiB`（防少量大帧），双 socket 生效）；
   **守卫拒绝与响应过滤 fail-closed 必写 `audit`**（actor/profile/method/ip/结果/时间戳，不含 token/密钥/字节）；
   **REST 同语义（REQ-022）**：`/api/hermes/*` 非 `super_admin` 缺 `profile` 时（豁免路径 `/api/hermes/health` 除外）
   注入 `default_profile` 或 403，**禁止**提前 `return` 跳过 `assertProfileAccess`；注入须落入**被转发的 query**。

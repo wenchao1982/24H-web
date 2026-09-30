@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { openDb, type Db } from "../db";
 import { migrate } from "../db/migrate";
 import {
+  ATTACHMENT_PREFIX_CHARS,
   PROFILE_AGNOSTIC_METHODS,
   SESSION_SCOPED_NO_PROFILE_METHODS,
   classifyFrame,
@@ -470,6 +471,36 @@ describe("guardClientFrame", () => {
     expect(outcome.text).toContain('"profile":"alpha"');
   });
 
+  it("parses the frame JSON exactly once, independent of payload size (perf)", () => {
+    const small = text({ jsonrpc: "2.0", id: 100, method: "session.list", params: {} });
+    const large = text({
+      jsonrpc: "2.0",
+      id: 101,
+      method: "session.list",
+      params: { pad: "A".repeat(4 * 1024 * 1024) },
+    });
+
+    const countParses = (raw: string): number => {
+      const spy = vi.spyOn(JSON, "parse");
+      try {
+        const outcome = guardClientFrame(raw, false, adminWithProfile, db);
+        expect(outcome.action).toBe("forward");
+        return spy.mock.calls.length;
+      } finally {
+        spy.mockRestore();
+      }
+    };
+
+    const smallParses = countParses(small);
+    const largeParses = countParses(large);
+    console.log(
+      `[frameGuard] JSON.parse count small=${smallParses} large(4MiB)=${largeParses}`,
+    );
+    // 复用同一次解析：计数不随载荷增大而增加（且 ≤ 2）。
+    expect(largeParses).toBe(smallParses);
+    expect(largeParses).toBeLessThanOrEqual(2);
+  });
+
   it("rejects an attachment with invalid magic bytes (REQ-023)", () => {
     const raw = text({
       jsonrpc: "2.0",
@@ -655,8 +686,9 @@ describe("validateAttachmentMagic (REQ-023)", () => {
         .map((call) => call[0])
         .filter((value): value is string => typeof value === "string");
       expect(stringArgs.length).toBeGreaterThan(0);
-      expect(stringArgs).toContain(huge.slice(0, 48));
-      expect(stringArgs.some((value) => value.length > 64)).toBe(false);
+      expect(stringArgs).toContain(huge.slice(0, ATTACHMENT_PREFIX_CHARS));
+      // 解码入参长度恒为常量级（`ATTACHMENT_PREFIX_CHARS`），不随载荷增大。
+      expect(stringArgs.every((value) => value.length <= ATTACHMENT_PREFIX_CHARS)).toBe(true);
     } finally {
       spy.mockRestore();
     }

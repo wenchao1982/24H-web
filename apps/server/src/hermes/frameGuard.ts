@@ -184,7 +184,13 @@ function readSessionId(params: unknown): string | undefined {
  */
 const IMAGE_ATTACH_METHOD = "image.attach_bytes";
 const PDF_ATTACH_METHOD = "pdf.attach";
-const ATTACHMENT_PREFIX_CHARS = 48;
+export const ATTACHMENT_PREFIX_CHARS = 48;
+/**
+ * 前缀扫描上界：**先截取** `ATTACHMENT_PREFIX_SCAN_CHARS` 个字符的切片，再只对该切片
+ * 去空白/去 `data:` 前缀。取 `ATTACHMENT_PREFIX_CHARS` 的常数倍（8×）以容纳可能的
+ * `data:...;base64,` 前缀与穿插空白，同时**避免对整帧（13 MB 级）做两次全量扫描/拷贝**。
+ */
+export const ATTACHMENT_PREFIX_SCAN_CHARS = ATTACHMENT_PREFIX_CHARS * 8;
 const DATA_URL_BASE64_PREFIX = /^data:[^,]*;base64,/i;
 
 /**
@@ -205,9 +211,15 @@ const PDF_MAGIC = Buffer.from("%PDF-", "latin1");
 
 export type AttachmentValidation = { ok: true } | { ok: false; message: string };
 
-/** 剥离可选 `data:...;base64,` 前缀与空白，只解码前 `ATTACHMENT_PREFIX_CHARS` 个字符。 */
+/**
+ * 剥离可选 `data:...;base64,` 前缀与空白，只解码前 `ATTACHMENT_PREFIX_CHARS` 个字符。
+ *
+ * **先切有界前缀、再清洗**：早期实现对**整个**载荷 `trim()` + `replace(/\s+/g, "")`
+ * 会在 13 MB 载荷上产生两次全量扫描/拷贝；现仅对 `ATTACHMENT_PREFIX_SCAN_CHARS`
+ * 字符的切片处理，语义不变（仍正确处理 `data:` 前缀与前置/穿插空白）。
+ */
 function readBase64Prefix(raw: string): Buffer {
-  let cleaned = raw.trim();
+  let cleaned = raw.slice(0, ATTACHMENT_PREFIX_SCAN_CHARS).trim();
   const match = DATA_URL_BASE64_PREFIX.exec(cleaned);
   if (match) {
     cleaned = cleaned.slice(match[0].length);
@@ -289,7 +301,11 @@ export function validateAttachmentMagic(
   return { ok: false, message: "PDF 内容类型校验失败：缺少 %PDF- 魔数" };
 }
 
-function classifyParsed(parsed: unknown): FrameClassification {
+/**
+ * 对**已解析**的 JSON 值分类（供调用方复用一次 `JSON.parse` 的结果，避免重复解析大帧）。
+ * `classifyFrame` 是「文本 → 解析 → 本函数」的薄封装。
+ */
+export function classifyParsed(parsed: unknown): FrameClassification {
   if (Array.isArray(parsed)) {
     return { kind: "batch", elements: parsed.map((item) => classifyParsed(item)) };
   }
@@ -438,7 +454,8 @@ export function guardClientFrame(
     return { action: "reject", code: "INVALID_FRAME", id: null };
   }
 
-  const classification = classifyFrame(text, false);
+  // 复用上一步的解析结果，不再二次 `JSON.parse`（大帧下避免双倍全量解析）。
+  const classification = classifyParsed(parsed);
   if (classification.kind === "invalid") {
     return { action: "reject", code: "INVALID_FRAME", id: classification.id ?? null };
   }
@@ -470,7 +487,7 @@ export function guardClientFrame(
     let profile: string | undefined;
     let needsInject = false;
     for (const element of elements) {
-      const elementClassification = classifyFrame(JSON.stringify(element), false);
+      const elementClassification = classifyParsed(element);
       const decision = decideProfileGuard(elementClassification, user, db, sessionOwners);
       if (decision.action === "deny") {
         // 任一元素越权 → 整批拒绝，不转发任何元素。

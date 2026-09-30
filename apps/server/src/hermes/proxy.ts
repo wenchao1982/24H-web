@@ -7,7 +7,6 @@ import { getHermesToken, hermesUpstream } from "./client";
 import { resolveTarget } from "./connections";
 import { listUserProfiles } from "../users/repo";
 import {
-  classifyFrame,
   guardClientFrame,
   invalidAttachmentFrame,
   invalidFrame,
@@ -25,9 +24,19 @@ interface PendingFrame {
   bytes: number;
 }
 
-/** REQ-018 / REQ-018b：`maxPayload` 与队列上限（条数 AND 累计字节）。 */
+/**
+ * REQ-018 / REQ-018b：`maxPayload`、队列**条数**上限与**累计字节**预算。
+ *
+ * 两个上限**各自独立**、分别防御不同形态的内存放大（命中任一即拒新帧）：
+ * - `WS_MAX_PENDING_COUNT`：防**大量小帧**堆积。冷启动（token 拉取期间，约数百 ms）
+ *   客户端允许合理突发小帧；早期实现曾把 `WS_QUEUE_FACTOR` 兼作条数上限 → 第 5 帧
+ *   即被拒（功能回归，已于本轮解耦修复）。
+ * - `WS_MAX_PENDING_BYTES = WS_QUEUE_FACTOR × WS_MAX_PAYLOAD`：防**少量大帧**堆内存；
+ *   `K = 4 × 16 MiB = 64 MiB` 为**单连接**内存上限。
+ */
 export const WS_MAX_PAYLOAD = 16 * 1024 * 1024; // 16 MiB
 export const WS_QUEUE_FACTOR = 4;
+export const WS_MAX_PENDING_COUNT = 256;
 export const WS_MAX_PENDING_BYTES = WS_QUEUE_FACTOR * WS_MAX_PAYLOAD; // 64 MiB
 
 /** 响应过滤待决表上限（REQ-015 兜底：伪造 id / 并发洪泛）。 */
@@ -217,14 +226,8 @@ async function bridge(
     return false;
   };
 
-  const recordProfileReads = (text: string) => {
+  const recordProfileReads = (parsed: unknown) => {
     if (isSuperAdmin) {
-      return;
-    }
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
       return;
     }
     const items = Array.isArray(parsed) ? parsed : [parsed];
@@ -287,14 +290,8 @@ async function bridge(
   };
 
   /** 转发建/附会话请求前，记下 `requestId → profile`（回包到达时据以登记归属）。 */
-  const recordSessionRequest = (text: string) => {
+  const recordSessionRequest = (parsed: unknown) => {
     if (isSuperAdmin) {
-      return;
-    }
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
       return;
     }
     const items = Array.isArray(parsed) ? parsed : [parsed];
@@ -375,6 +372,24 @@ async function bridge(
     }
   };
 
+  /**
+   * 单次解析上行帧，供「profile 读取登记」与「session 归属登记」复用
+   * （避免对同一大帧重复 `JSON.parse`）。
+   */
+  const recordClientRequest = (text: string) => {
+    if (isSuperAdmin) {
+      return;
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      return;
+    }
+    recordProfileReads(parsed);
+    recordSessionRequest(parsed);
+  };
+
   // Attach the client listener synchronously: on a cold start the upstream
   // token fetch below is async, and any frame sent by the client before the
   // upstream socket exists must not be dropped.
@@ -408,12 +423,14 @@ async function bridge(
       return;
     }
 
-    recordProfileReads(outcome.text);
-    recordSessionRequest(outcome.text);
+    recordClientRequest(outcome.text);
 
     if (!sendUpstream(outcome.text)) {
       const bytes = Buffer.byteLength(outcome.text);
-      if (pending.length >= WS_QUEUE_FACTOR || pendingBytes + bytes > WS_MAX_PENDING_BYTES) {
+      if (
+        pending.length >= WS_MAX_PENDING_COUNT ||
+        pendingBytes + bytes > WS_MAX_PENDING_BYTES
+      ) {
         logAudit(db, {
           actorId: userRef.id >= 0 ? userRef.id : null,
           action: "ws.queue.overflow",
@@ -521,9 +538,6 @@ async function bridge(
   } else {
     socket.once("open", flushOutbound);
   }
-
-  // classifyFrame 在响应过滤路径复用（避免两处独立解析）。
-  void classifyFrame;
 }
 
 export const hermesWsRoutes: FastifyPluginAsync<HermesWsOptions> = async (app, opts) => {

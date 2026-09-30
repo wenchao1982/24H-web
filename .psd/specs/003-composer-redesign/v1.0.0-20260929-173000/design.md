@@ -663,6 +663,8 @@ TASK-003 负责实现并导出该函数；TASK-029（响应过滤）依赖它，
 | BFF 无帧大小/队列上限（评审 MEDIUM #14） | `proxy.ts:33-34` 的 `pending`/`outbound` 为无界数组，10MB（≈13.3MB base64）单帧在冷启动队列下被放大 | **REQ-018**：显式设 `maxPayload` 与队列长度上限；超限回可读错误并仅终止该连接 |
 | 契约源码在仓库外，判定不可 CI 复核（评审 LOW #16） | 所有「以官方源码为准」的断言无法被本仓库独立验证 | **TC-016**：归档可核验的契约片段到 `contracts-evidence.md`（TASK-033） |
 | 队列上限只按条数、不限字节（评审 N8） | `pending`/`outbound` 为无界数组，N 条近上限帧可堆内存 | **REQ-018 / TC-018**：同时约束条数与累计字节（`pendingBytes ≤ K × maxPayload`，K 量化）；`maxPayload` 同时作用于客户端接入侧与上游侧 socket |
+| 条数上限与字节系数耦合（大帧实测回归） | `proxy.ts` 曾把 `WS_QUEUE_FACTOR = 4` **兼作条数上限** → 冷启动（token 拉取期间）客户端发第 5 帧（哪怕极小）即回 `INVALID_FRAME` + `close(1013)`，属**过严功能回归**，且使字节预算形同虚设 | **已修复（本轮）**：解耦为 **`WS_MAX_PENDING_COUNT = 256`（条数）** 与 **`WS_MAX_PENDING_BYTES = K × maxPayload`（字节，`K = 4` → 64 MiB）**；判定 = 命中任一即拒。实测：300 小帧于第 **257** 帧触发条数上限（累计仅 0.032 MiB）；近 16 MiB 大帧于第 **4** 帧触发字节上限（累计 ≈64 MiB） |
+| 大帧路径二次全量解析/扫描（实测） | `guardClientFrame` 对同一文本 `JSON.parse` **两次**；`readBase64Prefix` 对整段 13 MB base64 做 `trim()` + `replace(/\s+/g,"")` 两次全量扫描 | **已修复（本轮）**：`classifyParsed` 复用已解析值（`JSON.parse` 计数 **2 → 1**，且不随载荷增大，spy 实测 small=1 / large(4MiB)=1）；`readBase64Prefix` 改为先 `slice(0, ATTACHMENT_PREFIX_SCAN_CHARS = 384)` 有界切片再清洗（18 MB 载荷实测 ≈565µs → ≈0.7µs/次）。**无残余偏差** |
 | 守卫拒绝无审计（评审 N10） | 越权探测不可发现 | **REQ-021**：403 与 fail-closed 写 `audit`（actor / profile / method / ip / 结果；不含 token/密钥/字节） |
 | REST 侧守卫曾被误述为「已有」（评审 R3 HIGH） | 规格 §1 声称 REST「已有 `assertProfileAccess`」，但 `routes/hermes.ts:40` 缺 profile 即 return | **REQ-022 闭合**；已在 `requirements.md §1` 订正表述 |
 | 豁免清单靠人工枚举不可持续 | 手工维护清单易与契约漂移 | **TC-019 / PR-014**：清单从契约派生并归档 `contracts-evidence.md`；`maxPayload = 16 MiB`、`K = 4` |
@@ -704,7 +706,7 @@ TASK-003 负责实现并导出该函数；TASK-029（响应过滤）依赖它，
 - 命中拒绝 → `GuardOutcome` 新增 `reject` code `INVALID_ATTACHMENT_TYPE`（携带 `id` 与可读 `message`）；`proxy.ts` 映射为 `invalidAttachmentFrame` + `logAudit(action="ws.upload.invalid_type", detail=message)`，**不转发**。
 - 批帧：逐元素同样校验；任一 attach 元素非法 → 整批拒绝（复用既有「整批拒绝」语义）。
 
-**仅前缀解码（性能）**：从 `params.content_base64`（回退 `params.data`）取**前 `ATTACHMENT_PREFIX_CHARS = 48` 个 base64 字符**（先剥离 `data:<mime>;base64,` 前缀与空白）→ `Buffer.from(prefix, "base64")` ≈ **36 字节**，足够判定最长二进制魔数（WebP 需 12 字节）**与 SVG 文本前缀**（UTF-8 BOM 3 字节 + 前置空白 + `<?xml` 5 字符 / `<svg` 4 字符）。**禁止**对整段 base64 调用 `Buffer.from(..., "base64")`（10MB 载荷 base64 后 ≈13.3MB，整帧解码会造成内存放大 —— 与 §7.4 的 10MB 偏差补偿控制一致，36 字节仍远小于整帧）。JSON 仅解析一次（`guardClientFrame` 已有的 `parsed`），不额外解析。
+**仅前缀解码（性能）**：从 `params.content_base64`（回退 `params.data`）取**前 `ATTACHMENT_PREFIX_CHARS = 48` 个 base64 字符** → `Buffer.from(prefix, "base64")` ≈ **36 字节**，足够判定最长二进制魔数（WebP 需 12 字节）**与 SVG 文本前缀**（UTF-8 BOM 3 字节 + 前置空白 + `<?xml` 5 字符 / `<svg` 4 字符）。**先截取有界前缀再清洗**：`raw.slice(0, ATTACHMENT_PREFIX_SCAN_CHARS)`（`ATTACHMENT_PREFIX_SCAN_CHARS = 48 × 8 = 384`，足以容纳 `data:...;base64,` 前缀与穿插空白）后再 `trim()` / 去 `data:` 前缀 / `replace(/\s+/g,"")`，**避免对整段（13 MB 级）base64 做两次全量扫描/拷贝**（本轮修复：18 MB 载荷 ≈565µs → ≈0.7µs/次）。**禁止**对整段 base64 调用 `Buffer.from(..., "base64")`（10MB 载荷 base64 后 ≈13.3MB，整帧解码会造成内存放大 —— 与 §7.4 的 10MB 偏差补偿控制一致，36 字节仍远小于整帧）。JSON 仅解析一次（`guardClientFrame` 复用已解析值 `classifyParsed`，`JSON.parse` 计数实测 1），不额外解析。
 
 > **前缀长度变更**：初版为 24 字符（≈18 字节），仅够二进制魔数；为覆盖 SVG 文本判定提高至 48 字符（≈36 字节）。单测「`Buffer.from` spy + 20MB 假载荷」断言仅解码前缀，期望字符数同步为 48（`frameGuard.test.ts`）。
 
@@ -757,9 +759,10 @@ TASK-003 负责实现并导出该函数；TASK-029（响应过滤）依赖它，
 | `send` single-flight | 进行中重复调用恒不产生第 2 次 `session.create` | 并发双击、attach 挂起中再次触发 |
 | `cwd` 透传 | hero 恒 `cwd_explicit:true`（仅显式选目录）；相对路径恒原样透传 | `""` / `"./x"` / `/abs` / 未选 |
 | `classifyFrame`（method 非字符串） | `method` 键存在但非字符串恒为 `invalid` 并拒绝 | `method ∈ {undefined, null, 123, {}, "session.list"}` |
-| `frameQueue` 字节预算 | 累计字节达 `K × maxPayload` 恒拒绝新帧 | 单帧≈上限 × K、条数未满但字节满、并发 |
+| `frameQueue` 条数 / 字节上限 | 条数达 `WS_MAX_PENDING_COUNT = 256` 恒拒新帧；累计字节达 `K × maxPayload = 64 MiB` 恒拒新帧；**两者独立**（大量小帧 / 少量大帧分别触发） | 大片 = 257 条小帧触发条数、单帧≈上限 × K 于第 4 帧触发字节、并发 |
+| `guardClientFrame` 解析次数 | 对同一文本恒只 `JSON.parse` 一次，且计数不随载荷增大 | small vs large(4MiB)，`JSON.parse` spy 计数应相等且 ≤ 2（实测均 = 1） |
 | `reconcileModel` 参数 | 每次调用恒含非空 `profile` 与 `session_id` | 无 default_profile（应不发请求）、连续两次 `message.complete` |
-| `validateAttachmentMagic` | 任意非法魔数（image/pdf）恒 `ok:false`；合法 PNG/JPEG/GIF/BMP/WebP 与 `%PDF-` 恒 `ok:true`；恒只解码前缀（`Buffer.from` 实参长度 ≤ 24） | 41 字节文本冒充 image、非 `%PDF-` 冒充 pdf、`data:` 前缀、缺失载荷、20MB 假载荷 + `Buffer.from` spy |
+| `validateAttachmentMagic` | 任意非法魔数（image/pdf）恒 `ok:false`；合法 PNG/JPEG/GIF/BMP/WebP 与 `%PDF-` 恒 `ok:true`；恒只解码前缀（`Buffer.from` 实参长度 ≤ `ATTACHMENT_PREFIX_CHARS` = 48） | 41 字节文本冒充 image、非 `%PDF-` 冒充 pdf、`data:` 前缀、缺失载荷、20MB 假载荷 + `Buffer.from` spy |
 
 > 说明：上表末 5 行为本次对抗性评审回环新增的属性；原 REQ-006 / REQ-010 / REQ-011 / REQ-014 / REQ-015 对应的既有属性行已在 `requirements.md §6` 同步更新（并发 single-flight、deferred 回正、过滤 fail-closed）。
 
@@ -825,7 +828,8 @@ expect(gateway.paramsOf("session.workspace.move")[0]).toEqual({ session_key: "s1
 | 24 | REST：`admin` 无 profile 请求 `/api/hermes/chat/workspaces` | 被注入 `profile=alpha` 并守卫；未分配则不转发 |
 | 25 | REST：`admin` 无任何分配 profile 请求任意 `/api/hermes/*`（非 health） | 403 且不转发 |
 | 26 | REST：`GET /api/hermes/health` 无 profile | 放行（豁免） |
-| 27 | 队列字节预算：`pendingBytes` 恰 64 MiB / 超 1 字节 | 恰好可收 / 拒绝新帧 |
+| 27 | 队列上限：条数 `WS_MAX_PENDING_COUNT = 256`（300 小帧于第 257 帧触发）/ 字节 `pendingBytes` 恰 64 MiB 或超 1 字节（近 16 MiB 大帧于第 4 帧触发）；**两者独立** | 条数于第 257 帧拒绝（累计仅 0.032 MiB）；字节于第 4 帧拒绝（累计 ≈64 MiB）；冷启动 5 小帧全部通过 |
+| 27b | 冷启动回归：token 拉取挂起期间发 5 个小编帧 | 5 帧全部入队、连接保持 OPEN、无 `INVALID_FRAME`/`close`（防「第 5 帧被拒」回归） |
 | 28 | REST 注入后**上游实际收到的 URL** | query 字符串含 `profile=<default_profile>`（不是仅本地变量） |
 | 29 | **REQ-023**：`admin` 发 `image.attach_bytes{content_base64:<41 字节非图片文本 base64>, filename:"fake.png"}` | 同 `id` 400 `INVALID_ATTACHMENT_TYPE`；上游未收到；`audit` 恰 1 条 `ws.upload.invalid_type` |
 | 30 | **REQ-023**：`admin` 发合法 1x1 PNG `image.attach_bytes` | 转发（`profile=alpha` 注入）；非 `%PDF-` 的 `pdf.attach` 拒绝、`%PDF-` 开头转发；`file.attach`/`super_admin` 不做类型校验 |

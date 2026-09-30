@@ -306,6 +306,7 @@
 | N14 | 群聊 | 群聊房间成员编辑（等官方 add/remove member RPC；现为创建时固定 2–6 人） | T17.1 | 官方支持后可增删成员 | 待开发 |
 | N15 | 对话 | 会话身份对（stored/runtime id）+ 历史会话 resume（修复 prompt.submit 4001） | T6.3 | 点选历史会话可发送并收到回复；重命名/移动工作区正常 | 已验收 |
 | N16 | 对话 | 打断（停止）回合收尾：悬挂工具卡结算 + 「已中断」呈现 | N15 | 长工具打断后无悬挂 spinner、状态显示「已中断」、保留部分文本 | 进行中 |
+| N17 | 安全/性能 | WS 队列上限解耦（`WS_MAX_PENDING_COUNT = 256` 独立于字节系数 `K = 4`，修「第 5 帧被拒」回归）＋ 大帧性能修复（`readBase64Prefix` 有界切片、`classifyParsed` 复用单次 `JSON.parse`、`recordClientRequest` 合并解析） | TASK-031 | `npm run check` 全绿；条数/字节上限分别实测触发；`frameGuard` JSON.parse 计数=1；见 `contracts-evidence.md §8.9` | 已验收 |
 
 ## 明确不做
 
