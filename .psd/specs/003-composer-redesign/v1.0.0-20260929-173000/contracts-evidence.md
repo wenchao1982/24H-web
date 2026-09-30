@@ -476,7 +476,7 @@ WS 连接：`ws://127.0.0.1:19119/api/ws?token=<token>`，帧 `{"jsonrpc":"2.0",
 image.attach_bytes ~10MB -> {"attached":true,"path":".../upload_20260930_093747_2.png","count":2,"text":"...","bytes":10485760,"name":"..."} elapsedMs=290
 ```
 
-→ 网关**接受**该帧（290ms，无断开）。**注意**：此路径**直连 Hermes，未经过 BFF 代理**，故「经 BFF 端到端」仍未实测；BFF `maxPayload=16 MiB`（REQ-018）未在本轮触发。
+→ 网关**接受**该帧（290ms，无断开）。**注意**：此路径**直连 Hermes**，用于佐证**真机上游**接受量级；**经 BFF 代理的端到端大帧路径已另行实测**——见 §8.9（`apps/server/src/hermes/proxy.largePayload.test.ts`：转发 `13,981,124`B 帧成功并注入 `profile:"alpha"`，超限时触发 `1009` / `1013/QUEUE_OVERFLOW`；**其上游为 mock**）。两路径合观：BFF 侧行为被端到端覆盖、真机上游量级被直连佐证。
 
 ### 8.7 REST 注入后上游是否按租户作用域（REQ-022）
 
