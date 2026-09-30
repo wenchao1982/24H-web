@@ -570,3 +570,43 @@ curl ... /api/chat/workspaces?profile=nonexistent_xyz# 404 {"detail":"Profile 'n
 - **F6**：`model.save_key` / `model.disconnect` 的产品语义（启动 profile 凭证写入的授权边界）待产品确认。
 - **F9**：批帧逐元素 `decideProfileGuard` 的 `resolveDefaultProfile` 在超大批（数百元素）下的性能未专门优化（上限受 `maxPayload` 约束）。
 
+---
+
+## 10. (A) 类方法的调用方核查（F5/F6 结案，2026-09-30）
+
+复核命令（仓库根）：
+
+```bash
+for m in tools.list toolsets.list tools.show skills.reload complete.slash model.save_key model.disconnect; do
+  grep -rn "$m" apps packages --include='*.ts' --include='*.tsx'
+done
+grep -rn 'save_key\|model.disconnect' apps/web/src --include='*.ts' --include='*.tsx'   # 零命中
+grep -rn 'api/hermes/model' apps/web/src --include='*.ts' --include='*.tsx'              # 设置页走 REST
+```
+
+### 10.1 方法 → 全仓引用位置 → 是否 SPA 调用
+
+| (A) 类方法 | 全仓引用（代表位置） | SPA 调用？ | 结论 |
+|---|---|---|---|
+| `tools.list` | `apps/server/src/hermes/frameGuard.ts:58,103`（守卫清单）；`frameGuard.test.ts` / `proxy.test.ts:364-426` | **否** | 仅存于 BFF 守卫与测试 |
+| `toolsets.list` | `frameGuard.ts:59,104`；`frameGuard.test.ts` | **否** | 同上 |
+| `tools.show` | `frameGuard.ts:60,105`；`frameGuard.test.ts` | **否** | 同上 |
+| `skills.reload` | `frameGuard.ts:46,106`；`frameGuard.test.ts` | **否** | 同上 |
+| `complete.slash` | `frameGuard.ts:42,107`；`apps/web/src/chat/ChatPage.tsx:162-166`（注释：回退已删除）；`ChatPage.test.tsx:650-666`（**断言从不调用**） | **否** | 前端仅有「已删除回退」的注释与负向断言（`paramsOf("complete.slash")` 恒为空） |
+| `model.save_key` | `frameGuard.ts:52,108`；`frameGuard.test.ts` | **否** | `grep save_key apps/web` 零命中 |
+| `model.disconnect` | `frameGuard.ts:53,109`；`frameGuard.test.ts` | **否** | `grep model.disconnect apps/web` 零命中（`browser.disconnect` / OAuth `disconnect` 与之无关，均为其它方法/REST） |
+
+**核对结论**：SPA（`apps/web/src`）**不调用任何 (A) 类方法**。设置页的模型操作走 **REST** `/api/hermes/model/*`（`apps/web/src/settings/ModelPanel.tsx:35-76`：`info` / `options` / `moa` / `set`），不经 WS 的 `model.save_key` / `model.disconnect`。
+
+### 10.2 F5：重连后 `sessionOwners` 失效
+
+- `sessionOwners` 是 **per-connection 内存表**（`frameGuard.ts` 第 4 参，缺省 `EMPTY_SESSION_OWNERS`）。WS 重连 → 新连接归属表为空 → 对 (A) 类方法带**旧** `session_id` 会命中 `SESSION_SCOPED_NO_PROFILE_METHODS` 的 fail-closed 分支 → **403 不转发**（安全方向正确、功能有损）。
+- **对本应用无功能影响**：SPA 不调用 (A) 类方法（§10.1 证据）。
+- **若未来前端需要**（登记为按需项）：① 重连后先 `session.resume` 重新登记归属；② 或将归属表持久化（按 `userId+sessionId`）；③ 或 403 时提示「请重新选择会话」。
+
+### 10.3 F6：`model.save_key` / `model.disconnect` 产品语义
+
+- 二者被纳入 fail-closed 清单（写/清**启动 profile** 凭证风险，见 §6.2）。
+- **结案（无影响）**：设置页经 REST `/api/hermes/model/*` 操作，不经 WS（§10.1 证据）；故不存在「设置页无会话路径调用被 403」的功能回归。
+- **若未来改经 WS**：须显式带 `session_id`（并满足归属校验）或 `profile`，否则 fail-closed 403。
+

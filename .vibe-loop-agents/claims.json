@@ -19,5 +19,33 @@
     "claimedAt": "2026-09-30T02:13:11.508Z",
     "status": "done",
     "result": "REQ-023 落地（R10 在 BFF 闭合）。规格：requirements.md 新增 REQ-023 + §1/§4/§6/§7/§8/§9 R10/§10 更新；design.md §7.7/§8.1/§8.4；tasks.md TASK-037 + 追溯/依赖图/一致性清单；constitution.md A-009/N-025/N-026/Q-005；manifest.json changes+knownGaps；contracts-evidence.md §8.5；基线 architecture.md §7.2/§7.3。实现：frameGuard.ts#validateAttachmentMagic（照抄 prompt_attachments.py:20-23 _IMAGE_MAGIC + WebP RIFF + %PDF-；仅解码前 24 字符）+ invalidAttachmentFrame + GuardOutcome INVALID_ATTACHMENT_TYPE，guardClientFrame 非 super_admin 在租户守卫后校验（含批帧），proxy.ts 映射审计 ws.upload.invalid_type。测试新增 21 例（frameGuard 19 + proxy 2）。npm run check 全绿：server 233 / web 473。"
+  },
+  {
+    "agentId": "spec-agent-003",
+    "taskId": "muntucm324gx",
+    "claimedAt": "2026-09-30T09:33:44.113Z",
+    "status": "done",
+    "result": "已修复（F1）。实测复现 `[[{\"id\":1,\"method\":\"session.create\",\"params\":{\"profile\":\"gamma\"}}]]` → 修复前 forward（整帧转发，绕过 REQ-008）；修复后 reject INVALID_FRAME (id:null)。修法：JSON-RPC 2.0 禁止嵌套批 → 批内元素分类为 batch/invalid/binary 一律整批拒绝。单测 2 例 + 集成 1 例（断言上游 frames.length===0）。文档同步 requirements REQ-008 / design.md §7.1 / contracts-evidence §9 / architecture.md §7.2。提交 b2c6e7b。npm run check 全绿。"
+  },
+  {
+    "agentId": "spec-agent-003",
+    "taskId": "muntucnzxr14",
+    "claimedAt": "2026-09-30T09:33:44.234Z",
+    "status": "done",
+    "result": "已修复（F2）。实测复现 `[ping, session.list]` → 修复前 ping 被注入 \"profile\":\"alpha\"（PingParams extra=\"forbid\" → 上游 4000，整批失败）；修复后 ping 无 profile、session.list 含 \"profile\":\"alpha\"、整批 forward。修法：批循环按 decision.action===\"inject\" 记录索引，只对这些元素注入。单测 1 例 + 集成 1 例。提交 b2c6e7b。npm run check 全绿。"
+  },
+  {
+    "agentId": "spec-agent-003",
+    "taskId": "muntucr2j5ph",
+    "claimedAt": "2026-09-30T09:33:44.382Z",
+    "status": "done",
+    "result": "本轮已完成 F3/F4/F7/F8；F5/F6/F9 已登记为独立 FOLLOW-UP 任务（见 mungqq 系列新任务），不在本轮扩大范围。\n· F3 批内非法元素（{\"method\":null}）原被转发 → 随 F1 一并整批拒绝 INVALID_FRAME（已加单测）。\n· F4 sessionOwners 可选导致安全控制默认放行 → 改为 fail-closed 默认（undefined ⇒ 空表 ⇒ deny），proxy.ts 始终传非空表；原「不传表 allow」用例改写为 deny（+8 例）。\n· F7 附件载荷取值优先级与上游核对：methods_prompt.py:763（image.attach_bytes）/:800（pdf.attach）均为 `params.get(\"content_base64\") or params.get(\"data\")`，contracts/prompt_voice.py:120-127/134-143 确认 content_base64 为主、data 为别名、无 data_url → BFF 取值顺序已一致，实现精确镜像 or 链并加证据注释（+3 例）。\n· F8 文档对齐：REQ-008 批帧拒绝措辞由「错误数组」订正为「单对象 id:null 错误帧（整批拒绝、不逐元素回应）」，同步 design §7.1。\n· F5（WS 重连后 per-connection sessionOwners 清空 → 旧会话 (A) 类请求 fail-closed 拒绝，安全但功能有损）、F6（model.save_key/model.disconnect 启动 profile 凭证写入的产品授权语义）、F9（超大批帧逐元素 resolveDefaultProfile 性能）已登记。\n共 +16 例；frameGuard 83→97，proxy +2。npm run check 全绿。提交 b2c6e7b。"
+  },
+  {
+    "agentId": "spec-agent-003",
+    "taskId": "munuromsiz5t",
+    "claimedAt": "2026-09-30T09:33:44.515Z",
+    "status": "done",
+    "result": "已修复。proxy.ts 新增并导出 WS_MAX_OUTBOUND_COUNT=256 / WS_MAX_OUTBOUND_BYTES = K×maxPayload = 64MiB，以及导出纯函数 shouldRejectOutbound(count, bytes)（与实现同一函数，避免漂移）。ws.on(\"message\") 的 outbound.push 分支先判定：超限 → logAudit({action:\"ws.outbound.overflow\"}，不含 token/密钥/字节) → socket.close(1013,\"QUEUE_OVERFLOW\")，不 push；flushOutbound 冲刷后 outboundBytes=0，语义不变。\n测试方式：以纯函数单测为主（集成层难以稳定构造——Fastify WS 路由进入 bridge 时客户端 socket 通常已 OPEN，outbound 是极短竞态），proxy.largePayload.test.ts 新增 4 例（常量 pinning / 空与小队列接受 / 条数上限独立 / 字节上限独立）。文档同步 design §7.4/§8.1/§8.4、contracts-evidence §8.9、architecture §7.2/§7.3、AGENTS §5、manifest changes。提交 8a1be42。npm run check 全绿。"
   }
 ]

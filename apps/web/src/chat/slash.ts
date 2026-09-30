@@ -1,5 +1,5 @@
 /**
- * M15 会话命令（Slash）：`commands.catalog` / `complete.slash` 的容错解析 + `/name args` 解析。
+ * M15 会话命令（Slash）：`commands.catalog` 的容错解析 + `/name args` 解析。
  *
  * 字段以官方契约为准，缺失即降级；`slash.exec` 统一承载命令执行。
  */
@@ -52,18 +52,6 @@ export function normalizeCatalog(payload: unknown): SlashCommand[] {
     }
     return [command];
   });
-}
-
-/** `complete.slash` 的容错解析；形状与 catalog 接近。 */
-export function normalizeCompletions(payload: unknown): SlashCommand[] {
-  const raw =
-    payload && typeof payload === "object" && !Array.isArray(payload)
-      ? ((payload as Record<string, unknown>).completions ??
-        (payload as Record<string, unknown>).commands ??
-        (payload as Record<string, unknown>).items ??
-        payload)
-      : payload;
-  return normalizeCatalog(raw);
 }
 
 /** 按命令名（或描述）过滤，忽略前导 `/`，大小写不敏感。 */

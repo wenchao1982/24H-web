@@ -1,11 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  filterCommands,
-  normalizeCatalog,
-  normalizeCompletions,
-  parseSlash,
-  slashResultText,
-} from "./slash";
+import { filterCommands, normalizeCatalog, parseSlash, slashResultText } from "./slash";
 
 describe("slash T20.1 命令解析", () => {
   it("normalizes catalog from array and wrapped shapes", () => {
@@ -21,13 +15,11 @@ describe("slash T20.1 命令解析", () => {
     expect(normalizeCatalog(null)).toEqual([]);
   });
 
-  it("normalizes completions and filters by name/description", () => {
-    const commands = normalizeCompletions({
-      completions: [
-        { name: "goal", description: "持久目标" },
-        { name: "review", description: "代码评审" },
-      ],
-    });
+  it("filters commands by name/description", () => {
+    const commands = [
+      { name: "goal", description: "持久目标" },
+      { name: "review", description: "代码评审" },
+    ];
     expect(filterCommands(commands, "/go").map((c) => c.name)).toEqual(["goal"]);
     expect(filterCommands(commands, "评审").map((c) => c.name)).toEqual(["review"]);
     expect(filterCommands(commands, "")).toHaveLength(2);
