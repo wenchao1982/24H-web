@@ -197,6 +197,39 @@ describe("decideProfileGuard", () => {
     expect(decideProfileGuard(frame, superAdmin, db)).toEqual({ action: "allow" });
   });
 
+  it("allows `tools.list` when the session owner is an assigned profile (R24)", () => {
+    const frame = classify({
+      jsonrpc: "2.0",
+      id: 84,
+      method: "tools.list",
+      params: { session_id: "r1" },
+    });
+    const owners = new Map<string, string>([["r1", "alpha"]]);
+    expect(decideProfileGuard(frame, adminWithProfile, db, owners)).toEqual({ action: "allow" });
+  });
+
+  it("denies `tools.list` when the session owner is unassigned (R24)", () => {
+    const frame = classify({
+      jsonrpc: "2.0",
+      id: 85,
+      method: "tools.list",
+      params: { session_id: "r1" },
+    });
+    const owners = new Map<string, string>([["r1", "gamma"]]);
+    expect(decideProfileGuard(frame, adminWithProfile, db, owners)).toEqual({ action: "deny" });
+  });
+
+  it("denies `tools.list` for an unknown session id when owners are tracked (R24)", () => {
+    const frame = classify({
+      jsonrpc: "2.0",
+      id: 86,
+      method: "tools.list",
+      params: { session_id: "unknown" },
+    });
+    const owners = new Map<string, string>([["r1", "alpha"]]);
+    expect(decideProfileGuard(frame, adminWithProfile, db, owners)).toEqual({ action: "deny" });
+  });
+
   it("injects for `commands.catalog` whose schema declares profile", () => {
     const frame = classify({ jsonrpc: "2.0", id: 9, method: "commands.catalog", params: {} });
     expect(decideProfileGuard(frame, adminWithProfile, db)).toEqual({
@@ -210,8 +243,39 @@ describe("decideProfileGuard", () => {
     expect(decideProfileGuard(frame, adminNoProfile, db)).toEqual({ action: "deny" });
   });
 
-  it("pins the exemption list to exactly 18 methods", () => {
-    expect(PROFILE_AGNOSTIC_METHODS.size).toBe(18);
+  it("pins the exemption list to exactly the mechanically derived set (MethodSweep)", () => {
+    // 机械核验：`tui_gateway.contracts` 注册表里参数类 schema 未声明 `profile` 字段的
+    // 方法集合（26 条）。契约变更时须重跑 MethodSweep 并同步本清单与全部文档（R14）。
+    const expected = [
+      "ping",
+      "gateway.capabilities",
+      "client.capabilities",
+      "complete.slash",
+      "reload.env",
+      "reload.mcp",
+      "plugins.list",
+      "skills.reload",
+      "learning.frames",
+      "learning.detail",
+      "learning.delete",
+      "learning.edit",
+      "paste.collapse",
+      "model.save_key",
+      "model.disconnect",
+      "diagnostics.share_nous",
+      "image.generate",
+      "onboarding.ensure_setup_profile",
+      "onboarding.reset_setup_profile",
+      "tools.list",
+      "toolsets.list",
+      "tools.show",
+      "browser.controller.register",
+      "browser.controller.heartbeat",
+      "browser.controller.detach",
+      "browser.controller.result",
+    ];
+    expect([...PROFILE_AGNOSTIC_METHODS].sort()).toEqual([...expected].sort());
+    expect(PROFILE_AGNOSTIC_METHODS.size).toBe(26);
   });
 });
 
@@ -292,6 +356,36 @@ describe("guardClientFrame", () => {
       action: "reject",
       code: "PROFILE_FORBIDDEN",
       id: 7,
+    });
+  });
+
+  it("forwards `tools.list` with a session_id owned by an assigned profile (R24)", () => {
+    const raw = text({
+      jsonrpc: "2.0",
+      id: 8,
+      method: "tools.list",
+      params: { session_id: "r1" },
+    });
+    const owners = new Map<string, string>([["r1", "alpha"]]);
+    expect(guardClientFrame(raw, false, adminWithProfile, db, owners)).toEqual({
+      action: "forward",
+      text: raw,
+      injected: false,
+    });
+  });
+
+  it("rejects `tools.list` when the session_id is not owned by the caller (R24)", () => {
+    const raw = text({
+      jsonrpc: "2.0",
+      id: 8,
+      method: "tools.list",
+      params: { session_id: "runtime:other" },
+    });
+    const owners = new Map<string, string>([["runtime:x", "alpha"]]);
+    expect(guardClientFrame(raw, false, adminWithProfile, db, owners)).toEqual({
+      action: "reject",
+      code: "PROFILE_FORBIDDEN",
+      id: 8,
     });
   });
 

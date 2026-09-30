@@ -59,7 +59,7 @@
   **守卫拒绝与响应过滤 fail-closed 必写 `audit`**（actor/profile/method/ip/结果/时间戳，不含 token/密钥/字节）；
   **REST 同语义（REQ-022）**：`/api/hermes/*` 非 `super_admin` 缺 `profile` 时（豁免路径 `/api/hermes/health` 除外）
   注入 `default_profile` 或 403，**禁止**提前 `return` 跳过 `assertProfileAccess`；注入须落入**被转发的 query**。
-  豁免清单（WS 18 条 / REST 1 条）与判据见 `architecture.md §7.2` + `.psd/specs/003-composer-redesign/*/contracts-evidence.md`。
+  豁免清单（WS 26 条 / REST 1 条）与判据见 `architecture.md §7.2` + `.psd/specs/003-composer-redesign/*/contracts-evidence.md`。
 - 完整清单见 `docs/INTERFACES.md`。
 
 ## 6. 验证

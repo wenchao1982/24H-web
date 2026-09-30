@@ -33,6 +33,17 @@ export const WS_MAX_PENDING_BYTES = WS_QUEUE_FACTOR * WS_MAX_PAYLOAD; // 64 MiB
 const MAX_PENDING_PROFILE_READS = 256;
 const PENDING_PROFILE_READ_TTL_MS = 60_000;
 
+/** R24：per-connection 会话归属表上限与 TTL（防内存泄漏，超限 fail-closed）。 */
+const MAX_SESSION_OWNERS = 512;
+const SESSION_OWNER_TTL_MS = 10 * 60_000;
+
+/** 会回传 runtime/stored 会话 id 的建/附会话 RPC（用于填充归属表）。 */
+const SESSION_OWNERSHIP_METHODS: ReadonlySet<string> = new Set([
+  "session.create",
+  "session.resume",
+  "session.activate",
+]);
+
 interface PendingProfileRead {
   userId: number;
   kind: "list" | "describe";
@@ -184,6 +195,11 @@ async function bridge(
   const outbound: PendingFrame[] = [];
   let pendingBytes = 0;
   const pendingProfileReads = new Map<string, PendingProfileRead>();
+  // R24：per-connection 会话归属（session_id → profile）与其待决建/附请求（requestId → profile）。
+  const sessionOwners = new Map<string, string>();
+  const sessionOwnerAt = new Map<string, number>();
+  const pendingSessionOwners = new Map<string, string>();
+  const pendingSessionOwnerAt = new Map<string, number>();
   let upstreamSocket: WebSocket | null = null;
 
   const sendToClient = (text: string) => {
@@ -244,12 +260,127 @@ async function bridge(
     }
   };
 
+  // R24：归属表与待决表按 TTL 清理；超限时新条目直接丢弃（fail-closed：未知会话将被拒绝）。
+  const pruneSessionOwners = () => {
+    const now = Date.now();
+    for (const [key, at] of sessionOwnerAt) {
+      if (now - at > SESSION_OWNER_TTL_MS) {
+        sessionOwners.delete(key);
+        sessionOwnerAt.delete(key);
+      }
+    }
+    for (const [key, at] of pendingSessionOwnerAt) {
+      if (now - at > SESSION_OWNER_TTL_MS) {
+        pendingSessionOwners.delete(key);
+        pendingSessionOwnerAt.delete(key);
+      }
+    }
+  };
+
+  const rememberSessionOwner = (sessionId: string, profile: string) => {
+    if (sessionOwners.size >= MAX_SESSION_OWNERS && !sessionOwners.has(sessionId)) {
+      return;
+    }
+    sessionOwners.set(sessionId, profile);
+    sessionOwnerAt.set(sessionId, Date.now());
+  };
+
+  /** 转发建/附会话请求前，记下 `requestId → profile`（回包到达时据以登记归属）。 */
+  const recordSessionRequest = (text: string) => {
+    if (isSuperAdmin) {
+      return;
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      return;
+    }
+    const items = Array.isArray(parsed) ? parsed : [parsed];
+    for (const item of items) {
+      if (typeof item !== "object" || item === null || Array.isArray(item)) {
+        continue;
+      }
+      const record = item as Record<string, unknown>;
+      if (typeof record.method !== "string" || !SESSION_OWNERSHIP_METHODS.has(record.method)) {
+        continue;
+      }
+      const key = readId(record.id);
+      if (key === null || pendingSessionOwners.size >= MAX_SESSION_OWNERS) {
+        continue;
+      }
+      const params = record.params;
+      const profile =
+        typeof params === "object" && params !== null && !Array.isArray(params)
+          ? (params as Record<string, unknown>).profile
+          : undefined;
+      if (typeof profile !== "string" || profile.trim() === "") {
+        continue;
+      }
+      pendingSessionOwners.set(key, profile.trim());
+      pendingSessionOwnerAt.set(key, Date.now());
+    }
+  };
+
+  /** 上游响应：把 runtime/stored id 登记到发起该请求的 profile；`session.list` 行若有 `profile` 也登记。 */
+  const applySessionOwnerResponse = (parsed: unknown) => {
+    if (isSuperAdmin) {
+      return;
+    }
+    const items = Array.isArray(parsed) ? parsed : [parsed];
+    for (const item of items) {
+      if (typeof item !== "object" || item === null || Array.isArray(item)) {
+        continue;
+      }
+      const record = item as Record<string, unknown>;
+      const result = record.result;
+      if (typeof result !== "object" || result === null || Array.isArray(result)) {
+        continue;
+      }
+      const resultRecord = result as Record<string, unknown>;
+
+      if (Array.isArray(resultRecord.sessions)) {
+        for (const row of resultRecord.sessions) {
+          if (typeof row !== "object" || row === null || Array.isArray(row)) {
+            continue;
+          }
+          const rowRecord = row as Record<string, unknown>;
+          const id = rowRecord.id;
+          const profile = rowRecord.profile;
+          if (typeof id === "string" && id !== "" && typeof profile === "string" && profile !== "") {
+            rememberSessionOwner(id, profile);
+          }
+        }
+      }
+
+      const key = readId(record.id);
+      if (key === null) {
+        continue;
+      }
+      const owner = pendingSessionOwners.get(key);
+      if (owner === undefined) {
+        continue;
+      }
+      pendingSessionOwners.delete(key);
+      pendingSessionOwnerAt.delete(key);
+      const runtime = resultRecord.session_id;
+      const stored = resultRecord.stored_session_id ?? resultRecord.session_key;
+      if (typeof runtime === "string" && runtime !== "") {
+        rememberSessionOwner(runtime, owner);
+      }
+      if (typeof stored === "string" && stored !== "") {
+        rememberSessionOwner(stored, owner);
+      }
+    }
+  };
+
   // Attach the client listener synchronously: on a cold start the upstream
   // token fetch below is async, and any frame sent by the client before the
   // upstream socket exists must not be dropped.
   socket.on("message", (data: RawData, isBinary: boolean) => {
     const text = rawToString(data);
-    const outcome = guardClientFrame(text, isBinary, userRef, db);
+    pruneSessionOwners();
+    const outcome = guardClientFrame(text, isBinary, userRef, db, sessionOwners);
     if (outcome.action === "reject") {
       logAudit(db, {
         actorId: userRef.id >= 0 ? userRef.id : null,
@@ -268,6 +399,7 @@ async function bridge(
     }
 
     recordProfileReads(outcome.text);
+    recordSessionRequest(outcome.text);
 
     if (!sendUpstream(outcome.text)) {
       const bytes = Buffer.byteLength(outcome.text);
@@ -349,6 +481,9 @@ async function bridge(
           outgoing = JSON.stringify(outcome.frame);
           outgoingBinary = false;
         }
+      }
+      if (parsed !== undefined) {
+        applySessionOwnerResponse(parsed);
       }
     }
     if (socket.readyState === WebSocket.OPEN) {

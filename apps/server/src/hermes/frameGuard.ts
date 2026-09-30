@@ -27,11 +27,13 @@ export interface FrameClassification {
 }
 
 /**
- * 豁免清单：参数类 schema **未声明 `profile` 字段**的方法（从官方 `contracts/*.py` 派生）。
+ * 豁免清单（26 条）：参数类 schema **未声明 `profile` 字段**的方法（从官方
+ * `contracts/*.py` 机械派生，见 `.psd/.../contracts-evidence.md` MethodSweep 小节）。
  *
  * 判据唯一 = schema 是否声明 `profile`；**不得**以「是否直继 `Params`」判断 ——
  * `Params` 设 `ConfigDict(extra="forbid")`，向无该字段的类注入会得到 4000。
  * 未知方法不在清单内 → 按需 profile 处理（注入或 403），保证 default-deny。
+ * 契约变更时须重新 MethodSweep 并同步本清单与全部文档（R14 / Q-010）。
  */
 export const PROFILE_AGNOSTIC_METHODS: ReadonlySet<string> = new Set([
   "ping",
@@ -41,17 +43,25 @@ export const PROFILE_AGNOSTIC_METHODS: ReadonlySet<string> = new Set([
   "reload.env",
   "reload.mcp",
   "plugins.list",
+  "skills.reload",
   "learning.frames",
   "learning.detail",
   "learning.delete",
+  "learning.edit",
   "paste.collapse",
   "model.save_key",
   "model.disconnect",
   "diagnostics.share_nous",
   "image.generate",
+  "onboarding.ensure_setup_profile",
+  "onboarding.reset_setup_profile",
   "tools.list",
   "toolsets.list",
   "tools.show",
+  "browser.controller.register",
+  "browser.controller.heartbeat",
+  "browser.controller.detach",
+  "browser.controller.result",
 ]);
 
 /**
@@ -59,9 +69,15 @@ export const PROFILE_AGNOSTIC_METHODS: ReadonlySet<string> = new Set([
  * （故不可注入，否则 `extra="forbid"` → 4000），但其 handler 在缺 `session_id`
  * 时回退到**启动 profile** 的配置（`tools_mcp_plugins.py:20-21`）→ 跨租户读取。
  *
- * fail-closed 最小闭合：非 `super_admin` 且未带 `params.profile` 时，
- * **无 `session_id` → 拒绝**（阻断「回退启动 profile」这条路）；带 `session_id` → 放行。
- * **残余**：`session_id` 的归属仍未被逐条校验，彻底闭合依赖后续「session 归属校验」。
+ * fail-closed：非 `super_admin` 且未带 `params.profile` 时，
+ * **无 `session_id` → 拒绝**（阻断「回退启动 profile」这条路）。
+ *
+ * **R24 彻底闭合（session 归属校验）**：当调用方提供 `sessionOwners`
+ * （per-connection：runtime/stored session_id → 所属 profile，由 `proxy.ts` 从
+ * `session.create` / `session.resume` / `session.activate` 回包累积）时，
+ * 带 `session_id` 的请求须**归属命中且在该调用者已分配 profile 内**才放行；
+ * 未知 / 他人会话一律拒绝。未提供 `sessionOwners` 时保持旧行为（带 `session_id` 放行），
+ * 兼容不维护归属表的既有单测。
  */
 export const SESSION_SCOPED_NO_PROFILE_METHODS: ReadonlySet<string> = new Set([
   "tools.list",
@@ -169,14 +185,19 @@ export function classifyFrame(data: string | Uint8Array, isBinary: boolean): Fra
  *
  * - `super_admin` → allow（不注入）
  * - 已带 `params.profile` → 校验归属：可访问 allow，否则 deny
- * - 未带 profile 且命中 `_SessionScoped` 方法（R24）→ 有 `session_id` allow，否则 deny
+ * - 未带 profile 且命中 `_SessionScoped` 方法（R24）→ 按 session 归属校验（见下），否则 deny
  * - 未带 profile 且命中豁免清单 → allow
  * - 未带 profile 且未命中豁免 → 注入调用者 `default_profile`；无可用 → deny
+ *
+ * R24：`sessionOwners` 提供时，`_SessionScoped` 方法须 `session_id` 归属命中且
+ * 落在调用者已分配 profile 内才 allow；未知/他人会话 deny。缺 `sessionOwners` 时
+ * 退化为「有 `session_id` 即 allow」（兼容既有调用方）。
  */
 export function decideProfileGuard(
   frame: FrameClassification,
   user: GuardUser,
   db: Db,
+  sessionOwners?: ReadonlyMap<string, string>,
 ): GuardDecision {
   if (frame.kind !== "request" || !frame.method) {
     return { action: "allow" };
@@ -195,7 +216,17 @@ export function decideProfileGuard(
   // R24（TASK-036）：`_SessionScoped` 无 `profile` 字段 → 先于豁免清单判定。
   // 缺 `session_id` 时 handler 会回退「启动 profile」，故 fail-closed 拒绝。
   if (SESSION_SCOPED_NO_PROFILE_METHODS.has(frame.method)) {
-    return frame.sessionId !== undefined ? { action: "allow" } : { action: "deny" };
+    if (frame.sessionId === undefined) {
+      return { action: "deny" };
+    }
+    // 提供归属表时，逐条校验该 session 属于调用者已分配 profile；否则拒绝。
+    if (sessionOwners) {
+      const owner = sessionOwners.get(frame.sessionId);
+      if (owner === undefined || !userCanAccessProfile(db, user.id, owner)) {
+        return { action: "deny" };
+      }
+    }
+    return { action: "allow" };
   }
 
   if (PROFILE_AGNOSTIC_METHODS.has(frame.method)) {
@@ -233,6 +264,7 @@ export function guardClientFrame(
   isBinary: boolean,
   user: GuardUser,
   db: Db,
+  sessionOwners?: ReadonlyMap<string, string>,
 ): GuardOutcome {
   const text = typeof raw === "string" ? raw : safeDecode(raw);
   if (isBinary || text === null) {
@@ -251,7 +283,7 @@ export function guardClientFrame(
     return { action: "reject", code: "INVALID_FRAME", id: classification.id ?? null };
   }
   if (classification.kind === "request") {
-    const decision = decideProfileGuard(classification, user, db);
+    const decision = decideProfileGuard(classification, user, db, sessionOwners);
     if (decision.action === "deny") {
       return { action: "reject", code: "PROFILE_FORBIDDEN", id: classification.id ?? null };
     }
@@ -267,7 +299,7 @@ export function guardClientFrame(
     let needsInject = false;
     for (const element of elements) {
       const elementClassification = classifyFrame(JSON.stringify(element), false);
-      const decision = decideProfileGuard(elementClassification, user, db);
+      const decision = decideProfileGuard(elementClassification, user, db, sessionOwners);
       if (decision.action === "deny") {
         // 任一元素越权 → 整批拒绝，不转发任何元素。
         return { action: "reject", code: "PROFILE_FORBIDDEN", id: null };

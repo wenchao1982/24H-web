@@ -75,13 +75,13 @@
 | Q-002 | `分享` 目标形态 | 已定：沿用现有 `?session=<storedId>` 链接 + 剪贴板 |
 | Q-003 | 会话内切换智能体（profile） | 已定：**强开新会话**；已建会话的 pill 只读展示 |
 | Q-004 | WS 大 payload 降级策略 | 已定：保持 10MB、不分片；>2MB 显示等待态；失败重试复用 identity 不重复 create；网关拒绝原样透传 |
-| Q-005 | 服务端 magic bytes 校验落点（Hermes 还是 BFF） | **未定**，需实测；若网关不做则 BFF 补（风险 R10） |
+| Q-005 | 服务端 magic bytes 校验落点（Hermes 还是 BFF） | **已定：Hermes**（2026-09-30）；`prompt_attachments._sniff_image_ext`（图片）+ `methods_prompt` 的 `%PDF-` 校验（PDF），`methods_profiles.py:16` 明写 mime 不被信任；R10 已闭合 |
 | Q-006 | `···` 菜单「连接」的确切语义（多实例切换 vs 状态展示） | **未定**，需产品确认 |
 | Q-007 | `/api/auth/me` 是否返回头像（决定 AgentPicker 是否只用首字占位） | **未定**，实现阶段验证 |
 | Q-008 | 官方 L1 是否支持 JSON-RPC 数组批帧 | **未定**，实现阶段验证 |
 | Q-009 | hero 态选昂贵模型无二次确认（`session.create` 无 `confirm_expensive_model` 字段） | **已定**：接受该限制（REQ-011a）；网关若拒绝则透传 message |
-| Q-010 | WS 豁免清单（18 条，判据 = 参数类未声明 `profile`）与 REST 豁免清单（1 条）是否与官方契约/路由完全一致 | **未定**；判据可机械派生（TASK-033 归档 + TASK-004 MethodSweep 断言「豁免集合 == 无 profile 字段集合」）；漏判方向为功能回归 |
-| Q-011 | `_SessionScoped` 方法（`tools.list`/`toolsets.list`/`tools.show`）无 `profile` 字段可注入，缺 `session_id` 时回退启动 profile 配置 | **未定**（R24）；须单开任务做 session 归属校验 |
+| Q-010 | WS 豁免清单（判据 = 参数类未声明 `profile`）与 REST 豁免清单（1 条）是否与官方契约/路由完全一致 | **已定（MethodSweep 机械核验 2026-09-30）**：WS 26 条 == 注册表无 `profile` 字段方法集合（原 18 条补齐 8 条，无「多出」）；结果见 `contracts-evidence.md §4.3`；漏判方向为功能回归 |
+| Q-011 | `_SessionScoped` 方法（`tools.list`/`toolsets.list`/`tools.show`）无 `profile` 字段可注入，缺 `session_id` 时回退启动 profile 配置 | **已定（TASK-036，2026-09-30）**：缺 `session_id` fail-closed 拒绝；带 `session_id` 按 per-connection `sessionOwners` 校验归属（未知/他人 403 不转发） |
 
 ### 🚫 Never Do
 

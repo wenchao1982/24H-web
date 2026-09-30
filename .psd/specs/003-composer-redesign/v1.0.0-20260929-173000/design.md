@@ -597,7 +597,7 @@ TASK-003 负责实现并导出该函数；TASK-029（响应过滤）依赖它，
 
 > **为什么不能用「是否直继 `Params`」**：`contracts/base.py:35` 为 `Params` 设了 `ConfigDict(extra="forbid")`（docstring: "Unknown keys are rejected"）→ **向未声明 `profile` 的参数类注入 `profile` 会被拒绝（4000）**。而 `_SessionScoped(Params)`（`tools_mcp_plugins.py:19-23`）只声明 `session_id`、**无 `profile`**，且 `CommandsCatalogParams(Params)` / `ConfigShowParams(Params)`（`tools_commands.py:190/325`）**声明了 `profile`** —— 故「直继 `Params`」既不充分也不必要，**该判据已废弃**。
 
-**豁免清单（18 条，参数类无 `profile` 字段）**：
+**豁免清单（26 条，参数类无 `profile` 字段；MethodSweep 机械核验 2026-09-30）**：
 
 | 方法 | 参数类 | 证据 |
 |---|---|---|
@@ -607,13 +607,19 @@ TASK-003 负责实现并导出该函数；TASK-029（响应过滤）依赖它，
 | `reload.env` | `ReloadEnvParams(Params)` | `contracts/tools_mcp_plugins.py:101` |
 | `reload.mcp` | `ReloadMcpParams(Params)` | `contracts/tools_mcp_plugins.py:113` |
 | `plugins.list` | `PluginsListParams(Params)` | `contracts/tools_mcp_plugins.py:564` |
+| `skills.reload` | `SkillsReloadParams(Params)`（仅 `session_id`） | `contracts/tools_mcp_plugins.py:207` |
 | `learning.frames` | `LearningFramesParams(Params)` | `contracts/tools_mcp_plugins.py:240` |
 | `learning.detail` / `learning.delete` | `LearningNodeParams(Params)` | `contracts/tools_mcp_plugins.py:307` |
+| `learning.edit` | `LearningEditParams(LearningNodeParams)` | `contracts/tools_mcp_plugins.py:311` |
 | `paste.collapse` | `PasteCollapseParams(Params)` | `contracts/profiles_vault_complete_foreign_subagents.py:68` |
 | `model.save_key` / `model.disconnect` | `ModelSaveKeyParams(Params)` / `ModelDisconnectParams(Params)` | `contracts/profiles_vault_complete_foreign_subagents.py:82/96` |
 | `diagnostics.share_nous` | `DiagnosticsShareNousParams(Params)` | `contracts/config_free_tier_control.py:156` |
 | `image.generate` | `ImageGenerateParams(Params)` | `contracts/config_free_tier_control.py:286` |
+| `onboarding.ensure_setup_profile` / `onboarding.reset_setup_profile` | `Params`（空） | `contracts/profiles_vault_complete_foreign_subagents.py:392/402` |
 | `tools.list` / `toolsets.list` / `tools.show` | `_SessionScoped(Params)`（仅 `session_id`） | `contracts/tools_mcp_plugins.py:19-23 / 44 / 47 / 66` |
+| `browser.controller.register` | `BrowserControllerRegisterParams(BrowserControllerParams)` | `contracts/groups_bot_relay.py:583` |
+| `browser.controller.heartbeat` / `browser.controller.detach` | `BrowserControllerParams(Params)`（`session_id: str` 必填） | `contracts/groups_bot_relay.py:577` |
+| `browser.controller.result` | `BrowserControllerResultParams(BrowserControllerParams)` | `contracts/groups_bot_relay.py:611` |
 
 **明确须注入（参数类声明了 `profile`）**：`commands.catalog`（`tools_commands.py:190`）、`config.show`（`:325`）、`cron.manage`（`:423`，doc: "optionally profile-scoped cron store"）、`shell.exec`、`cli.exec`、`process.kill`、`tools.configure`、`browser.manage`、`agents.list`、`insights.get`、`session.set_hidden`、`complete.path`（`CompletePathParams(ProfileParams)`）、`llm.oneshot`（`LlmOneshotParams(ProfileParams)`）。
 
@@ -622,9 +628,9 @@ TASK-003 负责实现并导出该函数；TASK-029（响应过滤）依赖它，
 - 把「不在豁免清单里」误解为「放行」——**未知方法必须注入**
 - 以「是否直继 `Params`」为判据（会向 `tools.*` 注入 → 4000）
 
-**残余（未闭合，登记 R24）**：`tools.list` / `toolsets.list` / `tools.show` 因 schema **无 `profile` 字段**而**无法用 profile 守卫**；其 handler 在缺 `session_id` 时**回退到启动 profile 的配置**（`tools_mcp_plugins.py:20-21`）→ 存在跨租户读取。该风险的闭合依赖 **session 归属校验**（维度③ 残余），须单开任务。
+**R24 已闭合（session 归属校验）**：`tools.list` / `toolsets.list` / `tools.show` 因 schema **无 `profile` 字段**而**无法用 profile 守卫**；其 handler 在缺 `session_id` 时**回退到启动 profile 的配置**（`tools_mcp_plugins.py:20-21`）→ 跨租户读取。闭合：BFF WS 代理维护 per-connection `sessionOwners`（`session.create`/`session.resume`/`session.activate` 回包累积 runtime/stored id → profile，`session.list` 行含 `profile` 时也登记；上限 512 / TTL 10 min）；非 `super_admin` 的 `_SessionScoped` 请求缺 `session_id` fail-closed 拒绝，带 `session_id` 须归属命中且落调用者白名单，未知/他人一律 403 不转发。见 `architecture.md §7.2`、`contracts-evidence.md §6`。
 
-**测试要求（MethodSweep，修正版）**：以 `contracts/*.py` 为数据源，机械断言 **「豁免集合 == 参数类未声明 `profile` 字段的方法集合」**（不要断言「== 直继 Params 集合」——该断言不可通过）。
+**测试要求（MethodSweep，修正版）**：以 `contracts/*.py` 为数据源，机械断言 **「豁免集合 == 参数类未声明 `profile` 字段的方法集合」**（不要断言「== 直继 Params 集合」——该断言不可通过）。**核验结果（2026-09-30）**：注册表 237 个方法中 26 个参数类无 `profile` 字段；原清单 18 条为真子集，补齐 8 条（`skills.reload` / `learning.edit` / `onboarding.ensure_setup_profile` / `onboarding.reset_setup_profile` / `browser.controller.register|heartbeat|detach|result`）；无「多出」项。见 `contracts-evidence.md` MethodSweep 小节。
 
 ---
 
@@ -653,7 +659,7 @@ TASK-003 负责实现并导出该函数；TASK-029（响应过滤）依赖它，
 | 偏差 | 说明 | 补偿控制 |
 |---|---|---|
 | WS 单帧可达 10MB（base64 ≈13.3MB），OWASP 建议 ≤64KB | 契约无分片通道 | >2MB 等待态；失败复用 identity 不重复 create；建议 BFF 显式设 `maxPayload`；`proxy.ts:33-46` 的 `pending`/`outbound` 需上限；网关上限实测（R3/R11） |
-| 服务端 magic bytes 校验落点未定 | `File.type` 仅客户端声明 | 客户端仅作 UX 预筛；实测网关，若不做则 BFF 补（R10，独立任务） |
+| 服务端 magic bytes 校验落点 **已定：Hermes** | `File.type` 仅客户端声明 | 网关已按魔数嗅探（`prompt_attachments._sniff_image_ext` / `methods_prompt` 的 `%PDF-` 校验）；客户端仅作 UX 预筛；**R10 已闭合** |
 | BFF 无帧大小/队列上限（评审 MEDIUM #14） | `proxy.ts:33-34` 的 `pending`/`outbound` 为无界数组，10MB（≈13.3MB base64）单帧在冷启动队列下被放大 | **REQ-018**：显式设 `maxPayload` 与队列长度上限；超限回可读错误并仅终止该连接 |
 | 契约源码在仓库外，判定不可 CI 复核（评审 LOW #16） | 所有「以官方源码为准」的断言无法被本仓库独立验证 | **TC-016**：归档可核验的契约片段到 `contracts-evidence.md`（TASK-033） |
 | 队列上限只按条数、不限字节（评审 N8） | `pending`/`outbound` 为无界数组，N 条近上限帧可堆内存 | **REQ-018 / TC-018**：同时约束条数与累计字节（`pendingBytes ≤ K × maxPayload`，K 量化）；`maxPayload` 同时作用于客户端接入侧与上游侧 socket |
@@ -764,7 +770,7 @@ expect(gateway.paramsOf("session.workspace.move")[0]).toEqual({ session_key: "s1
 | 17 | 构造伪造 id + 并发 1000 次 `profiles.list` | `pendingProfileReads` 受长度上限约束、超时清理生效，无内存泄漏 |
 | 18 | 越权 403 / fail-closed / REST 403 | `audit` 表各新增恰好 1 条记录，且不含 token/字节 |
 | 19 | 单帧非字符串 `method`（如 `"method":123`） | 判为 `invalid` 并拒绝 |
-| 20 | **MethodSweep（判定修正）**：以 `contracts/*.py` 为数据源，机械断言「豁免集合 == **参数类未声明 `profile` 字段的方法集合**」（18 条） | 无「被错误注入」的功能回归，无遗漏 |
+| 20 | **MethodSweep（判定修正）**：以 `contracts/*.py` 为数据源，机械断言「豁免集合 == **参数类未声明 `profile` 字段的方法集合**」（26 条，2026-09-30 核验） | 无「被错误注入」的功能回归，无遗漏 |
 | 21 | `commands.catalog` / `config.show` / `cron.manage` / `shell.exec` / `complete.path` / `llm.oneshot` 缺 profile | **均被注入**（参数类声明了 `profile`） |
 | 21b | `tools.list` / `toolsets.list` / `tools.show` / `reload.env` / `plugins.list` / `learning.*` / `image.generate` 缺 profile | **均不注入**（schema 无 `profile`，注入会触发 4000） |
 | 22 | 未知方法 `totally.unknown` 缺 profile | **被注入**（不得放行） |
@@ -821,6 +827,6 @@ expect(gateway.paramsOf("session.workspace.move")[0]).toEqual({ session_key: "s1
 5. **Wave 4**：测试补齐（a11y / 集成 / StrictMode / BFF 27 例）
 6. **Wave 5**：`npm run check` 全绿 + 基线一致性复核
 
-> **残余（Wave 1 之外，单开任务）**：`_SessionScoped` 方法（`tools.*`）的 session 归属校验（R24）；REST 注入的上游语义实测；`contracts-evidence.md` 归档（TASK-033）。
+> **残余（Wave 1 之外，单开任务）**：REST 注入的上游语义实测；`contracts-evidence.md` 归档（TASK-033）。`_SessionScoped` 方法（`tools.*`）的 session 归属校验（R24）**已闭合**。
 
 > **PR-011**：REQ-008 / REQ-015 / REQ-017 / REQ-018 / REQ-021 / REQ-022 全部落在 Wave 1。

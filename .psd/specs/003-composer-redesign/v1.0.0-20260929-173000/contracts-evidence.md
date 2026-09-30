@@ -11,8 +11,8 @@
 | 判据 | 结论 | 依据 |
 |---|---|---|
 | WS request 是否需 profile 守卫 / 注入 | 参数类**声明了 `profile`** → 可守卫/须注入；**未声明** → 豁免 | `contracts/base.py:32-35`（`Params` 的 `extra="forbid"`）+ 各参数类字段 |
-| 豁免清单是否可机械派生 | 是：豁免集合 == 「参数类未声明 `profile` 字段的方法集合」 | §4 全表（18 条豁免 / 13 条须注入） |
-| `_SessionScoped` 方法能否用 profile 守卫 | **不能**（schema 无 `profile`，注入即 4000）；残余 R24 | `contracts/tools_mcp_plugins.py:19-23` |
+| 豁免清单是否可机械派生 | 是：豁免集合 == 「参数类未声明 `profile` 字段的方法集合」 | §4 全表（26 条豁免 / 211 条声明了 `profile`）；§4.3 MethodSweep 核验（2026-09-30） |
+| `_SessionScoped` 方法能否用 profile 守卫 | **不能**（schema 无 `profile`，注入即 4000）；R24 以 **session 归属校验**闭合（§6） | `contracts/tools_mcp_plugins.py:19-23` |
 | 模型对齐来源 | **`model.options{profile, session_id}` 回包的 `model`/`provider`**；无 `session.info` RPC | `contracts/config_free_tier_control.py:216-280`；§3.5 |
 
 ---
@@ -177,8 +177,17 @@
 | 16 | `tools.list` | `_SessionScoped(Params)` | `tools_mcp_plugins.py:19-23` | `:44` |
 | 17 | `toolsets.list` | `_SessionScoped(Params)` | `tools_mcp_plugins.py:19-23` | `:47` |
 | 18 | `tools.show` | `_SessionScoped(Params)` | `tools_mcp_plugins.py:19-23` | `:66` |
+| 19 | `skills.reload` | `SkillsReloadParams(Params)`（仅 `session_id`） | `tools_mcp_plugins.py:207` | `:233` |
+| 20 | `learning.edit` | `LearningEditParams(LearningNodeParams)` | `tools_mcp_plugins.py:311` | `:335` |
+| 21 | `onboarding.ensure_setup_profile` | `Params`（空） | —（直接使用基类 `Params`） | `profiles_vault_complete_foreign_subagents.py:392` |
+| 22 | `onboarding.reset_setup_profile` | `Params`（空） | —（直接使用基类 `Params`） | `profiles_vault_complete_foreign_subagents.py:402` |
+| 23 | `browser.controller.register` | `BrowserControllerRegisterParams(BrowserControllerParams)` | `groups_bot_relay.py:583` | `:606` |
+| 24 | `browser.controller.result` | `BrowserControllerResultParams(BrowserControllerParams)` | `groups_bot_relay.py:611` | `:622` |
+| 25 | `browser.controller.heartbeat` | `BrowserControllerParams(Params)`（`session_id: str` 必填） | `groups_bot_relay.py:577` | `:627` |
+| 26 | `browser.controller.detach` | `BrowserControllerParams(Params)`（`session_id: str` 必填） | `groups_bot_relay.py:577` | `:635` |
 
-> 计数：方法 18 条（其中 `ping`/`gateway.capabilities` 共用类，`learning.detail`/`delete` 共用类，`tools.*` 三条共用类）。
+> 计数：方法 **26 条**（其中 `ping`/`gateway.capabilities` 共用类，`learning.detail`/`delete`/`edit` 继承 `LearningNodeParams`，`tools.*` 三条共用类，`browser.controller.heartbeat`/`detach` 共用类）。
+> **变更记录（2026-09-30）**：MethodSweep 机械核验发现原 18 条为真子集，补齐 #19–#26（`skills.reload` / `learning.edit` / `onboarding.ensure_setup_profile` / `onboarding.reset_setup_profile` / `browser.controller.{register,result,heartbeat,detach}`）；**无「多出」项**（无方法被错误豁免）。详见 §4.3。
 
 ### 4.2 须注入（参数类**声明了** `profile`；非 super_admin 缺 profile 时必须注入，否则落启动 profile → 跨租户）
 
@@ -200,6 +209,39 @@
 
 > 判据**唯一**：参数类是否声明 `profile` 字段。**不得**以「是否直继 `Params`」判断——`CommandsCatalogParams(Params)`/`ConfigShowParams(Params)` 直继 `Params` 却声明了 `profile`；`_SessionScoped(Params)` 直继 `Params` 却无 `profile`。
 > 其余未列入本表的方法，凡参数类（含继承）声明了 `profile` 或未知方法 → 一律按 4.2 处理（注入或 403）；仅 §4.1 豁免。
+
+### 4.3 MethodSweep 机械核验结果（2026-09-30）
+
+**目的**：机械断言「WS 豁免集合 == 参数类 schema 未声明 `profile` 字段的方法集合」（R14 / Q-010），闭合「人工枚举漏方法」风险。
+
+**方法**：以 `tui_gateway.contracts` 包为数据源（`__init__.py` 导入全部 topic 模块触发 `method(...)` 注册），遍历 `registry.METHODS`，对每个方法的 `contract.params.model_fields` 判定是否含 `profile`（pydantic v2 的 `model_fields` 含继承字段，故 `ProfileParams` 子类正确计入「声明了」）。
+
+以该包 venv 的解释器（含 pydantic 2.13）运行临时脚本：
+
+```python
+import sys
+sys.path.insert(0, "/vol1/@apphome/trim.openclaw/data/home/hermes-desktop/home/hermes-agent")
+import tui_gateway.contracts  # 触发全部 method(...) 注册
+from tui_gateway.contracts import METHODS
+no_profile = sorted(n for n in METHODS if "profile" not in METHODS[n].params.model_fields)
+print(len(METHODS), len(no_profile), no_profile)
+```
+
+**结果**：
+
+| 指标 | 值 |
+|---|---|
+| 注册方法总数 | **237** |
+| 参数类**无** `profile` 字段（= 理论豁免集合） | **26** |
+| 参数类**声明** `profile`（含继承） | 211 |
+| 与 §4.1 清单对照 | 完全一致 |
+
+- **多出**（规格豁免但契约声明 `profile` → 危险方向）：**0 条**。
+- **漏掉**（契约无 `profile` 但规格原未豁免 → 会被错误注入 4000）：**8 条**，已补齐：`skills.reload`、`learning.edit`、`onboarding.ensure_setup_profile`、`onboarding.reset_setup_profile`、`browser.controller.register`、`browser.controller.heartbeat`、`browser.controller.detach`、`browser.controller.result`。
+- **结论**：豁免集合已与契约机械对齐（26 条）；R14 / Q-010 **已闭合（机械核验）**。实现侧 `apps/server/src/hermes/frameGuard.ts#PROFILE_AGNOSTIC_METHODS` 与 `frameGuard.test.ts` 的名单断言同步为 26 条。
+
+> 复核命令（只读，不依赖本仓库）：
+> `grep -n "method(\"skills.reload\"\|method(\"learning.edit\"\|method(\"onboarding.ensure_setup_profile\"\|method(\"onboarding.reset_setup_profile\"\|method(\"browser.controller" "$SRC/contracts/"*.py`
 
 ---
 
@@ -294,7 +336,7 @@
 | `toolsets.list`（`:47`） | `_SessionScoped`（无 `profile`） | 同上 |
 | `tools.show`（`:66`） | `_SessionScoped`（无 `profile`） | 同上 |
 
-**R24（未闭合）**：上述 handler 缺 `session_id` 时回退**启动 profile** 配置（源码注释明写 `tools_mcp_plugins.py:20-21`）→ 跨租户读取工具/Toolsets 目录。因参数类无 `profile` 字段，**无法用 profile 守卫闭合**；须依赖 **session 归属校验**（校验 `session_id` 所属 profile ∈ 调用者白名单）。已在 `requirements.md §9 R24` / `§10` 登记，规划为独立任务（TASK-036）。
+**R24（已闭合，TASK-036）**：上述 handler 缺 `session_id` 时回退**启动 profile** 配置（源码注释明写 `tools_mcp_plugins.py:20-21`）→ 跨租户读取工具/Toolsets 目录。因参数类无 `profile` 字段，**无法用 profile 守卫闭合**；改为 **session 归属校验**：BFF WS 代理为每条连接维护 `sessionOwners`（runtime/stored session_id → profile，源自 `session.create`/`session.resume`/`session.activate` 回包；`session.list` 行含 `profile` 时也登记；上限 512 / TTL 10 min）。非 `super_admin` 的 `_SessionScoped` 请求：缺 `session_id` → fail-closed 拒绝（`SESSION_SCOPED_NO_PROFILE_METHODS`，判定早于豁免清单）；带 `session_id` → 归属命中且 `userCanAccessProfile` 通过才放行，未知/他人会话一律 403 不转发。见 `architecture.md §7.2`。
 
 ---
 

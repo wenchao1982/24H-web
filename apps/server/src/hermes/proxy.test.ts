@@ -137,6 +137,49 @@ function startEchoUpstream(): { urls: string[]; frames: string[] } {
   return { urls, frames };
 }
 
+/** Upstream that answers session create/resume/activate with a runtime + stored id (R24 ownership). */
+function startSessionUpstream(): { urls: string[]; frames: string[] } {
+  const urls: string[] = [];
+  const frames: string[] = [];
+  wss = new WebSocketServer({ server: upstream!.server, path: "/api/ws" });
+  wss.on("connection", (socket, request) => {
+    upstreamSockets.push(socket);
+    urls.push(request.url ?? "");
+    socket.send("from-upstream");
+    socket.on("message", (data) => {
+      const text = data.toString();
+      frames.push(text);
+      let reply = `echo:${text}`;
+      try {
+        const parsed = JSON.parse(text) as { id?: unknown; method?: unknown };
+        if (
+          parsed &&
+          typeof parsed === "object" &&
+          (parsed.method === "session.create" ||
+            parsed.method === "session.resume" ||
+            parsed.method === "session.activate")
+        ) {
+          reply = JSON.stringify({
+            jsonrpc: "2.0",
+            id: parsed.id,
+            result: {
+              session_id: "runtime:x",
+              stored_session_id: "stored:x",
+              message_count: 0,
+              messages: [],
+              info: {},
+            },
+          });
+        }
+      } catch {
+        // non-JSON frames echo as-is
+      }
+      socket.send(reply);
+    });
+  });
+  return { urls, frames };
+}
+
 describe("GET /api/hermes/ws", () => {
   it("authenticates with the session cookie and pipes frames both ways", async () => {
     upstream = await startMockHermes({ token: "ws-token-1" });
@@ -251,12 +294,13 @@ describe("profile guard over WS", () => {
   async function boot(
     token: string,
     seed: () => Promise<{ session: string; csrf: string }>,
+    startUpstream: () => { urls: string[]; frames: string[] } = startEchoUpstream,
   ): Promise<{ upstreamState: { urls: string[]; frames: string[] }; client: WebSocket; messages: MessageQueue }> {
     upstream = await startMockHermes({ token });
     ctx = await createTestContext({ hermesBaseUrl: upstream.baseUrl });
     const { session } = await seed();
     await ctx.app.listen({ port: 0, host: "127.0.0.1" });
-    const upstreamState = startEchoUpstream();
+    const upstreamState = startUpstream();
     const { client, messages } = await connect(session);
     expect(await messages.next()).toBe("from-upstream");
     return { upstreamState, client, messages };
@@ -317,22 +361,58 @@ describe("profile guard over WS", () => {
     expect(forwarded.params.profile).toBe("alpha");
   });
 
-  it("does not inject for an exempt `_SessionScoped` method carrying a session_id (tools.list would 4000)", async () => {
-    const { upstreamState, client, messages } = await boot("ws-exempt-token", () =>
-      seedAdmin(["alpha"]),
+  it("tracks session ownership and forwards an owned `tools.list` without injecting (R24)", async () => {
+    const { upstreamState, client, messages } = await boot(
+      "ws-exempt-token",
+      () => seedAdmin(["alpha"]),
+      startSessionUpstream,
+    );
+
+    const createFrame = JSON.stringify({
+      jsonrpc: "2.0",
+      id: 45,
+      method: "session.create",
+      params: {},
+    });
+    client.send(createFrame);
+    const createReply = JSON.parse(await messages.next());
+    expect(createReply.result.session_id).toBe("runtime:x");
+    // session.create was injected with the caller's default profile.
+    expect(JSON.parse(upstreamState.frames[0]).params.profile).toBe("alpha");
+
+    const ownedFrame = JSON.stringify({
+      jsonrpc: "2.0",
+      id: 46,
+      method: "tools.list",
+      params: { session_id: "runtime:x" },
+    });
+    client.send(ownedFrame);
+    expect(await messages.next()).toBe(`echo:${ownedFrame}`);
+    // The owned session is allowed and forwarded un-injected (tools.list has no profile field).
+    expect(upstreamState.frames[1]).toBe(ownedFrame);
+    expect(JSON.parse(upstreamState.frames[1]).params.profile).toBeUndefined();
+  });
+
+  it("rejects an unowned `tools.list` session_id with 403 and never forwards it (R24)", async () => {
+    const { upstreamState, client, messages } = await boot(
+      "ws-unowned-token",
+      () => seedAdmin(["alpha"]),
+      startSessionUpstream,
     );
 
     const frame = JSON.stringify({
       jsonrpc: "2.0",
-      id: 45,
+      id: 47,
       method: "tools.list",
-      params: { session_id: "runtime:s1" },
+      params: { session_id: "runtime:other" },
     });
     client.send(frame);
-    await messages.next();
+    const reply = JSON.parse(await messages.next());
 
-    expect(upstreamState.frames[0]).not.toContain("profile");
-    expect(JSON.parse(upstreamState.frames[0]).params.profile).toBeUndefined();
+    expect(reply.id).toBe(47);
+    expect(reply.error.code).toBe(403);
+    expect(reply.error.data.code).toBe("PROFILE_FORBIDDEN");
+    expect(upstreamState.frames).toHaveLength(0);
   });
 
   it("rejects `tools.list` without session_id (R24 fail-closed, never forwards)", async () => {
