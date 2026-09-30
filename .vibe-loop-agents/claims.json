@@ -5,5 +5,11 @@
     "claimedAt": "2026-09-28T10:50:29.777Z",
     "status": "done",
     "result": "技能界面沙箱预览页改造完成。改 4 文件 + 截图，未改任何测试。npm run check 全绿（server 131 + web 280）。截图 docs/refs/impl-skillhost.png。"
+  },
+  {
+    "agentId": "spec-agent-003",
+    "taskId": "mune68yfr1io",
+    "claimedAt": "2026-09-30T01:27:06.675Z",
+    "status": "claimed"
   }
 ]

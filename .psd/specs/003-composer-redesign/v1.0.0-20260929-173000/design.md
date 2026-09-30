@@ -764,7 +764,7 @@ expect(gateway.paramsOf("session.workspace.move")[0]).toEqual({ session_key: "s1
 | 11 | **REQ-018**：上行帧超 `maxPayload` | 可读错误 + 仅该连接关闭 |
 | 12 | **REQ-015**：`admin` 发 `profiles.list` | 回包 `profiles[]` 仅含已分配 |
 | 13 | **REQ-015 fail-closed**：上游返回 `{nope:1}` | 不下发全量，回错误 |
-| 14 | **MethodSweep**：以 `docs/INTERFACES.md` 全方法清单逐条发无 `profile` 帧 | 每条命中「注入 / 403 / 显式豁免」之一，无遗漏 |
+| 14 | **MethodSweep**：以 `contracts/*.py`（官方契约注册表）为数据源逐条发无 `profile` 帧（`docs/INTERFACES.md` 仅作导航） | 机械断言「**豁免集合 == 参数类未声明 `profile` 字段的方法集合**」，无遗漏且无「被错误注入」；「注入/403/豁免」三选一断言已废弃（无法检出功能回归） |
 | 15 | 非豁免方法（`cron.manage` / `vault.list` / `tools.list` / `plugins.manage` / `skill_manage` / `connectors.operation.status`） | 均被注入 `profile` 或 403 |
 | 16 | `profiles.list` 上游返回 `{id, error}` | **原样透传**错误（不变成 BFF 500） |
 | 17 | 构造伪造 id + 并发 1000 次 `profiles.list` | `pendingProfileReads` 受长度上限约束、超时清理生效，无内存泄漏 |
