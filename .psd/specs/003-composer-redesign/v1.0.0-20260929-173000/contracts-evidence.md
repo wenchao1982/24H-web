@@ -12,7 +12,7 @@
 |---|---|---|
 | WS request 是否需 profile 守卫 / 注入 | 参数类**声明了 `profile`** → 可守卫/须注入；**未声明** → 豁免 | `contracts/base.py:32-35`（`Params` 的 `extra="forbid"`）+ 各参数类字段 |
 | 豁免清单是否可机械派生 | 是：豁免集合 == 「参数类未声明 `profile` 字段的方法集合」 | §4 全表（26 条豁免 / 211 条声明了 `profile`）；§4.3 MethodSweep 核验（2026-09-30） |
-| `_SessionScoped` 方法能否用 profile 守卫 | **不能**（schema 无 `profile`，注入即 4000）；R24 以 **session 归属校验**闭合（§6） | `contracts/tools_mcp_plugins.py:19-23` |
+| 无 `profile` 字段且缺 `session_id` 回退启动 profile 的方法能否用 profile 守卫 | **不能**（schema 无 `profile`，注入即 4000）；R24 以 **session 归属校验**闭合 7 条 (A) 类（§6.2/§6.3） | `contracts/tools_mcp_plugins.py:19-23`；`server.py:568-595` |
 | 模型对齐来源 | **`model.options{profile, session_id}` 回包的 `model`/`provider`**；无 `session.info` RPC | `contracts/config_free_tier_control.py:216-280`；§3.5 |
 
 ---
@@ -316,9 +316,43 @@ print(len(METHODS), len(no_profile), no_profile)
 
 ---
 
-## 6. 无法用 profile 守卫的方法集合（残余 R24）
+## 6. 无法用 profile 守卫、须 session 归属校验的方法集合（R24，已闭合）
 
-`_SessionScoped` 无 `profile` 字段，且 handler 在缺 `session_id` 时回退**启动 profile** 的配置：
+### 6.1 机械筛选：豁免 ∩ 参数类声明 `session_id`
+
+以 `tui_gateway.contracts.METHODS` 为数据源，取 `PROFILE_AGNOSTIC_METHODS`（26 条）中参数类 `model_fields`（含继承）声明 `session_id` 者，共 **12 条**：
+
+```python
+import tui_gateway.contracts
+from tui_gateway.contracts import METHODS
+for n, c in sorted(METHODS.items()):
+    f = c.params.model_fields
+    if "profile" not in f and "session_id" in f:
+        print(n, c.params.__name__, f["session_id"].is_required(), f["session_id"].default)
+```
+
+### 6.2 逐条读 handler 的归类审计（2026-09-30）
+
+判据：**(A)** 缺/未知 `session_id` → 回退**启动 profile / launch env**（危险，须归属校验）；**(B)** 缺 `session_id` → handler 自行 fail-closed；**(C)** 与 session 无关或有意全局（`session_id` 不影响 home/profile 解析）。
+
+| 方法 | 参数类 | `session_id` | 归类 | 证据（`文件:行`） |
+|---|---|---|---|---|
+| `tools.list` | `_SessionScoped(Params)` | 可选（`None`） | **A** | `contracts/tools_mcp_plugins.py:19-23,44`（docstring: absent/unknown id → launch profile） |
+| `toolsets.list` | `_SessionScoped(Params)` | 可选 | **A** | `contracts/tools_mcp_plugins.py:19-23,47` |
+| `tools.show` | `_SessionScoped(Params)` | 可选 | **A** | `contracts/tools_mcp_plugins.py:19-23,66` |
+| `skills.reload` | `SkillsReloadParams(Params)` | 可选 | **A** | handler `methods_tools.py:1291-1304`；helper docstring `methods_tools.py:591-601`（unscoped → launch profile #110695）；契约 `tools_mcp_plugins.py:207,233` |
+| `complete.slash` | `CompleteSlashParams(Params)` | 可选 | **A** | handler `methods_complete.py:276-289`（`_session_home_scope(_sessions.get(...))`）；helper `methods_tools.py:591-601`；契约 `profiles_vault_complete_foreign_subagents.py:50,64` |
+| `model.save_key` | `ModelSaveKeyParams(Params)` | 可选 | **A** | `@_profile_scoped` `server.py:568-595`（取不到会话 → `profile_home=None` → 启动 profile scope，**写凭证**）；handler `methods_complete.py:347-384`；契约 `profiles_vault_complete_foreign_subagents.py:82,92` |
+| `model.disconnect` | `ModelDisconnectParams(Params)` | 可选 | **A** | 同 `server.py:568-595`（**清凭证**）；handler `methods_complete.py:387-403`；契约 `profiles_vault_complete_foreign_subagents.py:96,107` |
+| `browser.controller.register` | `BrowserControllerRegisterParams(BrowserControllerParams)` | 必填 | **B** | `methods_browser_control.py:93-126`（`_session_transport_contains(None,…)===false` → 403）；`session_transports.py:20-25`；handler `:149-182` |
+| `browser.controller.result` | `BrowserControllerResultParams(...)` | 必填 | **B** | 同上 gate；handler `:185-195` |
+| `browser.controller.heartbeat` | `BrowserControllerParams(Params)` | 必填 | **B** | 同上 gate；handler `:198-205` |
+| `browser.controller.detach` | `BrowserControllerParams(Params)` | 必填 | **B** | 同上 gate；handler `:208-212` |
+| `reload.mcp` | `ReloadMcpParams(Params)` | 可选 | **C** | `methods_tools.py:332-408`：`_do_full_reload` 显式绑定 `{"profile_home": None}` 后遍历**全部**已服务 home 重建（`:370-390`）；`session_id` 仅作 compute-host 路由（`:343-349`）。有意全局操作（契约 doc「for every live session」，`tools_mcp_plugins.py:113,137`），其全局副作用不在归属校验可闭合范围（另记） |
+
+### 6.3 闭合（(A) 类 7 条）
+
+`_SessionScoped` / 上述 (A) 类方法无 `profile` 字段，且 handler 在缺/未知 `session_id` 时回退**启动 profile / launch env**：
 
 ```python
 19: class _SessionScoped(Params):
@@ -330,13 +364,7 @@ print(len(METHODS), len(no_profile), no_profile)
 
 来源：`contracts/tools_mcp_plugins.py:19-23`
 
-| 方法 | 参数类 | 风险 |
-|---|---|---|
-| `tools.list`（`tools_mcp_plugins.py:44`） | `_SessionScoped`（无 `profile`） | schema 无 `profile` → **注入即 4000**；无法 profile 守卫 |
-| `toolsets.list`（`:47`） | `_SessionScoped`（无 `profile`） | 同上 |
-| `tools.show`（`:66`） | `_SessionScoped`（无 `profile`） | 同上 |
-
-**R24（已闭合，TASK-036）**：上述 handler 缺 `session_id` 时回退**启动 profile** 配置（源码注释明写 `tools_mcp_plugins.py:20-21`）→ 跨租户读取工具/Toolsets 目录。因参数类无 `profile` 字段，**无法用 profile 守卫闭合**；改为 **session 归属校验**：BFF WS 代理为每条连接维护 `sessionOwners`（runtime/stored session_id → profile，源自 `session.create`/`session.resume`/`session.activate` 回包；`session.list` 行含 `profile` 时也登记；上限 512 / TTL 10 min）。非 `super_admin` 的 `_SessionScoped` 请求：缺 `session_id` → fail-closed 拒绝（`SESSION_SCOPED_NO_PROFILE_METHODS`，判定早于豁免清单）；带 `session_id` → 归属命中且 `userCanAccessProfile` 通过才放行，未知/他人会话一律 403 不转发。见 `architecture.md §7.2`。
+**R24（已闭合，TASK-036）**：因参数类无 `profile` 字段，**无法用 profile 守卫闭合**；改为 **session 归属校验**：BFF WS 代理为每条连接维护 `sessionOwners`（runtime/stored session_id → profile，源自 `session.create`/`session.resume`/`session.activate` 回包；`session.list` 行含 `profile` 时也登记；上限 512 / TTL 10 min）。非 `super_admin` 的 **7 条 (A) 类**请求（`tools.list` / `toolsets.list` / `tools.show` / `skills.reload` / `complete.slash` / `model.save_key` / `model.disconnect`）：缺 `session_id` → fail-closed 拒绝（`SESSION_SCOPED_NO_PROFILE_METHODS`，判定早于豁免清单）；带 `session_id` → 归属命中且 `userCanAccessProfile` 通过才放行，未知/他人会话一律 403 不转发。见 `architecture.md §7.2`。
 
 ---
 

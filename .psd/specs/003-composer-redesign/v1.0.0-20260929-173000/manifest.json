@@ -23,7 +23,8 @@
     "Wave 0 基线订正：AGENTS.md / requirement.md / ui-spec.md / architecture.md / docs/TASKS.md / task-list.md",
     "REQ-003 对齐：`＋` 菜单追加「工作区」内联入口（docked 态可切工作区，发 `session.workspace.move{session_key: storedId}`）；同步 ui-spec.md §2/§3、requirement.md §3、spec requirements.md REQ-003",
     "R14/Q-010 闭合（MethodSweep 机械核验 2026-09-30）：WS 豁免清单由 18 条修正为 26 条（补齐 skills.reload / learning.edit / onboarding.ensure_setup_profile / onboarding.reset_setup_profile / browser.controller.{register,heartbeat,detach,result}），与注册表无 profile 字段集合完全一致；无「多出」项；同步 frameGuard.ts / frameGuard.test.ts / architecture.md §7.2 / requirements.md REQ-017+§7+§9+§10 / design.md §7.1.2 / contracts-evidence.md §4.3 / task-list.md / tasks.md / constitution.md Q-010 / AGENTS.md",
-    "R24 闭合（session 归属校验，TASK-036）：BFF WS 代理维护 per-connection sessionOwners，对 tools.list/toolsets.list/tools.show 带 session_id 的请求校验归属（白名单内放行，未知/他人 403 不转发）；无 session_id 仍 fail-closed",
+    "R24 闭合（session 归属校验，TASK-036）：BFF WS 代理维护 per-connection sessionOwners，对 (A) 类 session 归属方法（tools.list/toolsets.list/tools.show/skills.reload/complete.slash/model.save_key/model.disconnect）带 session_id 的请求校验归属（白名单内放行，未知/他人 403 不转发）；无 session_id 仍 fail-closed",
+    "R24 扩展（task sweep，2026-09-30）：MethodSweep 机械筛选「26 条豁免 ∩ 参数类声明 session_id」得 12 条候选，逐条读 handler 归类——(A) 4 条新增（skills.reload/complete.slash/model.save_key/model.disconnect）加入 SESSION_SCOPED_NO_PROFILE_METHODS；(B) browser.controller.{register,result,heartbeat,detach} 缺会话 403 fail-closed；(C) reload.mcp 有意全局。同步 frameGuard.ts/frameGuard.test.ts/proxy.test.ts/architecture.md §7.2/requirements.md §7-§10/design.md §7.1.2/contracts-evidence.md §6.2；前端 ChatPage 的 complete.slash 回退（入参 prefix 非法 + 无合法 session_id，已非功能）已移除，commands.catalog 为唯一来源",
     "R10 闭合：服务端 magic bytes 校验落点已定为 Hermes（prompt_attachments._sniff_image_ext / methods_prompt 的 %PDF- 校验）"
   ],
   "reviewResult": {
@@ -184,7 +185,7 @@
     ]
   },
   "knownGaps": [
-    "R24 已闭合（TASK-036，2026-09-30）：_SessionScoped 方法（tools.list / toolsets.list / tools.show）schema 无 profile 字段，无法 profile 守卫；缺 session_id 时 fail-closed 拒绝（SESSION_SCOPED_NO_PROFILE_METHODS，判定早于豁免清单）；带 session_id 时由 BFF WS 代理 per-connection sessionOwners 校验归属（未知/他人 403 不转发）",
+    "R24 已闭合（TASK-036，2026-09-30）：(A) 类 session 归属方法（tools.list / toolsets.list / tools.show / skills.reload / complete.slash / model.save_key / model.disconnect）schema 无 profile 字段，无法 profile 守卫，缺/未知 session_id 时回退启动 profile；缺 session_id 时 fail-closed 拒绝（SESSION_SCOPED_NO_PROFILE_METHODS，判定早于豁免清单）；带 session_id 时由 BFF WS 代理 per-connection sessionOwners 校验归属（未知/他人 403 不转发）。已复核非 (A)：browser.controller.*（(B) fail-closed）、reload.mcp（(C) 有意全局）",
     "WS 豁免清单契约同步性：已闭合（MethodSweep 机械核验 2026-09-30）。豁免集合 == 注册表参数类未声明 profile 的方法集合（26 条，原 18 条补齐 8 条：skills.reload / learning.edit / onboarding.ensure_setup_profile / onboarding.reset_setup_profile / browser.controller.{register,heartbeat,detach,result}；无「多出」）；REST 1 条；契约变更时须重跑 MethodSweep 并同步清单与 contracts-evidence.md §4.3",
     "REQ-022 注入 profile 后上游是否按租户作用域：未实测",
     "WS 大帧端到端可达性未实测（R15）",
@@ -192,6 +193,7 @@
     "batch 回包与上游批帧支持程度未实测（Q-008）",
     "··· 菜单「连接」语义未定（Q-006）",
     "/api/auth/me 是否返回头像未验证（Q-007）",
-    "contracts-evidence.md 尚未生成（TASK-033）"
+    "contracts-evidence.md 尚未生成（TASK-033）",
+    "reload.mcp 为有意全局操作：参数类无 profile 字段，且 session_id 不参与 home/profile 解析——`_do_full_reload` 显式绑定 {\"profile_home\": None} 后遍历全部已服务 home 重建（methods_tools.py:332-408，尤其 :370-390、:343-349；契约 doc「for every live session」，tools_mcp_plugins.py:113,137）。非 super_admin 亦可触发全 home 重载，归属校验无法闭合其全局副作用；建议后续评估是否改为 super_admin-only"
   ]
 }

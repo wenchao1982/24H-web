@@ -3,6 +3,7 @@ import { openDb, type Db } from "../db";
 import { migrate } from "../db/migrate";
 import {
   PROFILE_AGNOSTIC_METHODS,
+  SESSION_SCOPED_NO_PROFILE_METHODS,
   classifyFrame,
   decideProfileGuard,
   guardClientFrame,
@@ -228,6 +229,73 @@ describe("decideProfileGuard", () => {
     });
     const owners = new Map<string, string>([["r1", "alpha"]]);
     expect(decideProfileGuard(frame, adminWithProfile, db, owners)).toEqual({ action: "deny" });
+  });
+
+  // R24 扩展：豁免 ∩ 声明 session_id 的 (A) 类方法（MethodSweep + 逐条读 handler）。
+  const newSessionScopedMethods = [
+    "skills.reload",
+    "complete.slash",
+    "model.save_key",
+    "model.disconnect",
+  ];
+
+  it.each(newSessionScopedMethods)(
+    "denies `%s` without session_id (R24 fail-closed: no fallback to startup profile)",
+    (method) => {
+      const frame = classify({ jsonrpc: "2.0", id: 90, method, params: {} });
+      expect(decideProfileGuard(frame, adminWithProfile, db)).toEqual({ action: "deny" });
+    },
+  );
+
+  it.each(newSessionScopedMethods)(
+    "allows `%s` when the session owner is an assigned profile (R24)",
+    (method) => {
+      const frame = classify({
+        jsonrpc: "2.0",
+        id: 91,
+        method,
+        params: { session_id: "r1" },
+      });
+      const owners = new Map<string, string>([["r1", "alpha"]]);
+      expect(decideProfileGuard(frame, adminWithProfile, db, owners)).toEqual({ action: "allow" });
+    },
+  );
+
+  it.each(newSessionScopedMethods)(
+    "denies `%s` when the session_id is unknown or foreign (R24)",
+    (method) => {
+      const frame = classify({
+        jsonrpc: "2.0",
+        id: 92,
+        method,
+        params: { session_id: "foreign" },
+      });
+      const owners = new Map<string, string>([["r1", "alpha"]]);
+      expect(decideProfileGuard(frame, adminWithProfile, db, owners)).toEqual({ action: "deny" });
+    },
+  );
+
+  it.each(newSessionScopedMethods)(
+    "allows `%s` without session_id for a super_admin (no guard)",
+    (method) => {
+      const frame = classify({ jsonrpc: "2.0", id: 93, method, params: {} });
+      expect(decideProfileGuard(frame, superAdmin, db)).toEqual({ action: "allow" });
+    },
+  );
+
+  it("pins the session-scoped list to exactly the audited (A)-class set (R24)", () => {
+    // (A) 类 = 豁免 ∩ 声明 session_id，且 handler 缺/未知 session_id 时回退启动 profile。
+    const expected = [
+      "tools.list",
+      "toolsets.list",
+      "tools.show",
+      "skills.reload",
+      "complete.slash",
+      "model.save_key",
+      "model.disconnect",
+    ];
+    expect([...SESSION_SCOPED_NO_PROFILE_METHODS].sort()).toEqual([...expected].sort());
+    expect(SESSION_SCOPED_NO_PROFILE_METHODS.size).toBe(7);
   });
 
   it("injects for `commands.catalog` whose schema declares profile", () => {

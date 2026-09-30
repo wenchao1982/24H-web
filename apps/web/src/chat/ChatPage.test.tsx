@@ -646,6 +646,25 @@ describe("ChatPage T20.1 Slash 命令菜单", () => {
     expect(gateway.paramsOf("slash.exec")).toEqual([{ command: "/goal", args: "" }]);
     expect(await screen.findByText("已设置目标")).toBeInTheDocument();
   });
+
+  it("[R24] never falls back to complete.slash when commands.catalog is empty", async () => {
+    const gateway = createFakeGateway((method) => {
+      if (method === "session.list") {
+        return { sessions: [] };
+      }
+      if (method === "commands.catalog") {
+        return { commands: [] };
+      }
+      return {};
+    });
+    renderChat(gateway);
+
+    await waitFor(() =>
+      expect(gateway.requests.some((entry) => entry.method === "commands.catalog")).toBe(true),
+    );
+    // `complete.slash` needs a session_id and would be fail-closed denied at this (hero) stage.
+    expect(gateway.paramsOf("complete.slash")).toHaveLength(0);
+  });
 });
 
 describe("ChatPage 会话身份对（stored/runtime id）", () => {

@@ -434,6 +434,89 @@ describe("profile guard over WS", () => {
     expect(reply).toContain(String(46));
   });
 
+  // R24 扩展：豁免 ∩ 声明 session_id 的 (A) 类方法（缺/未知 session_id 会回退启动 profile）。
+  const newSessionScopedMethods = [
+    "skills.reload",
+    "complete.slash",
+    "model.save_key",
+    "model.disconnect",
+  ];
+
+  it.each(newSessionScopedMethods)(
+    "forwards an owned `%s` without injecting (R24)",
+    async (method) => {
+      const { upstreamState, client, messages } = await boot(
+        `ws-owned-${method}`,
+        () => seedAdmin(["alpha"]),
+        startSessionUpstream,
+      );
+
+      const createFrame = JSON.stringify({
+        jsonrpc: "2.0",
+        id: 55,
+        method: "session.create",
+        params: {},
+      });
+      client.send(createFrame);
+      await messages.next();
+      // session.create gets the caller's default profile injected; its reply registers ownership.
+      expect(JSON.parse(upstreamState.frames[0]).params.profile).toBe("alpha");
+
+      const owned = JSON.stringify({
+        jsonrpc: "2.0",
+        id: 56,
+        method,
+        params: { session_id: "runtime:x" },
+      });
+      client.send(owned);
+      expect(await messages.next()).toBe(`echo:${owned}`);
+      expect(upstreamState.frames[1]).toBe(owned);
+      expect(JSON.parse(upstreamState.frames[1]).params.profile).toBeUndefined();
+    },
+  );
+
+  it.each(newSessionScopedMethods)(
+    "rejects an unowned `%s` session_id with 403 and never forwards it (R24)",
+    async (method) => {
+      const { upstreamState, client, messages } = await boot(
+        `ws-unowned-${method}`,
+        () => seedAdmin(["alpha"]),
+      );
+
+      const frame = JSON.stringify({
+        jsonrpc: "2.0",
+        id: 57,
+        method,
+        params: { session_id: "runtime:other" },
+      });
+      client.send(frame);
+      const reply = JSON.parse(await messages.next());
+
+      expect(reply.id).toBe(57);
+      expect(reply.error.code).toBe(403);
+      expect(reply.error.data.code).toBe("PROFILE_FORBIDDEN");
+      expect(upstreamState.frames).toHaveLength(0);
+    },
+  );
+
+  it.each(newSessionScopedMethods)(
+    "rejects `%s` without session_id (R24 fail-closed, never forwards)",
+    async (method) => {
+      const { upstreamState, client, messages } = await boot(
+        `ws-nosession-${method}`,
+        () => seedAdmin(["alpha"]),
+      );
+
+      const frame = JSON.stringify({ jsonrpc: "2.0", id: 58, method, params: {} });
+      client.send(frame);
+      const reply = await messages.next();
+
+      expect(upstreamState.frames).toHaveLength(0);
+      expect(reply).toContain("PROFILE_FORBIDDEN");
+      expect(reply).toContain(String(58));
+    },
+  );
+
   it("forwards a client response frame unchanged", async () => {
     const { upstreamState, client, messages } = await boot("ws-response-token", () =>
       seedAdmin(["alpha"]),

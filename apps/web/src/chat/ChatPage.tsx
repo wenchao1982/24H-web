@@ -20,12 +20,7 @@ import PersonalityPanel from "./PersonalityPanel";
 import SessionHeaderMenu from "./SessionHeaderMenu";
 import HeroIntro from "./HeroIntro";
 import { ComposerControls, useSessionControls, type UploadPanelKind } from "./composer";
-import {
-  normalizeCatalog,
-  normalizeCompletions,
-  slashResultText,
-  type SlashCommand,
-} from "./slash";
+import { normalizeCatalog, slashResultText, type SlashCommand } from "./slash";
 import {
   appendDelta,
   appendInterruptedNotice,
@@ -162,24 +157,21 @@ export default function ChatPage() {
     };
   }, [gateway, selectionProfile]);
 
-  // T20.1 命令目录：优先 `commands.catalog`，为空时回退 `complete.slash`。
+  // T20.1 命令目录：`commands.catalog` 为唯一来源。
+  //
+  // 原「为空时回退 `complete.slash`」已移除：该回退在本 effect（挂载时、hero 态）发起，
+  // 恒无合法 `session_id` —— `complete.slash` 属 R24 `_SessionScoped` 方法，缺 `session_id`
+  // 被 BFF fail-closed 拒绝；且其契约 `CompleteSlashParams` 仅声明 `text` / `session_id`
+  // （`extra="forbid"`），原载荷 `{ prefix: "/" }` 会判 4000。故该回退既非法（契约）又必然
+  // 403（租户守卫），属死路径；`commands.catalog` 已覆盖命令目录。
   useEffect(() => {
     let alive = true;
     const load = async () => {
       try {
         await gateway.connect().catch(() => undefined);
         const catalog = normalizeCatalog(await gateway.request("commands.catalog", {}));
-        if (catalog.length > 0) {
-          if (alive) {
-            setCommands(catalog);
-          }
-          return;
-        }
-        const completions = normalizeCompletions(
-          await gateway.request("complete.slash", { prefix: "/" }),
-        );
-        if (alive) {
-          setCommands(completions);
+        if (catalog.length > 0 && alive) {
+          setCommands(catalog);
         }
       } catch {
         // 命令目录不可用时静默降级（输入框仍可发送普通消息）

@@ -628,7 +628,7 @@ TASK-003 负责实现并导出该函数；TASK-029（响应过滤）依赖它，
 - 把「不在豁免清单里」误解为「放行」——**未知方法必须注入**
 - 以「是否直继 `Params`」为判据（会向 `tools.*` 注入 → 4000）
 
-**R24 已闭合（session 归属校验）**：`tools.list` / `toolsets.list` / `tools.show` 因 schema **无 `profile` 字段**而**无法用 profile 守卫**；其 handler 在缺 `session_id` 时**回退到启动 profile 的配置**（`tools_mcp_plugins.py:20-21`）→ 跨租户读取。闭合：BFF WS 代理维护 per-connection `sessionOwners`（`session.create`/`session.resume`/`session.activate` 回包累积 runtime/stored id → profile，`session.list` 行含 `profile` 时也登记；上限 512 / TTL 10 min）；非 `super_admin` 的 `_SessionScoped` 请求缺 `session_id` fail-closed 拒绝，带 `session_id` 须归属命中且落调用者白名单，未知/他人一律 403 不转发。见 `architecture.md §7.2`、`contracts-evidence.md §6`。
+**R24 已闭合（session 归属校验）**：以下 **7 条**方法因 schema **无 `profile` 字段**而**无法用 profile 守卫**，且 handler 在缺/未知 `session_id` 时**回退到启动 profile / launch env**（(A) 类）：`tools.list` / `toolsets.list` / `tools.show`（`tools_mcp_plugins.py:20-21`）；`skills.reload` / `complete.slash`（`_session_home_scope(_sessions.get(params.get("session_id","")))`，`methods_tools.py:591-601/1291-1304`、`methods_complete.py:276-289`）；`model.save_key` / `model.disconnect`（`@_profile_scoped` 取不到会话 → `profile_home=None` → 启动 profile scope，写/清凭证，`server.py:568-595`）。闭合：BFF WS 代理维护 per-connection `sessionOwners`（`session.create`/`session.resume`/`session.activate` 回包累积 runtime/stored id → profile，`session.list` 行含 `profile` 时也登记；上限 512 / TTL 10 min）；非 `super_admin` 的上述请求缺 `session_id` fail-closed 拒绝，带 `session_id` 须归属命中且落调用者白名单，未知/他人一律 403 不转发。**已复核非 (A)**：`browser.controller.*`（缺会话 `_session_transport_contains(None,…)===false` → 403，`methods_browser_control.py:93-126`）、`reload.mcp`（有意全局操作，`methods_tools.py:361-408`）。见 `architecture.md §7.2`、`contracts-evidence.md §6`。
 
 **测试要求（MethodSweep，修正版）**：以 `contracts/*.py` 为数据源，机械断言 **「豁免集合 == 参数类未声明 `profile` 字段的方法集合」**（不要断言「== 直继 Params 集合」——该断言不可通过）。**核验结果（2026-09-30）**：注册表 237 个方法中 26 个参数类无 `profile` 字段；原清单 18 条为真子集，补齐 8 条（`skills.reload` / `learning.edit` / `onboarding.ensure_setup_profile` / `onboarding.reset_setup_profile` / `browser.controller.register|heartbeat|detach|result`）；无「多出」项。见 `contracts-evidence.md` MethodSweep 小节。
 
@@ -773,6 +773,8 @@ expect(gateway.paramsOf("session.workspace.move")[0]).toEqual({ session_key: "s1
 | 20 | **MethodSweep（判定修正）**：以 `contracts/*.py` 为数据源，机械断言「豁免集合 == **参数类未声明 `profile` 字段的方法集合**」（26 条，2026-09-30 核验） | 无「被错误注入」的功能回归，无遗漏 |
 | 21 | `commands.catalog` / `config.show` / `cron.manage` / `shell.exec` / `complete.path` / `llm.oneshot` 缺 profile | **均被注入**（参数类声明了 `profile`） |
 | 21b | `tools.list` / `toolsets.list` / `tools.show` / `reload.env` / `plugins.list` / `learning.*` / `image.generate` 缺 profile | **均不注入**（schema 无 `profile`，注入会触发 4000） |
+| 21c | (A) 类 session 归属方法（`tools.list` / `toolsets.list` / `tools.show` / `skills.reload` / `complete.slash` / `model.save_key` / `model.disconnect`）缺 `session_id` | **不注入且 fail-closed 拒绝**（判定早于豁免清单；阻断「回退启动 profile」）；带 `session_id` 须归属命中且落调用者白名单，未知/他人 403 不转发 |
+| 21d | (B)/(C) 类豁免方法（`browser.controller.*` 缺会话 → 403；`reload.mcp` 有意全局） | 不纳入归属校验；`browser.controller.*` 由 handler 自身 fail-closed，`reload.mcp` 另记 |
 | 22 | 未知方法 `totally.unknown` 缺 profile | **被注入**（不得放行） |
 | 23 | batch 中任一元素越权 | **整批拒绝**，上游未收到任何元素 |
 | 24 | REST：`admin` 无 profile 请求 `/api/hermes/chat/workspaces` | 被注入 `profile=alpha` 并守卫；未分配则不转发 |

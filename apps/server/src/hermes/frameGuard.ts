@@ -65,12 +65,30 @@ export const PROFILE_AGNOSTIC_METHODS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * `_SessionScoped` 方法（R24，TASK-036）：参数类 schema **无 `profile` 字段**
- * （故不可注入，否则 `extra="forbid"` → 4000），但其 handler 在缺 `session_id`
- * 时回退到**启动 profile** 的配置（`tools_mcp_plugins.py:20-21`）→ 跨租户读取。
+ * 会话归属校验清单（R24，TASK-036）：参数类 schema **无 `profile` 字段**（故不可注入，
+ * 否则 `extra="forbid"` → 4000），且 handler 在缺/未知 `session_id` 时**回退到启动
+ * profile / launch env**（跨租户读或写）。此为 (A) 类方法；判定**必须早于**豁免清单 allow。
  *
- * fail-closed：非 `super_admin` 且未带 `params.profile` 时，
- * **无 `session_id` → 拒绝**（阻断「回退启动 profile」这条路）。
+ * 方法集合（MethodSweep 机械筛选「豁免 ∩ 参数类声明 `session_id`」+ 逐条读 handler 判定）：
+ * - `tools.list` / `toolsets.list` / `tools.show` — `_SessionScoped`，缺 `session_id` 回退启动
+ *   profile 配置（`tui_gateway/contracts/tools_mcp_plugins.py:19-23`，handler `methods_tools.py:44/47/66`）。
+ * - `skills.reload` — `_session_home_scope(_sessions.get(params.get("session_id","")))`；unscoped 解析
+ *   到启动 profile（`methods_tools.py:1291-1304`；helper docstring `methods_tools.py:591-601`）。
+ * - `complete.slash` — 同一 `_session_home_scope(_sessions.get(params.get("session_id","")))`
+ *   （`methods_complete.py:276-289`）；缺 session 时读启动 profile 的 skills/bundles。
+ * - `model.save_key` / `model.disconnect` — `@_profile_scoped`：无 `profile` 且取不到会话时
+ *   `profile_home = None` → 绑定**启动 profile** scope（`server.py:568-595`），对启动 profile
+ *   **写入/清除凭证**（handler `methods_complete.py:347-384` / `387-403`）。
+ *
+ * **不列入**（已复核，非 (A)）：
+ * - `browser.controller.{register,result,heartbeat,detach}` — `_controller_method` 缺会话即
+ *   `_session_transport_contains(None,…) === false` → 403，fail-closed（`methods_browser_control.py:93-126`；
+ *   `session_transports.py:20-25`）。
+ * - `reload.mcp` — 有意的**全局**操作（契约 doc「for every live session」）；`_do_full_reload` 显式绑定
+ *   `{"profile_home": None}` 后遍历所有已服务 home 重建（`methods_tools.py:361-408`），`session_id`
+ *   仅用于 compute-host 路由，不构成启动 profile 回退读取；其全局副作用不在归属校验可闭合范围（另记）。
+ *
+ * fail-closed：非 `super_admin` 且未带 `params.profile` 时，**无 `session_id` → 拒绝**。
  *
  * **R24 彻底闭合（session 归属校验）**：当调用方提供 `sessionOwners`
  * （per-connection：runtime/stored session_id → 所属 profile，由 `proxy.ts` 从
@@ -83,6 +101,10 @@ export const SESSION_SCOPED_NO_PROFILE_METHODS: ReadonlySet<string> = new Set([
   "tools.list",
   "toolsets.list",
   "tools.show",
+  "skills.reload",
+  "complete.slash",
+  "model.save_key",
+  "model.disconnect",
 ]);
 
 export interface GuardUser {
