@@ -448,7 +448,7 @@ WS 连接：`ws://127.0.0.1:19119/api/ws?token=<token>`，帧 `{"jsonrpc":"2.0",
 
 `{"attached":true,"path":".../images/upload_20260930_093746_1.png","count":1,"remainder":"","text":"[User attached image: ...]","bytes":70,"name":"...","width":1,"height":1,"token_estimate":85}`（成功）。
 
-### 8.5 magic bytes 实证（R10）— **订正：R10 未闭合**
+### 8.5 magic bytes 实证（R10）— **订正：R10 已由 REQ-023 在 BFF 闭合**
 
 - `pdf.attach{content_base64:<非 PDF base64>, filename:"fake.pdf", session_id}` →
   `{"error":{"code":5028,"message":"pdftoppm not installed (poppler-utils package required)"}}`
@@ -456,7 +456,17 @@ WS 连接：`ws://127.0.0.1:19119/api/ws?token=<token>`，帧 `{"jsonrpc":"2.0",
 - `image.attach_bytes{content_base64:<41 字节非图片文本>, filename:"fake.png", session_id}` →
   `{"attached":true,"path":".../upload_20260930_094016_1.png","bytes":41,...}`（**被接受**，无 width/height）。原因：`prompt_attachments.py:64-71` `_sniff_image_ext` 仅**推断扩展名**（filename 后缀优先；未知魔数默认 `.png`），`methods_prompt.py:775-776` 只判扩展名是否在允许集合——**不做拒绝**。→ 「magic bytes 校验」实为**扩展名嗅探，非安全拒绝**；R10 的「服务端校验」表述**过强**。
 
-**R10 订正结论（2026-09-30）＝未闭合**：客户端 `File.type` 仅作 UX 预筛；服务端（Hermes）**只做扩展名嗅探**（`_sniff_image_ext`），**并非内容类型拒绝**（41 字节非图片文本经 `image.attach_bytes` 被接受）；PDF 的 `%PDF-` 校验存在但被 `pdftoppm` 依赖遮蔽（缺 poppler-utils 先回 5028，分支不可达）。**处置**：若需要真正的 magic bytes 拒绝，应在 **BFF** 侧补校验（新任务），或在网关侧补/装 poppler-utils。原「R10 已闭合（magic bytes 在 Hermes 校验）」表述**作废**。
+**R10 历史结论（2026-09-30）＝Hermes 侧未闭合**（保留实测证据）：客户端 `File.type` 仅作 UX 预筛；服务端（Hermes）**只做扩展名嗅探**（`_sniff_image_ext`），**并非内容类型拒绝**（41 字节非图片文本经 `image.attach_bytes` 被接受）；PDF 的 `%PDF-` 校验存在但被 `pdftoppm` 依赖遮蔽（缺 poppler-utils 先回 5028，分支不可达）。原「R10 已闭合（magic bytes 在 Hermes 校验）」表述**作废**。
+
+**R10 处置落地（REQ-023 / TASK-037，2026-09-30）＝已在 BFF 闭合**：不再依赖 Hermes 的内容类型判定，改由 **BFF WS 代理**在通过租户守卫后、转发前对 `image.attach_bytes` / `pdf.attach` 的 `content_base64`（回退 `data`）做**前缀 magic bytes** 校验：
+
+- **权威扩展名集合（Hermes 允许）**：`hermes_cli/cli_terminal_input.py:31-34` `_IMAGE_EXTENSIONS = {.png, .jpg, .jpeg, .gif, .webp, .bmp, .tiff, .tif, .svg, .ico}`；经 `prompt_attachments.py:74-79` `_allowed_image_extensions` 消费，校验点 `methods_prompt.py:775-777`（`ext not in _allowed_image_extensions()` → 4016）。Hermes `_sniff_image_ext`（`:64-71`）**优先 filename 后缀**、仅后缀缺失时用魔数，**只推断不拒绝**。
+- **权威魔数表照抄 Hermes + 补齐**：`prompt_attachments.py:20-23` `_IMAGE_MAGIC = (PNG 89 50 4E 47 0D 0A 1A 0A, JPEG FF D8 FF, GIF87a/GIF89a「GIF8」, BMP 42 4D)`；WebP 由 `:69-70` 的 `RIFF`（0-3）+ `WEBP`（8-11）判定；PDF 魔数 `%PDF-`（`methods_prompt.py:1106`）。Hermes 允许但无魔数条目的格式由 BFF 补齐：**TIFF**（LE `49 49 2A 00` / BE `4D 4D 00 2A`）、**ICO**（`00 00 01 00`）、**CUR**（`00 00 02 00`）、**SVG**（文本前缀：去 UTF-8 BOM/前置空白后以 `<svg` 或 `<?xml` 开头，大小写不敏感）。按扩展名归并后 **BFF 接受集 == Hermes 允许集**。
+- **仅前缀解码**：剥离 `data:...;base64,` 前缀与空白后取前 **48 个 base64 字符**（≈36 字节；覆盖最长二进制魔数 WebP 12 字节，及 SVG 的 BOM 3 字节 + `<?xml` 5 字符文本判定）→ `Buffer.from(prefix,"base64")`，**禁止整帧解码**（10MB 载荷 base64 ≈13.3MB）。前缀长度由初版 24 → 48。
+- **策略**：**能判定则判定、无法判定则拒绝**（fail-closed）。**已知差异**：除 SVG 用文本前缀判定、CUR 不在 Hermes 允许集但 BFF 宽容接受（更严的上游仍会拒绝，无 fail-open）外，**当前无「Hermes 允许且无法用前缀魔数判定」的格式**。
+- **拒绝形状**：同 `id` 回 `{error:{code:400,message,data:{code:"INVALID_ATTACHMENT_TYPE"}}}`，**不转发**，并写 `audit`（action=`ws.upload.invalid_type`；不含 token/密钥/字节）。
+- **范围**：仅非 `super_admin` 且 `method ∈ {image.attach_bytes, pdf.attach}`；`file.attach` **不限类型**；`path` 形态（无 base64 载荷）交由上游。
+- **契约依据**：`tui_gateway/prompt_attachments.py:20-23/64-71/74-79`；`hermes_cli/cli_terminal_input.py:31-34`；`tui_gateway/methods_prompt.py:775-777/797-798/1106-1107`。
 
 ### 8.6 10MB 单帧可达性（R15，**直连网关**）
 

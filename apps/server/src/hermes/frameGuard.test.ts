@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { openDb, type Db } from "../db";
 import { migrate } from "../db/migrate";
 import {
@@ -7,6 +7,8 @@ import {
   classifyFrame,
   decideProfileGuard,
   guardClientFrame,
+  invalidAttachmentFrame,
+  validateAttachmentMagic,
   type FrameClassification,
   type GuardUser,
 } from "./frameGuard";
@@ -466,5 +468,197 @@ describe("guardClientFrame", () => {
     }
     expect(outcome.injected).toBe(true);
     expect(outcome.text).toContain('"profile":"alpha"');
+  });
+
+  it("rejects an attachment with invalid magic bytes (REQ-023)", () => {
+    const raw = text({
+      jsonrpc: "2.0",
+      id: 71,
+      method: "image.attach_bytes",
+      params: {
+        content_base64: Buffer.alloc(41, 0x41).toString("base64"),
+        filename: "fake.png",
+      },
+    });
+    const outcome = guardClientFrame(raw, false, adminWithProfile, db);
+    expect(outcome.action).toBe("reject");
+    if (outcome.action !== "reject") {
+      throw new Error("expected reject");
+    }
+    expect(outcome.code).toBe("INVALID_ATTACHMENT_TYPE");
+    expect(outcome.id).toBe(71);
+    expect(outcome.message).toBeTruthy();
+  });
+
+  it("does not type-check attachments for a super_admin", () => {
+    const raw = text({
+      jsonrpc: "2.0",
+      id: 72,
+      method: "image.attach_bytes",
+      params: { content_base64: Buffer.alloc(41, 0x41).toString("base64") },
+    });
+    expect(guardClientFrame(raw, false, superAdmin, db).action).toBe("forward");
+  });
+
+  it("rejects a batch containing an attachment with invalid magic bytes (REQ-023)", () => {
+    const raw = text([
+      { jsonrpc: "2.0", id: 73, method: "ping", params: {} },
+      {
+        jsonrpc: "2.0",
+        id: 74,
+        method: "pdf.attach",
+        params: { content_base64: Buffer.from("not a pdf").toString("base64") },
+      },
+    ]);
+    const outcome = guardClientFrame(raw, false, adminWithProfile, db);
+    expect(outcome.action).toBe("reject");
+    if (outcome.action !== "reject") {
+      throw new Error("expected reject");
+    }
+    expect(outcome.code).toBe("INVALID_ATTACHMENT_TYPE");
+  });
+
+  it("builds the INVALID_ATTACHMENT_TYPE error frame with the same id", () => {
+    const frame = JSON.parse(invalidAttachmentFrame(9, "坏图"));
+    expect(frame).toEqual({
+      jsonrpc: "2.0",
+      id: 9,
+      error: { code: 400, message: "坏图", data: { code: "INVALID_ATTACHMENT_TYPE" } },
+    });
+  });
+});
+
+describe("validateAttachmentMagic (REQ-023)", () => {
+  const PNG = Buffer.from("89504e470d0a1a0a", "hex");
+  const JPEG = Buffer.from("ffd8ff", "hex");
+  const GIF = Buffer.from("GIF89a", "latin1");
+  const BMP = Buffer.from("BM", "latin1");
+  // RIFF + 4 字节尺寸 + WEBP
+  const WEBP = Buffer.from("524946460000000057454250", "hex");
+  const TIFF_LE = Buffer.from("49492a00", "hex"); // "II*\0"
+  const TIFF_BE = Buffer.from("4d4d002a", "hex"); // "MM\0*"
+  const ICO = Buffer.from("00000100", "hex");
+  const SVG = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>', "utf8");
+  const SVG_XML = Buffer.from('<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"/>', "utf8");
+  const PDF = Buffer.from("%PDF-1.4", "latin1");
+
+  const payloadOf = (magic: Buffer): string =>
+    Buffer.concat([magic, Buffer.alloc(32, 7)]).toString("base64");
+
+  function attach(
+    method: string,
+    params: Record<string, unknown>,
+  ): { frame: FrameClassification; parsed: unknown } {
+    const parsed = { jsonrpc: "2.0", id: 1, method, params };
+    return { frame: classify(parsed), parsed };
+  }
+
+  it.each([
+    ["PNG", PNG],
+    ["JPEG", JPEG],
+    ["GIF", GIF],
+    ["BMP", BMP],
+    ["WebP", WEBP],
+    ["TIFF (little-endian)", TIFF_LE],
+    ["TIFF (big-endian)", TIFF_BE],
+    ["ICO", ICO],
+    ["SVG (<svg)", SVG],
+    ["SVG (<?xml)", SVG_XML],
+  ])("accepts a valid %s image payload", (_label, magic) => {
+    const { frame, parsed } = attach("image.attach_bytes", {
+      content_base64: payloadOf(magic),
+    });
+    expect(validateAttachmentMagic(frame, parsed)).toEqual({ ok: true });
+  });
+
+  it("accepts an SVG payload preceded by a UTF-8 BOM and whitespace", () => {
+    const payload = Buffer.concat([Buffer.from("\uFEFF  \n", "utf8"), SVG]);
+    const { frame, parsed } = attach("image.attach_bytes", {
+      content_base64: Buffer.concat([payload, Buffer.alloc(32, 7)]).toString("base64"),
+    });
+    expect(validateAttachmentMagic(frame, parsed)).toEqual({ ok: true });
+  });
+
+  it("accepts a PDF payload starting with %PDF-", () => {
+    const { frame, parsed } = attach("pdf.attach", { content_base64: PDF.toString("base64") });
+    expect(validateAttachmentMagic(frame, parsed)).toEqual({ ok: true });
+  });
+
+  it("rejects 41 bytes of non-image text disguised as an image", () => {
+    const { frame, parsed } = attach("image.attach_bytes", {
+      content_base64: Buffer.alloc(41, 0x41).toString("base64"),
+      filename: "fake.png",
+    });
+    const result = validateAttachmentMagic(frame, parsed);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.message).toContain("图片");
+    }
+  });
+
+  it("rejects non-%PDF- bytes disguised as a PDF", () => {
+    const { frame, parsed } = attach("pdf.attach", {
+      content_base64: Buffer.from("definitely not a pdf").toString("base64"),
+      filename: "fake.pdf",
+    });
+    const result = validateAttachmentMagic(frame, parsed);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.message).toContain("PDF");
+    }
+  });
+
+  it("handles a data: URL base64 wrapper", () => {
+    const { frame, parsed } = attach("image.attach_bytes", {
+      content_base64: `data:image/png;base64,${payloadOf(PNG)}`,
+    });
+    expect(validateAttachmentMagic(frame, parsed)).toEqual({ ok: true });
+  });
+
+  it("reads the `data` fallback field", () => {
+    const { frame, parsed } = attach("image.attach_bytes", { data: payloadOf(PNG) });
+    expect(validateAttachmentMagic(frame, parsed)).toEqual({ ok: true });
+  });
+
+  it("ignores whitespace/newlines inside the payload", () => {
+    const { frame, parsed } = attach("image.attach_bytes", {
+      content_base64: payloadOf(PNG).replace(/(.{8})/g, "$1\n"),
+    });
+    expect(validateAttachmentMagic(frame, parsed)).toEqual({ ok: true });
+  });
+
+  it("skips validation when only a path is given (no base64 payload)", () => {
+    const { frame, parsed } = attach("pdf.attach", { path: "/tmp/x.pdf" });
+    expect(validateAttachmentMagic(frame, parsed)).toEqual({ ok: true });
+  });
+
+  it("does not constrain file.attach (any file allowed)", () => {
+    const { frame, parsed } = attach("file.attach", {
+      data_url: "data:text/plain;base64,QUFB",
+      name: "a.txt",
+    });
+    expect(validateAttachmentMagic(frame, parsed)).toEqual({ ok: true });
+  });
+
+  it("ignores non-request frames", () => {
+    expect(validateAttachmentMagic({ kind: "response", id: 1 }, {})).toEqual({ ok: true });
+    expect(validateAttachmentMagic({ kind: "request", method: "ping" }, {})).toEqual({ ok: true });
+  });
+
+  it("decodes only a short prefix, never the whole payload (REQ-023 perf)", () => {
+    const huge = payloadOf(PNG) + "A".repeat(20 * 1024 * 1024);
+    const { frame, parsed } = attach("image.attach_bytes", { content_base64: huge });
+    const spy = vi.spyOn(Buffer, "from");
+    try {
+      expect(validateAttachmentMagic(frame, parsed)).toEqual({ ok: true });
+      const stringArgs = spy.mock.calls
+        .map((call) => call[0])
+        .filter((value): value is string => typeof value === "string");
+      expect(stringArgs.length).toBeGreaterThan(0);
+      expect(stringArgs).toContain(huge.slice(0, 48));
+      expect(stringArgs.some((value) => value.length > 64)).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

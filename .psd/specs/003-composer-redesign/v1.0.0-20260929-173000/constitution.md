@@ -66,6 +66,7 @@
 | A-006c | 响应侧过滤（`profiles.list`）：**「成功但结构不符」才 fail-closed**；上游**错误帧（`{id,error}`）必须原样透传** | REQ-015 |
 | A-007 | 错误提示用 `role="alert"`（即时）或 `role="status"` + `aria-live="polite"`（累积） |
 | A-008 | `previewUrl`（`URL.createObjectURL`）在移除 / 清空 / 发送成功 / 卸载 4 个时机恰好 revoke 一次 |
+| A-009 | 上传内容类型 shall 由**服务端**校验：BFF WS 代理对 `image.attach_bytes` / `pdf.attach` 的 `content_base64`/`data` 载荷做**前缀 magic bytes** 校验（仅解码前 48 个 base64 字符 ≈36 字节，禁止整帧解码；可判定格式含 PNG/JPEG/GIF/BMP/WebP/TIFF/ICO/CUR 与 SVG 文本前缀）；不匹配 shall 以同 `id` 回 `INVALID_ATTACHMENT_TYPE`、**不转发**并写 `audit`；`file.attach` 不限类型 | REQ-023 / R10 |
 
 ### ❓ Ask First
 
@@ -75,7 +76,7 @@
 | Q-002 | `分享` 目标形态 | 已定：沿用现有 `?session=<storedId>` 链接 + 剪贴板 |
 | Q-003 | 会话内切换智能体（profile） | 已定：**强开新会话**；已建会话的 pill 只读展示 |
 | Q-004 | WS 大 payload 降级策略 | 已定：保持 10MB、不分片；>2MB 显示等待态；失败重试复用 identity 不重复 create；网关拒绝原样透传 |
-| Q-005 | 服务端 magic bytes 校验落点（Hermes 还是 BFF） | **R10 未闭合（2026-09-30 订正）**：Hermes 仅 `_sniff_image_ext` **推断扩展名、不做内容类型拒绝**（实测非图片字节被接受），PDF `%PDF-` 校验被 `pdftoppm` 依赖遮蔽（缺 poppler-utils 回 5028）；`methods_profiles.py:16` 仅表示不信任声明的 MIME。**处置**：如需真正拒绝，应在 **BFF** 侧补（新任务）或网关补/装 poppler-utils |
+| Q-005 | 服务端 magic bytes 校验落点（Hermes 还是 BFF） | **已定：BFF（REQ-023 / TASK-037，2026-09-30）**。Hermes 仅 `_sniff_image_ext` **推断扩展名、不做内容类型拒绝**（实测非图片字节被接受），PDF `%PDF-` 校验被 `pdftoppm` 依赖遮蔽（缺 poppler-utils 回 5028）；`methods_profiles.py:16` 仅表示不信任声明的 MIME。**落地**：BFF WS 代理对 `image.attach_bytes`/`pdf.attach` 的 base64 载荷做**前缀**魔数校验，不匹配同 `id` 回 `INVALID_ATTACHMENT_TYPE` + `audit` + 不转发；`file.attach` 不限类型（R10 闭合） |
 | Q-006 | `···` 菜单「连接」的确切语义（多实例切换 vs 状态展示） | **未定**，需产品确认 |
 | Q-007 | `/api/auth/me` 是否返回头像（决定 AgentPicker 是否只用首字占位） | **未定**，实现阶段验证 |
 | Q-008 | 官方 L1 是否支持 JSON-RPC 数组批帧 | **未定**，实现阶段验证 |
@@ -111,3 +112,5 @@
 | N-022 | REST `/api/hermes/*` 在缺 `profile` 时提前 `return` 跳过 `assertProfileAccess`（`routes/hermes.ts:40` 的现状） |
 | N-023 | 向参数类 schema 未声明 `profile` 的方法注入 `profile`（`extra="forbid"` → 4000，功能回归） |
 | N-024 | 以「是否直继 `Params`」作为豁免判据（判据与契约事实相反） |
+| N-025 | 仅依赖客户端声明的 `File.type`/MIME 作为上传内容类型的安全边界（客户端可伪造） |
+| N-026 | 为校验上传魔数而**整帧 base64 解码**载荷（10MB → ≈13.3MB，内存放大）——只可解码前缀 |

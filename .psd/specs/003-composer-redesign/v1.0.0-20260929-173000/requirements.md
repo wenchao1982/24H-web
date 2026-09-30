@@ -27,7 +27,7 @@
 | **③ 会话 ID 寻址** | `session.list` / `session.resume` / `session.events.since` 以会话 id 寻址、**不含 `params.profile`** → 落到**启动 profile** 的存储，构成跨租户读写 | **REQ-017 闭合**（服务端强制注入调用者 `default_profile`） |
 | **④ 会话 ID 寻址** | 同 ③ 的 REST 对应面 | 由 **REQ-022** 闭合 |
 
-**残余缺口（显式登记）**：REST 路径的守卫缺口已由 **REQ-022** 闭合。**订正**：本 Spec 早前版本曾称「REST 已有 `assertProfileAccess`」——该表述不准确，`routes/hermes.ts:39-42` 在 `!profile \|\| role === "super_admin"` 时**提前 `return`**，故缺 `profile` 的请求实际未被守卫；REQ-022 已修正该行为。**已闭合**：session 归属方法（(A) 类，含 `_SessionScoped` 与 `skills.reload`/`complete.slash`/`model.save_key`/`model.disconnect`）的 session 归属校验（R24）。**部分实测（2026-09-30，见 `contracts-evidence.md §8`）**：REST 注入的上游语义（`profile` 被上游消费/校验）；WS 大帧直连网关可达（≈13.98 MB），**经 BFF 端到端仍未测**（R15）。**R10 未闭合（本轮订正）**：服务端**无真正的内容类型拒绝**——Hermes 仅按 `_sniff_image_ext` **推断扩展名**（`prompt_attachments.py:64`，**不拒绝**；实测 41 字节非图片文本经 `image.attach_bytes` 被接受），PDF 的 `%PDF-` 校验（`methods_prompt.py:1106-1107`）被 `pdftoppm` 依赖遮蔽（`:797-798`，本机缺 poppler-utils 时先回 5028）→ 若需真正 magic bytes 拒绝，应在 **BFF** 侧补（新任务），或在网关侧补/装 poppler-utils；见 §9 R10 / §10 与 `contracts-evidence.md §8.5`。**yolo 取值（本轮已修复，原「待裁定」已结）**：前端原发 `"default"` 表示「默认审批」→ 网关翻转**开启** yolo；已改发 `"off"`（默认审批）/`"on"`（自动批准），见 §10 与 `contracts-evidence.md §8.3`。
+**残余缺口（显式登记）**：REST 路径的守卫缺口已由 **REQ-022** 闭合。**订正**：本 Spec 早前版本曾称「REST 已有 `assertProfileAccess`」——该表述不准确，`routes/hermes.ts:39-42` 在 `!profile \|\| role === "super_admin"` 时**提前 `return`**，故缺 `profile` 的请求实际未被守卫；REQ-022 已修正该行为。**已闭合**：session 归属方法（(A) 类，含 `_SessionScoped` 与 `skills.reload`/`complete.slash`/`model.save_key`/`model.disconnect`）的 session 归属校验（R24）。**部分实测（2026-09-30，见 `contracts-evidence.md §8`）**：REST 注入的上游语义（`profile` 被上游消费/校验）；WS 大帧直连网关可达（≈13.98 MB），**经 BFF 端到端仍未测**（R15）。**R10 已闭合（REQ-023，本轮）**：Hermes 端实测**无真正的内容类型拒绝**——`_sniff_image_ext`（`prompt_attachments.py:64`）仅**推断扩展名、不拒绝**（41 字节非图片文本经 `image.attach_bytes` 被接受），PDF 的 `%PDF-` 校验（`methods_prompt.py:1106-1107`）被 `pdftoppm` 依赖遮蔽（`:797-798`，本机缺 poppler-utils 时先回 5028）。**处置（已落地）**：在 **BFF WS 代理**对 `image.attach_bytes` / `pdf.attach` 的 `content_base64`/`data` 载荷做 **magic bytes 校验（仅前缀解码）**，不匹配则同 `id` 回 `INVALID_ATTACHMENT_TYPE` 且不转发、写 `audit`（REQ-023）；见 §9 R10 / §10 与 `contracts-evidence.md §8.5`。**yolo 取值（本轮已修复，原「待裁定」已结）**：前端原发 `"default"` 表示「默认审批」→ 网关翻转**开启** yolo；已改发 `"off"`（默认审批）/`"on"`（自动批准），见 §10 与 `contracts-evidence.md §8.3`。
 
 ## 2. 用户故事
 
@@ -71,6 +71,7 @@
 | REQ-020 | high | 对话页已挂载 | 用户已显式选择智能体（`selection.profile !== null`） | 发起会话域 RPC（`session.list` / `session.most_recent` / `session.resume` / `session.events.since`） | 会话域请求 | shall 携带 `params.profile = selection.profile`，使多 profile 用户可访问**非默认** profile 的会话；未显式选择时由 BFF 注入 `default_profile`（REQ-017） | Given `admin` 有 `alpha`(default) + `beta` 且 `selection.profile === "beta"`, When 发 `session.list`, Then 帧含 `params.profile === "beta"` 且返回 `beta` 的会话; Given `selection.profile === null`, Then 帧不含 `profile` 并由 BFF 注入 `default_profile`; Given 发 `session.resume{profile:"beta", session_id:<beta 的 stored id>}, Then 成功恢复（不落 `alpha` 存储） |
 | REQ-021 | high | BFF 任意路径 | 租户守卫拒绝或响应过滤 fail-closed | 发生上述事件 | BFF | shall 向 `audit` 表写入一条记录（actor / profile / method / ip / 结果 / 时间戳），**shall 不得**写入 token、密钥或文件字节 | Given `admin` 越权 `params.profile`, Then `audit` 表新增一条含 actor、目标 profile、method、结果的记录; Given REQ-015 fail-closed 触发, Then 同样写审计; 断言记录中不含 token/密钥/字节 |
 | REQ-022 | **critical** | BFF REST 路径 `/api/hermes/*` 已建立 | 角色非 `super_admin` | 请求**未携带** `profile`（query 或 body，见 `routes/hermes.ts:30-32`） | **BFF REST 代理** | shall **default-deny**：① 路径命中**豁免清单** → 放行；② **其余一切路径** → 注入调用者 `default_profile` 作为 `profile`（query 或 body，与 `requestProfile` 读取位置一致）后再执行 `assertProfileAccess`；③ ②中若无可用 profile → 回 `403 PROFILE_FORBIDDEN` 不转发。**豁免清单（profile-agnostic REST 路径）**：`/api/hermes/health`（`routes/hermes.ts:62` 为独立路由，早于 `:85` 的 `app.all("/api/hermes/*")`，本就不经 `assertProfileAccess`）。**禁止**把未知路径当豁免。**残余**：REST 侧 `profile` 注入对上游语义的影响须实测（见 §10）。 | Given `admin` 分配 `alpha`（default=`alpha`）, When `GET /api/hermes/chat/workspaces`（无 `profile`）, Then 该请求被注入 `profile=alpha` 并做守卫（未分配则不转发）; Given 未分配 `beta`, When `GET /api/hermes/skills?profile=beta`, Then 403 `PROFILE_FORBIDDEN`（既有行为保持）; Given `GET /api/hermes/health`, Then 放行（豁免）; Given `super_admin`, Then 不做注入与拦截; Given `admin` 无任何分配 profile, When `GET /api/hermes/anything`, Then 403 且不转发 |
+| REQ-023 | **high** | BFF WS 代理路径已建立 | 角色非 `super_admin` | 客户端发送 `image.attach_bytes` / `pdf.attach` 且 `params` 含 `content_base64`（或 `data`） | **BFF WS 代理** | shall 对**载荷前缀**做 **magic bytes 校验**（**仅解码前 48 个 base64 字符 ≈ 36 字节，禁止整帧解码**；先剥离可能的 `data:<mime>;base64,` 前缀）：`image.attach_bytes` 须匹配**可判定的图片格式**之一——**二进制魔数** PNG（`89 50 4E 47 0D 0A 1A 0A`）/ JPEG（`FF D8 FF`）/ GIF（`GIF8`）/ BMP（`BM`）/ WebP（`RIFF…WEBP`）/ TIFF（LE `49 49 2A 00`、BE `4D 4D 00 2A`）/ ICO（`00 00 01 00`）/ CUR（`00 00 02 00`），以及**文本前缀** SVG（去 BOM/前置空白后以 `<svg` 或 `<?xml` 开头，大小写不敏感）；`pdf.attach` 须以 `%PDF-` 开头。不匹配 shall **拒绝**（以**同 `id`** 回 `{error:{code:400, message:"<可读>", data:{code:"INVALID_ATTACHMENT_TYPE"}}}`，**不转发**）并向 `audit` 写一条记录（action=`ws.upload.invalid_type`；不含 token/密钥/字节）。`file.attach` **不限制**类型（任意文件）；`path` 形态（无 base64 载荷）不在本校验范围 | Given `admin`（已分配 `alpha`）发 `image.attach_bytes{content_base64:<41 字节非图片文本 base64>, filename:"fake.png"}`, Then 同 `id` 回 400 `INVALID_ATTACHMENT_TYPE`、**上游未收到该帧**、`audit` 新增 1 条 `ws.upload.invalid_type`; Given 发合法 1x1 PNG 的 `content_base64`, Then 被转发（注入 `profile=alpha`）; Given 发合法 TIFF(LE/BE)/ICO/SVG（`<svg` 与 `<?xml`）载荷, Then 均被接受; Given 发 `pdf.attach{content_base64:<非 %PDF- base64>}`, Then 拒绝; Given 发 `pdf.attach{content_base64:<%PDF- 开头 base64>}`, Then 转发; Given `data:image/png;base64,...` 形式, Then 正常校验; Given `file.attach`, Then 不做类型校验; Given `super_admin`, Then 不校验；Given 载荷前缀合法但很小（如 11 字符 base64）, Then 仍可判定且**不整帧解码** |
 | REQ-016 | medium | 对话页已挂载 | 任意菜单打开（`＋` / 会话头 `···` / 三个 pill / **侧栏会话列表「更多」菜单**） | 键盘交互 | 菜单组件 | shall 符合 WAI-ARIA APG Menu Button：触发元素 `aria-haspopup="menu"` + `aria-expanded`，菜单 `role="menu"`、子项 `role="menuitem"`，`Esc` 关闭并**归还焦点**到触发元素 | Given 菜单打开, Then 触发元素 `aria-expanded="true"`; When 按 `Esc`, Then 菜单关闭且 `document.activeElement` 为触发元素; 断言子项均有 `role="menuitem"`（含侧栏会话列表「更多」菜单） |
 
 **优先级说明**：`REQ-008`/`REQ-015`/`REQ-017`/`REQ-018` 为安全边界（critical/high）；四者**全部落在 Wave 1 同波次交付**（`constitution.md` PR-011），不得跨波次。
@@ -104,6 +105,7 @@
 | REQ-021 | 守卫拒绝 / 过滤 fail-closed | 事件发生 | 写 `audit` 记录 |
 | REQ-017 | 缺 profile 的 request 帧 | 转发前 | 参数类无 profile → 不注入；其余（含未知）注入或 403 |
 | REQ-022 | 缺 profile 的 REST 请求 | 转发前 | 命中豁免则放行；其余注入或 403 |
+| REQ-023 | 非 super_admin 的 attach 帧含 base64 载荷 | 通过租户守卫后、转发前 | 仅前缀魔数校验；不匹配同 id 400 `INVALID_ATTACHMENT_TYPE` + 审计，不转发 |
 
 ## 5. 非功能需求
 
@@ -146,6 +148,7 @@
 | REQ-021 | 每条守卫拒绝与 fail-closed 恒产生恰好 1 条审计记录 | 可发现越权探测 | 403 × n、fail-closed、记录中无 token/字节 |
 | REQ-018b | `pendingBytes` 上限恒为 `4 × 16 MiB = 64 MiB` | 字节预算可独立断言 | 恰 64 MiB / 超 1 字节 / 并发连接 |
 | REQ-022 | REST 路径非豁免时恒被注入 `profile` 或 403 | 与 WS 侧同语义，无 early-return 漏口 | 无 profile / 已带 profile / health 豁免 / 未知路径 / 无分配 profile / super_admin |
+| REQ-023 | 任意非法魔数（图片/PDF）恒被拒绝且不转发；合法图片/PDF 恒通过；校验恒只解码前缀（不解全文） | 前端 `File.type` 恒不构成安全边界 | 41 字节文本冒充 image / 非 `%PDF-` 冒充 pdf / `data:` 前缀 / 缺失载荷字段 / 超大载荷（20MB）断言仅前缀解码 / `file.attach` / `super_admin` |
 | REQ-017a | 豁免集合恒 == 参数类无 profile 字段的方法集合（可用契约生成器独立断言） | 判据可机械复核 | 契约新增/删除 `profile` 字段、未知方法、`_SessionScoped` 方法 |
 
 ## 7. 边界（Always / Ask First / Never）
@@ -164,11 +167,12 @@
 | ✅ Always | 守卫拒绝与响应过滤 fail-closed 必写 `audit` 记录（不含 token/密钥/字节） | REQ-021 |
 | ✅ Always | 队列上限须同时约束**条数**与**累计字节** | REQ-018 |
 | ✅ Always | 响应过滤失败时 fail-closed | 绝不下发未过滤的全量（REQ-015） |
+| ✅ Always | 上传内容类型须**服务端**校验：BFF 对 `image.attach_bytes`/`pdf.attach` 的 base64 载荷做**前缀 magic bytes** 校验（仅解码前缀） | 客户端 `File.type`/MIME 仅 UX 预筛，非安全边界（REQ-023） |
 | ❓ Ask First | 单次上传数上限 / 拖拽文件夹（**已定**） | ≤10 个、只取顶层不递归 |
 | ❓ Ask First | `分享` 目标形态（**已定**） | 沿用现有链接 + 剪贴板 |
 | ❓ Ask First | 会话内切智能体（**已定**） | 强开新会话，pill 只读 |
 | ❓ Ask First | WS 大 payload 降级（**已定**） | 10MB 不分片、>2MB 等待态、失败复用 identity |
-| ❓ Ask First | 服务端 magic bytes 校验落点（**R10 未闭合，需补**） | 实测：Hermes 的 `_sniff_image_ext`（图片）仅**推断扩展名、非内容类型拒绝**，PDF `%PDF-` 校验被 `pdftoppm` 依赖遮蔽（缺 poppler-utils 先回 5028）；客户端 `File.type` 仅 UX 预筛。要真正拒绝应在 **BFF** 侧补，或网关补/装 poppler-utils |
+| ❓ Ask First | 服务端 magic bytes 校验落点（**已定：BFF**，REQ-023） | 实测 Hermes 的 `_sniff_image_ext`（图片）仅**推断扩展名、非内容类型拒绝**，PDF `%PDF-` 校验被 `pdftoppm` 依赖遮蔽（缺 poppler-utils 先回 5028）；故在 **BFF WS 代理**补**前缀** magic bytes 校验（REQ-023），客户端 `File.type` 仅 UX 预筛 |
 | ❓ Ask First | `···` 菜单「连接」的确切语义（多实例切换 vs 状态展示） | 需产品确认落点 |
 | ❓ Ask First | hero 态选昂贵模型无二次确认（`session.create` 无 `confirm_expensive_model` 字段） | 见 R13；需产品确认是否可接受 |
 | ❓ Ask First | WS 豁免清单（**已定，26 条，MethodSweep 机械核验 2026-09-30**）与 REST 豁免清单（1 条）是否与官方契约/路由一致 | 判据已可机械派生（参数类是否声明 `profile`），漏判方向为**功能回归**（错误注入 → 4000），非安全漏洞 |
@@ -190,6 +194,8 @@
 | 🚫 Never | REST `/api/hermes/*` 在缺 `profile` 时提前 `return` 跳过守卫（`routes/hermes.ts:40` 的现状） | REQ-022 |
 | 🚫 Never | 向参数类 schema 未声明 `profile` 的方法注入 `profile`（`extra="forbid"` → 4000） | REQ-017 |
 | 🚫 Never | 用「是否直继 `Params`」作为豁免判据 | REQ-017 |
+| 🚫 Never | 仅依赖客户端声明的 `File.type`/MIME 作为上传内容类型校验 | 客户端可伪造，非安全边界（REQ-023） |
+| 🚫 Never | 为校验魔数而**整帧 base64 解码**上传载荷（13MB 场景内存放大） | REQ-023（仅前缀解码） |
 
 ## 8. 契约依据（官方源码）
 
@@ -209,7 +215,8 @@
 | `pdf.attach{path?\|content_base64?\|data?, filename?, first_page?, last_page?}` → PNG 页 | `contracts/prompt_voice.py:134-161` |
 | `clipboard.paste{}` = **宿主**剪贴板（浏览器不可用） | `contracts/prompt_voice.py:104-109` |
 | `input.detect_drop{text}` = 仅识别**终端**拖拽文本（浏览器不可用） | `contracts/prompt_voice.py:199-215` |
-| **服务端仅扩展名嗅探、非内容类型拒绝（R10 未闭合）**：`_sniff_image_ext`（`prompt_attachments.py:20/64`，filename 后缀优先，否则魔数，未知默认 `.png`）只**推断扩展名**；`methods_prompt.py:775-776` 仅判扩展名是否在允许集合，**不拒绝**（实测 41 字节非图片文本被接受）。PDF `%PDF-` 校验（`methods_prompt.py:1106-1107`）存在，但 `:797-798` 先检查 `pdftoppm`，缺 poppler-utils → 5028，该分支不可达。「declared mime never trusted」仅表示不信任声明的 MIME，**不等于**拒绝伪造内容 | `tui_gateway/prompt_attachments.py:20/64/71`；`tui_gateway/methods_prompt.py:775-776/797-798/1106-1107`；`tui_gateway/methods_profiles.py:16` |
+| **Hermes 仅扩展名嗅探、非内容类型拒绝（R10 历史实测，已由 REQ-023 在 BFF 闭合）**：`_sniff_image_ext`（`prompt_attachments.py:20/64`，filename 后缀优先，否则魔数，未知默认 `.png`）只**推断扩展名**；`methods_prompt.py:775-776` 仅判扩展名是否在允许集合，**不拒绝**（实测 41 字节非图片文本被接受）。PDF `%PDF-` 校验（`methods_prompt.py:1106-1107`）存在，但 `:797-798` 先检查 `pdftoppm`，缺 poppler-utils → 5028，该分支不可达。「declared mime never trusted」仅表示不信任声明的 MIME，**不等于**拒绝伪造内容 → 由 **REQ-023** 在 BFF 侧补前缀 magic bytes 校验 | `tui_gateway/prompt_attachments.py:20/64/71`；`tui_gateway/methods_prompt.py:775-776/797-798/1106-1107`；`tui_gateway/methods_profiles.py:16` |
+| **权威图片魔数表（REQ-023 照抄 + 补齐）**：`_IMAGE_MAGIC = (PNG 89 50 4E 47 0D 0A 1A 0A, JPEG FF D8 FF, GIF87a/GIF89a「GIF8」, BMP 42 4D)`；WebP 由 `RIFF<4字节尺寸>WEBP` 判定（`head[8:12]==b"WEBP"`）；PDF 魔数 `%PDF-`（`methods_prompt.py:1106`）。Hermes 允许扩展名集合另含 `.tiff/.tif/.svg/.ico`，但 `_IMAGE_MAGIC` **无对应条目**（`_sniff_image_ext` 未知默认 `.png`）→ **REQ-023 本轮补齐**：TIFF（LE `49 49 2A 00` / BE `4D 4D 00 2A`）、ICO（`00 00 01 00`）、CUR（`00 00 02 00`）、SVG（文本前缀 `<svg`/`<?xml`，去 BOM/空白，大小写不敏感）。按扩展名归并后 **BFF 接受集与 Hermes 允许集一致**；前缀解码长度由 24 → **48 个 base64 字符（≈36 字节）**以覆盖 SVG 判定 | `tui_gateway/prompt_attachments.py:20-23`（`_IMAGE_MAGIC`）、`:64-71`（WebP RIFF 容器）、`:74-79`（`_allowed_image_extensions`）；`hermes_cli/cli_terminal_input.py:31-34`（`_IMAGE_EXTENSIONS`）；`tui_gateway/methods_prompt.py:775-777`（扩展名校验点）、`:1106-1107`（`%PDF-`） |
 | **不存在 `session.info`**；`session.status` 回包仅 `{output: str}`（渲染文本），**不可**用于模型对齐 | `contracts/sessions.py:431-440` |
 | 模型对齐唯一结构化来源：`model.options{profile, session_id: runtimeId}` 回包的 `model` / `provider` | `contracts/config_free_tier_control.py:273-277`（doc: "layered over the session's live provider when given"） |
 | `message.complete` 事件（回合结束）可作为对齐触发器 | `contracts/events.py:205` |
@@ -230,7 +237,7 @@
 | R7 | 基线漂移（`requirement.md` / `ui-spec.md` / `docs/TASKS.md:102` / 「corner-shape」四处） | 后续任务反复 | Wave 0 先改 4 份基线 + `task-list.md`，Wave 5 收口复核 |
 | R8 | 昂贵模型确认与 deferred 叠加（运行中 + 昂贵） | 状态机分支爆炸 | `useSessionControls` 纯 reducer + 属性测试组合态（REQ-010×011） |
 | R9 | 现有附件实现向 attach RPC 传 `{name,size,type}`，网关很可能报错；改为延迟绑定会破坏既有测试断言（`ChatPage.test.tsx:369-384`） | 既有测试需同步改 | Wave 2/4 同步改测试；新增「hero 零 RPC」专测 |
-| R10 | 服务端无真正的内容类型（magic bytes）拒绝 | 伪造文件可绕过 | **未闭合（2026-09-30 实测订正）**：Hermes `_sniff_image_ext`（`prompt_attachments.py:64-71`）仅**推断扩展名**、**不拒绝**（实测 41 字节非图片文本被 `image.attach_bytes` 接受，`attached:true`）；PDF `%PDF-` 校验（`methods_prompt.py:1106-1107`）在本机因 `pdftoppm` 缺失（`:797-798` 先检查）被遮蔽 → 5028，4017 **不可达/未验证**。故「magic bytes 校验」**非安全边界**，仅为扩展名嗅探；客户端 `File.type` 同样仅 UX 预筛。**处置**：如需真正拒绝，应在 **BFF** 侧补 magic bytes 校验（新任务），或在网关侧补/装 poppler-utils。见 `contracts-evidence.md §8.5` |
+| R10 | 服务端无真正的内容类型（magic bytes）拒绝 | 伪造文件可绕过 | **已闭合（REQ-023，本轮）**：Hermes `_sniff_image_ext`（`prompt_attachments.py:64-71`）仅**推断扩展名**、**不拒绝**（实测 41 字节非图片文本被 `image.attach_bytes` 接受）；PDF `%PDF-` 校验因 `pdftoppm` 缺失被遮蔽（5028，不可达）。**处置**：在 **BFF WS 代理**对 `image.attach_bytes`/`pdf.attach` 的 base64 载荷做**前缀 magic bytes** 校验（REQ-023；覆盖 PNG/JPEG/GIF/BMP/WebP/TIFF/ICO/CUR 与 SVG 文本前缀）：不匹配同 `id` 回 `INVALID_ATTACHMENT_TYPE` + 审计 + 不转发；`file.attach` 不限类型。客户端 `File.type` 仍仅 UX 预筛。见 `contracts-evidence.md §8.5` |
 | R11 | 规范偏差记录：OWASP 建议 WS 消息 ≤64KB，本 Spec 选 10MB 单帧 | 评审争议 | 在 `architecture.md` 显式登记偏差与补偿控制（A4 + 等待态 + 上限 + 实测） |
 | R12 | `ws.ts` 原有错误解析只读 `error.code`(number) + `message`，读不到 `PROFILE_FORBIDDEN` 字符串 | REQ-008 无法断言命名错误码 | 已定：扩展 `ws.ts` 读取 `error.data.code`（约 5 行） |
 | R13 | **帧分类 fail-open（CRITICAL，评审发现）**：原设计以「无 `id` = 通知」「带 `result`/`error` = 响应」「数组/二进制 = 放行」为免拦理由，形成 4 条可复现绕过 | 完全击穿 REQ-008 与 N-005 | **已由 REQ-008 的 default-deny 改写闭合**：凡含 `method` 即守卫、数组逐元素、二进制与解析失败一律拒绝；`constitution.md` A-006 同步改写 |
@@ -254,7 +261,7 @@
 | `profiles.list` 元数据枚举 | 不按调用者过滤 | **REQ-015 闭合**（过滤 + fail-closed） |
 | **会话 ID 维度越权** | `session.list/resume/events.since` 无 `profile` → 落启动 profile 存储 | **REQ-017 闭合**（注入 `default_profile`） |
 | REQ-017 豁免清单完备性 | 枚举是否漏方法 | **已闭合（MethodSweep 机械核验 2026-09-30，R14）**：注册表 237 方法中 26 个参数类无 `profile` 字段，与清单完全一致；见 `contracts-evidence.md` |
-| 服务端 magic bytes 校验 | **未闭合**（R10，本轮订正） | 无真正内容类型拒绝：`prompt_attachments._sniff_image_ext` 仅**推断扩展名、不拒绝**（实测接受非图片魔数字节）；`methods_prompt` 的 `%PDF-` 校验被 `pdftoppm` 依赖遮蔽（缺 poppler-utils 回 5028，4017 不可达）。客户端 `File.type` 仅 UX 预筛。**处置**：若需真正拒绝，在 **BFF** 侧补 magic bytes 校验（新任务），或网关补/装 poppler-utils。见 `contracts-evidence.md §8.5` |
+| 服务端 magic bytes 校验 | **已闭合（R10 / REQ-023，本轮）** | `prompt_attachments._sniff_image_ext` 仅**推断扩展名、不拒绝**（实测接受非图片魔数字节）；`methods_prompt` 的 `%PDF-` 校验被 `pdftoppm` 依赖遮蔽（缺 poppler-utils 回 5028，4017 不可达）。**已在 BFF WS 代理侧补**：`validateAttachmentMagic` 对 `image.attach_bytes`/`pdf.attach` 的 base64 载荷做**前缀魔数**校验（仅解码 48 字符 ≈36 字节；含 PNG/JPEG/GIF/BMP/WebP/TIFF/ICO/CUR 与 SVG 文本前缀），不匹配 → 同 `id` 400 `INVALID_ATTACHMENT_TYPE` + `audit`（`ws.upload.invalid_type`）+ 不转发；`file.attach` 不限类型；`super_admin` 不校验。见 §9 R10 / `contracts-evidence.md §8.5` |
 | WS 大帧端到端可达性 | `maxPayload` / 上游上限未实测 | 部分闭合（REQ-018 显式上限）；**部分实测（2026-09-30）**：直连网关接受 ≈13.98 MB `image.attach_bytes` 帧（290ms）；**经 BFF 端到端仍未测**（R15） |
 | hero 态昂贵模型无二次确认 | `session.create` 无该字段 | **未闭合**（REQ-011a / Ask First） |
 | 「连接」菜单语义 | 产品未定 | `❓Ask First` |

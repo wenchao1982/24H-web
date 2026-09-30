@@ -659,7 +659,7 @@ TASK-003 负责实现并导出该函数；TASK-029（响应过滤）依赖它，
 | 偏差 | 说明 | 补偿控制 |
 |---|---|---|
 | WS 单帧可达 10MB（base64 ≈13.3MB），OWASP 建议 ≤64KB | 契约无分片通道 | >2MB 等待态；失败复用 identity 不重复 create；建议 BFF 显式设 `maxPayload`；`proxy.ts:33-46` 的 `pending`/`outbound` 需上限；网关上限实测（R3/R11） |
-| 服务端内容类型校验 **R10 未闭合（订正）** | `File.type` 仅客户端声明 | 网关仅 `_sniff_image_ext` **推断扩展名、不拒绝**；PDF `%PDF-` 校验被 `pdftoppm` 遮蔽（缺 poppler-utils 回 5028）；客户端仅作 UX 预筛。**处置**：如需真正拒绝，在 **BFF** 侧补 magic bytes 校验（新任务）或网关补/装 poppler-utils |
+| 服务端内容类型校验 **R10 已闭合（REQ-023）** | `File.type` 仅客户端声明，非安全边界 | Hermes 仅 `_sniff_image_ext` **推断扩展名、不拒绝**；PDF `%PDF-` 校验被 `pdftoppm` 遮蔽（缺 poppler-utils 回 5028）。**处置（已落地）**：BFF WS 代理对 `image.attach_bytes`/`pdf.attach` 的 base64 载荷做**前缀** magic bytes 校验（仅解码 48 字符 ≈36 字节；PNG/JPEG/GIF/BMP/WebP/TIFF/ICO/CUR + SVG 文本前缀），不匹配同 `id` 回 `INVALID_ATTACHMENT_TYPE` + 审计 + 不转发（§7.7） |
 | BFF 无帧大小/队列上限（评审 MEDIUM #14） | `proxy.ts:33-34` 的 `pending`/`outbound` 为无界数组，10MB（≈13.3MB base64）单帧在冷启动队列下被放大 | **REQ-018**：显式设 `maxPayload` 与队列长度上限；超限回可读错误并仅终止该连接 |
 | 契约源码在仓库外，判定不可 CI 复核（评审 LOW #16） | 所有「以官方源码为准」的断言无法被本仓库独立验证 | **TC-016**：归档可核验的契约片段到 `contracts-evidence.md`（TASK-033） |
 | 队列上限只按条数、不限字节（评审 N8） | `pending`/`outbound` 为无界数组，N 条近上限帧可堆内存 | **REQ-018 / TC-018**：同时约束条数与累计字节（`pendingBytes ≤ K × maxPayload`，K 量化）；`maxPayload` 同时作用于客户端接入侧与上游侧 socket |
@@ -693,6 +693,50 @@ TASK-003 负责实现并导出该函数；TASK-029（响应过滤）依赖它，
 
 > **残余**：注入 `profile` 后**上游是否按租户作用域**尚未实测（见 `requirements.md §10`）；`/api/hermes/health` 因是独立路由（`routes/hermes.ts:62`，早于 `:85` 的 `app.all`）本就不经守卫，豁免为显式化。
 
+### 7.7 上传内容类型校验（REQ-023）
+
+**背景**：Hermes 端**不做内容类型拒绝**——`_sniff_image_ext`（`prompt_attachments.py:64-71`）仅按 filename 后缀/魔数**推断扩展名**（未知默认 `.png`），`methods_prompt.py:775-776` 只判扩展名是否在允许集合；PDF 的 `%PDF-` 校验（`:1106-1107`）被 `pdftoppm` 依赖（`:797-798`）遮蔽。客户端 `File.type` 仅 UX 预筛。→ 在 **BFF WS 代理**补服务端前缀 magic bytes 校验（R10 闭合）。
+
+**实现位置**：`apps/server/src/hermes/frameGuard.ts`
+
+- 新增导出 `validateAttachmentMagic(frame: FrameClassification, parsed: unknown): { ok: true } | { ok: false; message: string }`（照抄 `prompt_attachments.py:20-23` 的 `_IMAGE_MAGIC` + `:69-70` 的 WebP RIFF 判定）。
+- 由 `guardClientFrame` 在 `decideProfileGuard` 判定 **allow/inject 之后、构造转发文本之前**调用（等价于「通过租户守卫之后、转发之前」；`proxy.ts` 无需二次解析大帧）。**仅对非 `super_admin`**。
+- 命中拒绝 → `GuardOutcome` 新增 `reject` code `INVALID_ATTACHMENT_TYPE`（携带 `id` 与可读 `message`）；`proxy.ts` 映射为 `invalidAttachmentFrame` + `logAudit(action="ws.upload.invalid_type", detail=message)`，**不转发**。
+- 批帧：逐元素同样校验；任一 attach 元素非法 → 整批拒绝（复用既有「整批拒绝」语义）。
+
+**仅前缀解码（性能）**：从 `params.content_base64`（回退 `params.data`）取**前 `ATTACHMENT_PREFIX_CHARS = 48` 个 base64 字符**（先剥离 `data:<mime>;base64,` 前缀与空白）→ `Buffer.from(prefix, "base64")` ≈ **36 字节**，足够判定最长二进制魔数（WebP 需 12 字节）**与 SVG 文本前缀**（UTF-8 BOM 3 字节 + 前置空白 + `<?xml` 5 字符 / `<svg` 4 字符）。**禁止**对整段 base64 调用 `Buffer.from(..., "base64")`（10MB 载荷 base64 后 ≈13.3MB，整帧解码会造成内存放大 —— 与 §7.4 的 10MB 偏差补偿控制一致，36 字节仍远小于整帧）。JSON 仅解析一次（`guardClientFrame` 已有的 `parsed`），不额外解析。
+
+> **前缀长度变更**：初版为 24 字符（≈18 字节），仅够二进制魔数；为覆盖 SVG 文本判定提高至 48 字符（≈36 字节）。单测「`Buffer.from` spy + 20MB 假载荷」断言仅解码前缀，期望字符数同步为 48（`frameGuard.test.ts`）。
+
+**魔数表（基础照抄 Hermes `_IMAGE_MAGIC`，`prompt_attachments.py:20-23`；补齐 TIFF/ICO/CUR/SVG）**：
+
+| 格式 | 前缀字节 | 来源 / 判定 |
+|---|---|---|
+| PNG | `89 50 4E 47 0D 0A 1A 0A` | `_IMAGE_MAGIC[0]` |
+| JPEG | `FF D8 FF` | `_IMAGE_MAGIC[1]`（覆盖 `.jpg`/`.jpeg`） |
+| GIF | `47 49 46 38`（`GIF8`） | `_IMAGE_MAGIC[2..3]`（`GIF87a`/`GIF89a`） |
+| BMP | `42 4D`（`BM`） | `_IMAGE_MAGIC[4]` |
+| WebP | `RIFF`（0-3）+ `WEBP`（8-11） | `_sniff_image_ext` `:69-70` |
+| TIFF | `49 49 2A 00`（LE） / `4D 4D 00 2A`（BE） | 补齐（Hermes 允许 `.tiff/.tif`，`_IMAGE_MAGIC` 无条目） |
+| ICO | `00 00 01 00` | 补齐（Hermes 允许 `.ico`） |
+| CUR | `00 00 02 00` | 补齐（Hermes 允许集外，宽容接受） |
+| SVG | 去 BOM/前置空白后以 `<svg` 或 `<?xml` 开头（大小写不敏感） | 补齐（Hermes 允许 `.svg`；文本型无固定魔数） |
+| PDF | `%PDF-` | `methods_prompt.py:1106` |
+
+**两个集合对照**：
+- **Hermes 允许扩展名**（权威 `hermes_cli/cli_terminal_input.py:31-34` `_IMAGE_EXTENSIONS` → `prompt_attachments.py:74-79`，校验点 `methods_prompt.py:775-777`）：`.png .jpg .jpeg .gif .webp .bmp .tiff .tif .svg .ico`。Hermes `_sniff_image_ext`（`:64-71`）**优先 filename 后缀**、仅后缀缺失时用魔数，**只推断不拒绝**。
+- **BFF 接受（可魔数判定）**：PNG / JPEG / GIF / BMP / WebP / TIFF（LE+BE）/ ICO / CUR / SVG。按扩展名归并后**与 Hermes 允许集一致**（`.jpeg`→JPEG、`.tif`→TIFF、`.svg`→SVG）。
+
+**判定策略**：**能判定则判定、无法判定则拒绝**（fail-closed）。差异登记于本节「已知差异」与 `contracts-evidence.md §8.5`。
+
+**已知差异（除 SVG 判定方式外）**：经扩展名归并后，**当前无「Hermes 允许且 BFF 无法用前缀魔数判定」的格式**（TIFF/ICO/SVG 本轮已补齐）。另记两点：① `CUR` 不在 Hermes 允许集内，BFF 宽容接受（更严的上游仍会按扩展名拒绝，无 fail-open）；② Hermes 的 `_sniff_image_ext` 以 **filename 后缀优先于内容**，故「名为 `.png` 实为 SVG」的文件在 Hermes 通过、在 BFF 也通过（以真实内容 `<svg` 判定），两者对**内容**的信任模型不同（BFF 更可信内容），不构成安全回退。
+
+**作用方法**：仅 `method ∈ {image.attach_bytes, pdf.attach}`；`file.attach` **不限类型**；`path` 形态（无 base64 载荷）不在校验范围（`readPayload` 返回空即放行，交由上游）。
+
+**错误帧**：`{ jsonrpc:"2.0", id, error:{ code:400, message:"<可读>", data:{ code:"INVALID_ATTACHMENT_TYPE" } } }`（与 `profileForbiddenFrame`/`invalidFrame` 同风格）。
+
+**审计**：`action="ws.upload.invalid_type"`、actor、ip、`detail=<可读 message>`；**不含** token/密钥/文件字节/base64。
+
 ## 8. 测试策略
 
 > 工具：`vitest` + `@testing-library/react`。仓库**无 `fast-check`**；属性测试用「确定性生成器 + 遍历表」实现，不新增依赖。
@@ -715,6 +759,7 @@ TASK-003 负责实现并导出该函数；TASK-029（响应过滤）依赖它，
 | `classifyFrame`（method 非字符串） | `method` 键存在但非字符串恒为 `invalid` 并拒绝 | `method ∈ {undefined, null, 123, {}, "session.list"}` |
 | `frameQueue` 字节预算 | 累计字节达 `K × maxPayload` 恒拒绝新帧 | 单帧≈上限 × K、条数未满但字节满、并发 |
 | `reconcileModel` 参数 | 每次调用恒含非空 `profile` 与 `session_id` | 无 default_profile（应不发请求）、连续两次 `message.complete` |
+| `validateAttachmentMagic` | 任意非法魔数（image/pdf）恒 `ok:false`；合法 PNG/JPEG/GIF/BMP/WebP 与 `%PDF-` 恒 `ok:true`；恒只解码前缀（`Buffer.from` 实参长度 ≤ 24） | 41 字节文本冒充 image、非 `%PDF-` 冒充 pdf、`data:` 前缀、缺失载荷、20MB 假载荷 + `Buffer.from` spy |
 
 > 说明：上表末 5 行为本次对抗性评审回环新增的属性；原 REQ-006 / REQ-010 / REQ-011 / REQ-014 / REQ-015 对应的既有属性行已在 `requirements.md §6` 同步更新（并发 single-flight、deferred 回正、过滤 fail-closed）。
 
@@ -782,6 +827,8 @@ expect(gateway.paramsOf("session.workspace.move")[0]).toEqual({ session_key: "s1
 | 26 | REST：`GET /api/hermes/health` 无 profile | 放行（豁免） |
 | 27 | 队列字节预算：`pendingBytes` 恰 64 MiB / 超 1 字节 | 恰好可收 / 拒绝新帧 |
 | 28 | REST 注入后**上游实际收到的 URL** | query 字符串含 `profile=<default_profile>`（不是仅本地变量） |
+| 29 | **REQ-023**：`admin` 发 `image.attach_bytes{content_base64:<41 字节非图片文本 base64>, filename:"fake.png"}` | 同 `id` 400 `INVALID_ATTACHMENT_TYPE`；上游未收到；`audit` 恰 1 条 `ws.upload.invalid_type` |
+| 30 | **REQ-023**：`admin` 发合法 1x1 PNG `image.attach_bytes` | 转发（`profile=alpha` 注入）；非 `%PDF-` 的 `pdf.attach` 拒绝、`%PDF-` 开头转发；`file.attach`/`super_admin` 不做类型校验 |
 
 ### 8.5 StrictMode / 幂等
 

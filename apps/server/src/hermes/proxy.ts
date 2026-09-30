@@ -9,6 +9,7 @@ import { listUserProfiles } from "../users/repo";
 import {
   classifyFrame,
   guardClientFrame,
+  invalidAttachmentFrame,
   invalidFrame,
   profileForbiddenFrame,
 } from "./frameGuard";
@@ -382,18 +383,27 @@ async function bridge(
     pruneSessionOwners();
     const outcome = guardClientFrame(text, isBinary, userRef, db, sessionOwners);
     if (outcome.action === "reject") {
+      const auditAction =
+        outcome.code === "PROFILE_FORBIDDEN"
+          ? "ws.profile.forbidden"
+          : outcome.code === "INVALID_ATTACHMENT_TYPE"
+            ? "ws.upload.invalid_type"
+            : "ws.frame.invalid";
       logAudit(db, {
         actorId: userRef.id >= 0 ? userRef.id : null,
-        action: outcome.code === "PROFILE_FORBIDDEN" ? "ws.profile.forbidden" : "ws.frame.invalid",
+        action: auditAction,
         targetType: "hermes_ws",
         targetId: null,
         ip: request.ip,
-        detail: null,
+        // REQ-023：仅记录可读 message，绝不写 token / 密钥 / 文件字节 / base64。
+        detail: outcome.code === "INVALID_ATTACHMENT_TYPE" ? (outcome.message ?? null) : null,
       });
       sendToClient(
         outcome.code === "PROFILE_FORBIDDEN"
           ? profileForbiddenFrame(outcome.id)
-          : invalidFrame(outcome.id),
+          : outcome.code === "INVALID_ATTACHMENT_TYPE"
+            ? invalidAttachmentFrame(outcome.id, outcome.message)
+            : invalidFrame(outcome.id),
       );
       return;
     }

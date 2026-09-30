@@ -28,6 +28,7 @@
 | TASK-029 | **REQ-015 响应过滤**：在 `proxy.ts` 的**上游→客户端**路径（`:76`）用 `classifyFrame` 记录的 `pendingProfileReads: Map<id,{userId,kind}>` 匹配 `profiles.list`/`profiles.describe` 响应，按 `user_profiles` 白名单过滤 `result.profiles[]` 后下发。**fail-closed**：响应非 JSON / 结构不符（缺 `profiles` 键或非数组）/ 过滤异常 → **不下发**并回 `{error:{code:500,message:"profiles 过滤失败"}}`。`profiles.describe` 的未分配 `name` → 403。`super_admin` 不过滤。`pendingProfileReads` 须有长度上限与超时清理。**依赖 TASK-003 导出的 `classifyFrame`，不得自行解析帧** | REQ-015 | high | TASK-003 | vitest（server）：白名单过滤 + fail-closed + 上限清理 |
 | TASK-030 | **REQ-017 租户上下文注入（default-deny + schema 派生豁免清单）**：非 `super_admin` 的 request 帧缺 `params.profile` 时——**参数类 schema 未声明 `profile`** 的方法豁免（不得注入，否则 `extra="forbid"` → 4000）；**其余一切方法（含清单外未知方法）** 注入 `default_profile`；无可用 → 403。**豁免清单（26 条，MethodSweep 机械核验 2026-09-30）**：`ping`/`gateway.capabilities`/`client.capabilities`/`complete.slash`/`reload.env`/`reload.mcp`/`plugins.list`/`skills.reload`/`learning.frames`/`learning.detail`/`learning.delete`/`learning.edit`/`paste.collapse`/`model.save_key`/`model.disconnect`/`diagnostics.share_nous`/`image.generate`/`onboarding.ensure_setup_profile`/`onboarding.reset_setup_profile`/`tools.list`/`toolsets.list`/`tools.show`/`browser.controller.register`/`browser.controller.heartbeat`/`browser.controller.detach`/`browser.controller.result`。**须注入（声明了 `profile`）**：`commands.catalog`/`config.show`/`cron.manage`/`shell.exec`/`cli.exec`/`process.kill`/`tools.configure`/`browser.manage`/`agents.list`/`insights.get`/`session.set_hidden`/`complete.path`/`llm.oneshot`。**禁止**前缀白名单、禁止把未知方法当豁免、**禁止以「是否直继 `Params`」为判据**。MethodSweep 须机械断言「豁免集合 == 参数类无 `profile` 字段集合」 | REQ-017 | **critical** | TASK-003 | vitest：26 条豁免均不注入 / **13 条**须注入方法均被注入 / 未知方法被注入 / 无分配 403 / super_admin 不注入 / **MethodSweep 机械断言通过** |
 | TASK-036 | **R24 残余闭合（session 归属）**：`tools.list` / `toolsets.list` / `tools.show` 等 `_SessionScoped` 方法 schema 无 `profile` 字段，无法 profile 守卫；其 handler 缺 `session_id` 时回退**启动 profile** 配置（`tools_mcp_plugins.py:20-21`）→ 跨租户读取。须做 **session 归属校验**（校验 `session_id` 所属 profile ∈ 调用者白名单）或显式禁用 | R24（§10 残余） | **high** | 独立任务（不阻塞 Wave 1 主线） | vitest：跨租户 `session_id` 被拒；本租户通过 |
+| TASK-037 | **REQ-023 上传内容类型校验（R10 闭合）**：`apps/server/src/hermes/frameGuard.ts` 新增导出 `validateAttachmentMagic(frame, parsed)`（照抄 `prompt_attachments.py:20-23` 的 `_IMAGE_MAGIC` + WebP `RIFF..WEBP`；PDF `%PDF-`），仅在**非 `super_admin`** 且 `method ∈ {image.attach_bytes, pdf.attach}` 且 `params` 含 `content_base64`/`data` 时校验；**仅解码前 ~24 个 base64 字符**（剥离 `data:...;base64,` 前缀），**禁止整帧解码**；不匹配 → `GuardOutcome` 新增 `INVALID_ATTACHMENT_TYPE`，`proxy.ts` 同 `id` 回 `{error:{code:400,message,data:{code:"INVALID_ATTACHMENT_TYPE"}}}` + `logAudit(action="ws.upload.invalid_type")` + 不转发；`file.attach` 不限类型；批帧逐元素校验、任一非法整批拒绝 | REQ-023（R10） | **high** | TASK-003 | vitest：合法 PNG/JPEG/GIF/BMP/WebP 与 `%PDF-` 通过；41 字节文本冒充 image / 非 `%PDF-` 冒充 pdf → 拒绝；`data:` 前缀正确处理；20MB 假载荷 + `Buffer.from` spy 断言**仅前缀解码**；proxy 集成（非法被拒且上游未收到 + audit 1 条；合法 PNG 转发） |
 | TASK-035 | **REQ-022 REST 守卫**：`routes/hermes.ts` 的 `assertProfileAccess` 去掉「缺 `profile` 即提前 `return`」；非 `super_admin` 请求除豁免路径（`/api/hermes/health`）外，缺 `profile` → 注入调用者 `default_profile`（写入 query 或 body，与 `requestProfile` 读取位置一致）后执行守卫；无可用 → 403。**禁止**把未知路径当豁免；**并断言上游实际收到 `profile`**（注意 `routes/hermes.ts:94-95` 使用 `request.url` 构造上游 target，而 `requestProfile` 读 `request.query`/`request.body`（`:30-32`）——注入必须落入**被转发的 query 字符串**，否则守卫通过但上游不按租户作用域，静默失效） | REQ-022 | **critical** | TASK-001 | vitest（`routes/hermes.test.ts`）：注入 / 403 / health 豁免 / super_admin 不拦；既有 `profile guard` 用例保持绿 |
 | TASK-034 | **REQ-021 审计接入**：`hermes/proxy.ts`（WS 403 与 fail-closed）与 `routes/hermes.ts`（REST 403）调用 `apps/server/src/audit/repo.ts` 写审计（action / actor / profile / method / ip / 结果 / ts），**不含 token / 密钥 / 文件字节** | REQ-021 | high | TASK-003, TASK-029 | vitest：三类事件各恰 1 条记录；断言零 token/字节泄漏 |
 | TASK-031 | **REQ-018 上限**：为 WS 显式设 `maxPayload`（**同时作用于客户端接入侧与上游侧 socket**）与 `pending`/`outbound` 队列上限——**条数 AND 累计字节**（**`maxPayload = 16 MiB`**、**`K = 4`** → 单连接累计 ≤ **64 MiB**）；超限回可读错误并**仅**终止该连接 | REQ-018 | medium | TASK-003 | vitest：条数超限、**字节超限**、仅该连接关闭 |
@@ -112,6 +113,7 @@
 | REQ-020 | TASK-017, TASK-020 | full |
 | REQ-021 | **TASK-034**, TASK-004, TASK-025 | full |
 | REQ-022 | **TASK-035**, TASK-004 | full |
+| REQ-023 | **TASK-037**, TASK-003 | full |
 | REQ-018 | **TASK-031**, TASK-004, TASK-025 | full |
 | REQ-019 | TASK-006B, 007 | full |
 | R24（session 归属残余） | **TASK-036**, TASK-030, TASK-033 | closed（session 归属校验已实现） |
@@ -129,7 +131,8 @@ TASK-001 ─┬─> TASK-002
           │             │   └─> TASK-032           │
           │             ├─> TASK-030 ─┤            │
           │             ├─> TASK-031 ─┤            │
-          │             └─> TASK-034 ─┘            │
+          │             ├─> TASK-034 ─┤            │
+          │             └─> TASK-037 ─┘            │
           └─> TASK-035 ──────────────> (REST 守卫) ─┤
 TASK-005 ─┬───────────────────> TASK-013 ──────────┤
           └───────────────────> TASK-015 ─┬────────┤
@@ -148,15 +151,16 @@ TASK-014 ──────────────────> TASK-020       
 TASK-016..021 ─────────────> TASK-022 / 023 / 024 ────┤
 TASK-023 ──────────────────> TASK-026 ────────────────┤
 TASK-001..026, 028..035 ───> TASK-027 <───────────────┘
+TASK-037 ──────────────────> TASK-027
 TASK-030, TASK-033 ────────> TASK-036（独立任务，不阻塞主线）
 ```
-（注：TASK-030/031/034 依赖 TASK-003；TASK-035 只依赖 TASK-001；TASK-025 汇总依赖 TASK-003/004。）
+（注：TASK-030/031/034/037 依赖 TASK-003；TASK-035 只依赖 TASK-001；TASK-025 汇总依赖 TASK-003/004。）
 
 **关键路径**：`TASK-001 → TASK-003 → TASK-017 → TASK-020 → TASK-023 → TASK-027`
 
 ## 一致性检查清单
 
-- [ ] 所有 GEARS 需求（REQ-001..022，含后缀 010a / 011a / 018a / 018b）都能映射到测试用例
+- [ ] 所有 GEARS 需求（REQ-001..023，含后缀 010a / 011a / 018a / 018b）都能映射到测试用例
 - [ ] 依赖图无环；`classifyFrame` 由 TASK-003 导出并被 TASK-029 复用（**无脆弱耦合**：响应过滤不再自行解析帧）
 - [ ] 无孤儿任务（每个 TASK 至少链接 1 个 REQ）
 - [ ] 每条 REQ 至少被 1 个 TASK 覆盖；**过滤/注入/上限行为各有独立测试任务**（TASK-032 / TASK-004 / TASK-025）
@@ -174,3 +178,4 @@ TASK-030, TASK-033 ────────> TASK-036（独立任务，不阻塞
 - [ ] batch 任一元素越权 → **整批拒绝**，无局部转发（REQ-008）
 - [ ] REQ-017 判据为 **「参数类 schema 是否声明 `profile` 字段」**（非「是否直继 `Params`」），豁免清单 26 条，MethodSweep 机械断言可独立通过
 - [x] `tools.*` 等 `_SessionScoped` 方法的跨租户风险已闭合（R24 / TASK-036）：per-connection session 归属校验
+- [ ] 上传内容类型由 **BFF** 服务端校验（REQ-023 / TASK-037）：`image.attach_bytes`/`pdf.attach` 的 base64 载荷**仅前缀**魔数校验，不匹配不转发 + 审计；`file.attach` 不限类型（R10 闭合）

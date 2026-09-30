@@ -529,4 +529,49 @@ describe("profile guard over WS", () => {
     expect(upstreamState.frames[0]).toBe(frame);
     expect(JSON.parse(upstreamState.frames[0])).toEqual({ id: 9, result: { choice: "once" } });
   });
+
+  it("rejects an image attachment with invalid magic bytes and never forwards it (REQ-023)", async () => {
+    const { upstreamState, client, messages } = await boot("ws-attach-bad-token", () =>
+      seedAdmin(["alpha"]),
+    );
+
+    const frame = JSON.stringify({
+      jsonrpc: "2.0",
+      id: 61,
+      method: "image.attach_bytes",
+      params: { content_base64: Buffer.alloc(41, 0x41).toString("base64"), filename: "fake.png" },
+    });
+    client.send(frame);
+
+    const reply = JSON.parse(await messages.next());
+    expect(reply.id).toBe(61);
+    expect(reply.error.code).toBe(400);
+    expect(reply.error.data.code).toBe("INVALID_ATTACHMENT_TYPE");
+    expect(upstreamState.frames).toHaveLength(0);
+
+    const audit = ctx!.db
+      .prepare("SELECT action FROM audit WHERE action = ?")
+      .all("ws.upload.invalid_type");
+    expect(audit).toHaveLength(1);
+  });
+
+  it("forwards a valid PNG attachment with the profile injected (REQ-023)", async () => {
+    const { upstreamState, client, messages } = await boot("ws-attach-ok-token", () =>
+      seedAdmin(["alpha"]),
+    );
+
+    const png =
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    const frame = JSON.stringify({
+      jsonrpc: "2.0",
+      id: 62,
+      method: "image.attach_bytes",
+      params: { content_base64: png, filename: "1x1.png" },
+    });
+    client.send(frame);
+    await messages.next();
+
+    expect(upstreamState.frames).toHaveLength(1);
+    expect(JSON.parse(upstreamState.frames[0]).params.profile).toBe("alpha");
+  });
 });
