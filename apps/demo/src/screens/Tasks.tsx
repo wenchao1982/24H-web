@@ -1,8 +1,29 @@
 import { useState } from "react";
-import { CalendarClock, Pencil, Play, Plus, Search, Trash2 } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarClock,
+  Layers,
+  Pencil,
+  Play,
+  Plus,
+  Search,
+  Send,
+  Trash2,
+} from "lucide-react";
 import { NATIVE_AGENTS, TASKS } from "../mocks/data";
 import type { TaskItem } from "../mocks/types";
 import { cn } from "../lib/cn";
+
+const BLUEPRINTS = [
+  { id: "bp-1", name: "每日站会摘要", detail: "拉取昨日变更 → 生成摘要 → 投递" },
+  { id: "bp-2", name: "磁盘巡检告警", detail: "阈值检查 → 失败时通知" },
+];
+
+const DELIVERY_TARGETS = [
+  { id: "dt-1", label: "运维群", platform: "Telegram" },
+  { id: "dt-2", label: "#alerts", platform: "Slack" },
+  { id: "dt-3", label: "邮件（admin@）", platform: "Email" },
+];
 
 const CRON_PRESETS = [
   { label: "每小时", expr: "0 * * * *" },
@@ -160,23 +181,72 @@ export function Tasks() {
               </p>
               <div className="flex flex-col gap-1.5">
                 {[
-                  { at: active.last ?? "今天 09:00", status: "成功", ms: "1.2s" },
-                  { at: "昨天 09:00", status: "成功", ms: "1.4s" },
-                  { at: "前天 09:00", status: "失败", ms: "—" },
+                  { at: active.last ?? "今天 09:00", status: "成功", ms: "1.2s", err: "" },
+                  { at: "昨天 09:00", status: "成功", ms: "1.4s", err: "" },
+                  {
+                    at: "前天 09:00",
+                    status: "失败",
+                    ms: "—",
+                    err: "上游连接超时（HERMES_UNREACHABLE）；已重试 1 次",
+                  },
                 ].map((run, i) => (
                   <div
                     key={i}
-                    className="flex items-center gap-3 rounded-md border border-line-1 bg-s1 px-3 py-2 text-[12.5px]"
+                    className="flex flex-col gap-1 rounded-md border border-line-1 bg-s1 px-3 py-2 text-[12.5px]"
                   >
-                    <span className="text-label-2">{run.at}</span>
-                    <span className="text-label-3">{run.ms}</span>
-                    <span className="flex-1" />
-                    <span className={run.status === "成功" ? "text-success" : "text-danger"}>
-                      {run.status}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-label-2">{run.at}</span>
+                      <span className="text-label-3">{run.ms}</span>
+                      <span className="flex-1" />
+                      <span className={run.status === "成功" ? "text-success" : "text-danger"}>
+                        {run.status}
+                      </span>
+                    </div>
+                    {run.err ? (
+                      <p className="flex items-center gap-1.5 text-[11.5px] text-danger">
+                        <AlertTriangle size={12} /> {run.err}
+                      </p>
+                    ) : null}
                   </div>
                 ))}
               </div>
+            </div>
+
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <section className="rounded-lg border border-line-1 bg-s1 p-3.5">
+                <p className="mb-2 flex items-center gap-1.5 text-[12px] text-label-3">
+                  <Layers size={13} /> 蓝图
+                </p>
+                <div className="flex flex-col gap-2">
+                  {BLUEPRINTS.map((b) => (
+                    <div key={b.id} className="flex items-center gap-2">
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[12.5px] text-label-1">{b.name}</span>
+                        <span className="block text-[11px] text-label-3">{b.detail}</span>
+                      </span>
+                      <button
+                        type="button"
+                        className="shrink-0 rounded-md border border-line-1 px-2 py-0.5 text-[11px] text-label-2 hover:bg-s2"
+                      >
+                        实例化
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </section>
+              <section className="rounded-lg border border-line-1 bg-s1 p-3.5">
+                <p className="mb-2 flex items-center gap-1.5 text-[12px] text-label-3">
+                  <Send size={13} /> 投递目标
+                </p>
+                <div className="flex flex-col gap-1.5">
+                  {DELIVERY_TARGETS.map((t) => (
+                    <div key={t.id} className="flex items-center gap-2 text-[12.5px]">
+                      <span className="text-label-1">{t.label}</span>
+                      <span className="ml-auto text-[11px] text-label-3">{t.platform}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
             </div>
           </div>
         ) : (

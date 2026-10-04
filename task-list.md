@@ -327,7 +327,9 @@
 > 截图 `docs/refs/demo-*.png`；`build:demo` / `check:demo` 通过。
 > 注：以上**暂只进 Demo**；生产 `apps/web` 仍维持原实现（基线 UI 文档回填时同步）。
 >
-> **Demo 追加（M18 续）**：菜单加 **工作台>看板**、**编排** 组；新增 **看板（固定 4 列 Todo/Doing/Review/Done）**、**编排画布（`{{node.output}}` 注入 + 运行子代理树）**、**语音（composer mic + 聆听浮层）**；**智能体页改「方案 C 混合」**（左列表分组 `Hermes·profile` / `外部 agent`，外部 agent 卡片=logo·vendor·Installed·版本·Settings·Check for update·Delete·Automatic updates）。截图 `docs/refs/demo-{kanban,orchestration,voice,agents,agents-runtime,agents-install}-*.png`。
+> **Demo 追加（M18 续）**：菜单加 **工作台>看板**、**编排** 组；新增 **看板（固定 4 列 Todo/Doing/Review/Done）**、**编排画布（`{{node.output}}` 注入 + 运行子代理树）**、**语音（composer mic + 聆听浮层）**；**智能体页改「方案 C 混合」**（左列表分组 `Hermes·profile` / `外部 agent`，外部 agent 卡片=logo·vendor·Installed·版本·Settings·Check for update·Delete·Automatic updates）。截图 `docs/refs/demo-{kanban,orchestration,voice,agents,agents-runtime,agents-install}-*.png`。看板列已对齐 **Hermes `BOARD_COLUMNS`（triage…done，8 列）**。
+>
+> **Demo 反向补登（C03/C06/M19–M21 生产能力）**：`DetailsDock` Git 页补 **评审/发布**（ship-info 领先/落后 · 暂存/还原 · 提交/推送/PR）；`Tasks` 补 **蓝图实例化 + 投递目标 + 失败事件**；`Settings` 新增 **「语音」分区**（STT/TTS 提供方 + **自动朗读** + **唤醒词**开关）与 **「连接器」分组（独立于密钥库）**；`Composer`（docked）加 **自动朗读** 开关。`check:demo` / `build:demo` 通过。
 
 ## 订正（Hermes 接口/概念核对 · 2026-10）
 

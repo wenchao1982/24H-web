@@ -5,8 +5,10 @@ import {
   FileText,
   Folder,
   FolderOpen,
+  GitBranch,
   Image as ImageIcon,
   Package,
+  Upload,
   X,
 } from "lucide-react";
 import { ARTIFACTS, GIT_CHANGES, LOG_LINES, WORKSPACE_FILES } from "../mocks/data";
@@ -100,20 +102,108 @@ export function DetailsDock({ onClose }: DetailsDockProps) {
               ))}
             </div>
           ) : (
-            <div className="flex flex-col gap-1">
-              {GIT_CHANGES.map((c) => (
-                <div key={c.path} className="flex items-center gap-2 font-mono text-[12px]">
-                  <span className={cn("w-5 shrink-0 text-center", c.status === "M" ? "text-warning" : c.status === "A" ? "text-success" : c.status === "D" ? "text-danger" : "text-label-3")}>
-                    {c.status}
-                  </span>
-                  <span className="truncate text-label-2">{c.path}</span>
-                </div>
-              ))}
-            </div>
+            <GitReviewView />
           )}
         </div>
       )}
     </aside>
+  );
+}
+
+/** Git 评审 / 发布：状态 + 暂存/还原 + 提交/推送/PR（C06）。 */
+function GitReviewView() {
+  const [changes, setChanges] = useState(() => GIT_CHANGES.map((c) => ({ ...c, staged: c.status === "M" })));
+  const [message, setMessage] = useState("feat: 补齐编排执行器与看板导入");
+  const [note, setNote] = useState<string | null>(null);
+  const [prPending, setPrPending] = useState(false);
+
+  const toggle = (path: string) => {
+    setChanges((list) => list.map((c) => (c.path === path ? { ...c, staged: !c.staged } : c)));
+    setNote(null);
+  };
+  const revert = (path: string) => {
+    setChanges((list) => list.filter((c) => c.path !== path));
+    setNote(`已还原 ${path}`);
+  };
+
+  return (
+    <div className="flex flex-col gap-2.5">
+      <div className="flex items-center gap-1.5 rounded-md border border-line-1 bg-s1 px-2.5 py-1.5 text-[11.5px] text-label-2">
+        <GitBranch size={13} className="text-label-3" />
+        <span className="font-mono">feat/orchestration</span>
+        <span className="text-label-3">→ main</span>
+        <span className="ml-auto text-label-3">领先 3 · 落后 0</span>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        {changes.length === 0 ? (
+          <p className="py-2 text-center text-[12px] text-label-3">工作区干净。</p>
+        ) : (
+          changes.map((c) => (
+            <div key={c.path} className="flex items-center gap-2 font-mono text-[12px]">
+              <button
+                type="button"
+                onClick={() => toggle(c.path)}
+                className={cn(
+                  "w-5 shrink-0 text-center",
+                  c.status === "M" ? "text-warning" : c.status === "A" ? "text-success" : c.status === "D" ? "text-danger" : "text-label-3",
+                )}
+                aria-label={`暂存 ${c.path}`}
+              >
+                {c.status}
+              </button>
+              <span className={cn("truncate", c.staged ? "text-label-1" : "text-label-2")}>{c.path}</span>
+              {c.staged ? <span className="shrink-0 text-[10px] text-accent">已暂存</span> : null}
+              <button
+                type="button"
+                onClick={() => revert(c.path)}
+                className="ml-auto shrink-0 text-[11px] text-danger hover:underline"
+              >
+                还原
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+
+      <textarea
+        rows={2}
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        placeholder="提交信息"
+        className="rounded-md border border-line-1 bg-s1 px-2.5 py-2 text-[12px] text-label-1 outline-none focus:border-accent/50"
+      />
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => setNote("已提交 3 个文件")}
+          className="inline-flex h-8 items-center gap-1.5 rounded-md bg-accent px-3 text-[12px] font-medium text-white hover:bg-accent-strong"
+        >
+          提交
+        </button>
+        <button
+          type="button"
+          onClick={() => setNote("已推送到 origin/feat/orchestration")}
+          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-line-1 px-3 text-[12px] text-label-2 hover:bg-s2"
+        >
+          <Upload size={13} /> 推送
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setPrPending(true);
+            setNote("已创建 PR #128：补齐编排执行器与看板导入");
+          }}
+          className={cn(
+            "ml-auto inline-flex h-8 items-center rounded-md border px-3 text-[12px]",
+            prPending ? "border-accent/40 text-accent" : "border-line-1 text-label-2 hover:bg-s2",
+          )}
+        >
+          {prPending ? "PR #128" : "创建 PR"}
+        </button>
+      </div>
+      {note ? <p className="text-[11.5px] text-label-3">{note}</p> : null}
+    </div>
   );
 }
 

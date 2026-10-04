@@ -57,4 +57,5 @@
 - 独立高保真 Demo 落在 `apps/demo`（mock 数据、不碰后端），用于**先定稿视觉语言再回填**生产页。
 - Demo 内**允许引入 UI 库**（Tailwind v4 + Radix + lucide + cva/clsx）以快速出效果；
   **回填 `apps/web` 时仍须遵守 §1「不引 UI 库、手写 CSS + `--ds-*`」**，即 Demo 是设计参照而非直接复用代码。
-- Demo 独立验证 `check:demo`，**不进** 根 `npm run check`；首轮范围 = 核心 4 屏（见 `task-list.md` M18）。
+- Demo 独立验证 `check:demo`，**不进** 根 `npm run check`；首轮范围 = 核心 4 屏（见 `task-list.md` M18）；
+  现覆盖 18 屏，并反向补登生产能力：Git **评审/发布**、Cron **蓝图/投递目标/失败事件**、设置 **语音分区 + 连接器分组（独立于密钥库）**、看板 **8 列**。

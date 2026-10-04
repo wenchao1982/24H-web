@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { ArrowUp, Bot, Cpu, FolderClosed, Mic, Paperclip, Plus, SlidersHorizontal } from "lucide-react";
+import { ArrowUp, Bot, Cpu, FolderClosed, Mic, Paperclip, Plus, SlidersHorizontal, Volume2 } from "lucide-react";
 import { cn } from "../lib/cn";
 import { Pill } from "./Pill";
 
@@ -15,6 +15,7 @@ export interface ComposerProps {
 export function Composer({ variant = "hero" }: ComposerProps) {
   const hero = variant === "hero";
   const [listening, setListening] = useState(false);
+  const [autoRead, setAutoRead] = useState(false);
   return (
     <div className={cn("w-full", hero && "mx-auto max-w-[760px]")}>
       {hero ? (
@@ -62,6 +63,21 @@ export function Composer({ variant = "hero" }: ComposerProps) {
           ) : null}
           <span className="flex-1" />
           <span className="mr-1 font-mono text-[11px] text-label-3">0 / 10MB</span>
+          {!hero ? (
+            <button
+              type="button"
+              onClick={() => setAutoRead((v) => !v)}
+              aria-label="自动朗读"
+              aria-pressed={autoRead}
+              title="自动朗读助手回复"
+              className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-md transition-colors",
+                autoRead ? "bg-accent-weak text-accent" : "text-label-3 hover:bg-s2 hover:text-label-1",
+              )}
+            >
+              <Volume2 size={16} />
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => setListening((v) => !v)}
