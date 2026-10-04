@@ -56,8 +56,9 @@ async function runScenario(strict: boolean): Promise<Scenario> {
     gateway.emit("message.complete", { session_id: RUNTIME_ID, text: "你好，世界" });
   });
 
-  // StrictMode 会 mount → unmount → mount 双跑 effect，`on()` 调用次数必然为 2；
-  // 真正的不变量是 cleanup 后**存活**的 message.complete handler 恰好一个。
+  // M19 自动朗读新增第二个 `message.complete` 订阅（主事件 effect + 自动朗读 effect），
+  // 故非 StrictMode 基线为 2；StrictMode 双跑 effect 经 cleanup 后仍为 2。
+  // 真正的不变量是**助手气泡恰好一个**（下方断言）。
   const registrations = gateway.subscriberCount("message.complete");
   const assistantBubbles = Array.from(
     container.querySelectorAll('.bubble[data-role="assistant"]'),
@@ -74,7 +75,7 @@ describe("ChatPage StrictMode 重复助手气泡调查", () => {
   it("对照组（无 StrictMode）：每个事件只注册一次，恰好一个助手气泡", async () => {
     const { registrations, assistantBubbles, texts } = await runScenario(false);
 
-    expect(registrations, "非 StrictMode 下 message.complete 注册次数").toBe(1);
+    expect(registrations, "非 StrictMode 下 message.complete 注册次数").toBe(2);
     expect(assistantBubbles, "非 StrictMode 下助手气泡数量").toHaveLength(1);
     // M19：助手气泡含「朗读」按钮，故断言包含消息文本而非全等。
     expect(texts[0]).toContain("你好，世界");
@@ -83,7 +84,7 @@ describe("ChatPage StrictMode 重复助手气泡调查", () => {
   it("StrictMode：一个 message.complete 事件只应产生一个助手气泡", async () => {
     const { registrations, assistantBubbles, texts } = await runScenario(true);
 
-    expect.soft(registrations, "StrictMode 下 message.complete 注册次数").toBe(1);
+    expect.soft(registrations, "StrictMode 下 message.complete 注册次数").toBe(2);
     expect.soft(assistantBubbles, `StrictMode 下助手气泡数量（文本=${texts.join(" | ")}）`).toHaveLength(
       1,
     );

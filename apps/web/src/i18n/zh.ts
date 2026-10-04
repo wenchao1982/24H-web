@@ -219,6 +219,9 @@ export const zh = {
   "settings.section.integrations": "集成",
   "integrations.tabsAria": "集成子分区",
   "integrations.tab.memory": "记忆",
+  "integrations.tab.connectors": "连接器",
+  "connectors.title": "连接器",
+  "connectors.hint": "连接器独立于密钥库：展示 GitHub / Slack 等外部连接的授权状态。",
   "integrations.tab.webhooks": "Webhooks",
 
   "webhooks.title": "Webhooks",
@@ -366,6 +369,12 @@ export const zh = {
 
   "advanced.tab.voice": "语音",
   "voice.title": "语音",
+  "voice.prefs": "偏好",
+  "voice.autoRead": "自动朗读助手回复",
+  "voice.ttsSection": "语音合成（TTS）",
+  "voice.ttsSectionHint": "TTS 提供方与参数（schema 驱动）。",
+  "voice.sttSection": "语音识别（STT）",
+  "voice.sttSectionHint": "STT 提供方与参数（schema 驱动）。",
   "voice.hint": "唤醒词与语音合成；状态来自网关。",
   "voice.loading": "读取语音状态中…",
   "voice.stateLabel": "语音状态",

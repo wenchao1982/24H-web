@@ -64,3 +64,25 @@ export function normalizeGitDiff(payload: unknown): string {
   const source = asRecord(payload);
   return readString(source, "diff", "patch", "content");
 }
+
+export interface ShipInfo {
+  branch: string;
+  base: string;
+  ahead: number | null;
+  behind: number | null;
+  remote: string;
+}
+
+/** `GET /api/git/review/ship-info`：可推送目标/领先落后。 */
+export function normalizeShipInfo(payload: unknown): ShipInfo {
+  const root = asRecord(payload);
+  const num = (key: string): number | null =>
+    typeof root[key] === "number" ? (root[key] as number) : null;
+  return {
+    branch: readString(root, "branch", "current", "head"),
+    base: readString(root, "base", "base_branch", "baseBranch"),
+    ahead: num("ahead"),
+    behind: num("behind"),
+    remote: readString(root, "remote", "remote_name", "upstream"),
+  };
+}

@@ -4346,3 +4346,148 @@ mark {
 .bubble-speak:hover {
   color: var(--ds-accent);
 }
+
+/* ---------- 语音聆听浮层（M19） ---------- */
+.voice-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ds-overlay);
+}
+.voice-overlay-card {
+  width: 360px;
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-5);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface-l1);
+  box-shadow: var(--ds-elevation-panel);
+  text-align: center;
+}
+.voice-overlay-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  margin: 0;
+  color: var(--ds-accent);
+  font-size: var(--ds-font-size-sm);
+}
+.voice-overlay-text {
+  margin: 0;
+  min-height: 44px;
+  color: var(--ds-label-primary);
+  font-size: var(--ds-font-size);
+}
+
+/* ---------- 看板：home 订阅 + 导入弹窗（M20） ---------- */
+.task-detail-home {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+}
+.task-detail-home select {
+  font: inherit;
+  font-size: var(--ds-font-size-sm);
+  padding: var(--ds-space-1) var(--ds-space-2);
+  border: var(--ds-hairline) solid var(--ds-border-l2);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-l1);
+  color: var(--ds-label-primary);
+}
+.kanban-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ds-overlay);
+}
+.kanban-modal-card {
+  width: 440px;
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-4);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface-l1);
+  box-shadow: var(--ds-elevation-panel);
+}
+.kanban-modal-card h3 {
+  margin: 0;
+  font-size: var(--ds-font-size);
+}
+
+/* ---------- 编排：spawn_tree I/O + 执行规划（M21） ---------- */
+.orchestration-io,
+.orchestration-plan {
+  margin-top: var(--ds-space-3);
+  padding-top: var(--ds-space-3);
+  border-top: var(--ds-hairline) solid var(--ds-border-l1);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+}
+.orchestration-io-row {
+  display: flex;
+  gap: var(--ds-space-2);
+}
+.orchestration-io-row input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: var(--ds-font-size-sm);
+  padding: var(--ds-space-1) var(--ds-space-2);
+  border: var(--ds-hairline) solid var(--ds-border-l2);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-l1);
+  color: var(--ds-label-primary);
+}
+.orchestration-plan-list {
+  margin: 0;
+  padding-left: var(--ds-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+  font-size: var(--ds-font-size-sm);
+}
+.orchestration-plan-prompt {
+  margin: var(--ds-space-1) 0 0;
+  padding: var(--ds-space-2);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-l2);
+  font-size: var(--ds-font-size-xs);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ---------- 详情面板 → Git 评审 / 发布（C06） ---------- */
+.git-review {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+  margin-top: var(--ds-space-3);
+  padding-top: var(--ds-space-3);
+  border-top: var(--ds-hairline) solid var(--ds-border-l1);
+}
+.git-review h4 {
+  margin: 0;
+  font-size: var(--ds-font-size-sm);
+}
+.git-review textarea {
+  font: inherit;
+  font-size: var(--ds-font-size-sm);
+  padding: var(--ds-space-2);
+  border: var(--ds-hairline) solid var(--ds-border-l2);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-l1);
+  color: var(--ds-label-primary);
+  resize: vertical;
+}

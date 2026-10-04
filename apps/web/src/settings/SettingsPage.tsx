@@ -13,6 +13,7 @@ import IntegrationsPanel from "./IntegrationsPanel";
 import AdvancedSettingsPanel from "./AdvancedSettingsPanel";
 import UpgradePanel from "./UpgradePanel";
 import VoicePanel from "./VoicePanel";
+import SchemaSectionPanel from "./SchemaSectionPanel";
 import { t, type TranslationKey } from "../i18n";
 
 interface SectionDef {
@@ -70,7 +71,21 @@ export default function SettingsPage() {
         {section === "keys" ? <KeysPanel /> : null}
         {section === "model" ? <ModelPanel /> : null}
         {section === "appearance" ? <AppearancePanel /> : null}
-        {section === "voice" ? <VoicePanel /> : null}
+        {section === "voice" ? (
+          <>
+            <VoicePanel />
+            <SchemaSectionPanel
+              titleKey="voice.ttsSection"
+              hintKey="voice.ttsSectionHint"
+              prefix="tts"
+            />
+            <SchemaSectionPanel
+              titleKey="voice.sttSection"
+              hintKey="voice.sttSectionHint"
+              prefix="stt"
+            />
+          </>
+        ) : null}
         {section === "config" ? <ConfigPanel /> : null}
         {section === "approvals" ? <ApprovalPanel /> : null}
         {section === "oauth" ? <OAuthPanel /> : null}

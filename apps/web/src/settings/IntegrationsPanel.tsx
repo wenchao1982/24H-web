@@ -2,6 +2,7 @@ import { useState } from "react";
 import MemoryPanel from "./MemoryPanel";
 import WebhooksPanel from "./WebhooksPanel";
 import PluginCatalogPanel from "./PluginCatalogPanel";
+import ConnectorsPanel from "./ConnectorsPanel";
 import { t, type TranslationKey } from "../i18n";
 
 interface TabDef {
@@ -11,6 +12,7 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   { id: "memory", labelKey: "integrations.tab.memory" },
+  { id: "connectors", labelKey: "integrations.tab.connectors" },
   { id: "webhooks", labelKey: "integrations.tab.webhooks" },
   { id: "plugins", labelKey: "integrations.tab.plugins" },
 ];
@@ -36,6 +38,7 @@ export default function IntegrationsPanel() {
         ))}
       </nav>
       {tab === "memory" ? <MemoryPanel /> : null}
+      {tab === "connectors" ? <ConnectorsPanel /> : null}
       {tab === "webhooks" ? <WebhooksPanel /> : null}
       {tab === "plugins" ? <PluginCatalogPanel /> : null}
     </div>

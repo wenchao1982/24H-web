@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { fetchTask, type KanbanTaskDetail } from "./kanban";
+import {
+  fetchTask,
+  subscribeHome,
+  unsubscribeHome,
+  type KanbanTaskDetail,
+} from "./kanban";
+
+const HOME_PLATFORMS = ["telegram", "discord", "slack"];
 
 export interface TaskDetailProps {
   taskId: string;
@@ -22,6 +29,9 @@ export default function TaskDetail({ taskId, onClose }: TaskDetailProps) {
   const [detail, setDetail] = useState<KanbanTaskDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [platform, setPlatform] = useState("telegram");
+  const [homeBusy, setHomeBusy] = useState(false);
+  const [homeMessage, setHomeMessage] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -38,6 +48,24 @@ export default function TaskDetail({ taskId, onClose }: TaskDetailProps) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const subscribe = async (action: "subscribe" | "unsubscribe") => {
+    setHomeBusy(true);
+    setHomeMessage(null);
+    try {
+      if (action === "subscribe") {
+        await subscribeHome(taskId, platform);
+        setHomeMessage(`已订阅 ${platform}`);
+      } else {
+        await unsubscribeHome(taskId, platform);
+        setHomeMessage(`已退订 ${platform}`);
+      }
+    } catch (err) {
+      setHomeMessage(err instanceof Error ? err.message : "操作失败");
+    } finally {
+      setHomeBusy(false);
+    }
+  };
 
   const task = detail?.task ?? null;
 
@@ -123,6 +151,39 @@ export default function TaskDetail({ taskId, onClose }: TaskDetailProps) {
               </ul>
             </Section>
           ) : null}
+
+          <Section title="Home 订阅">
+            <div className="task-detail-home">
+              <select
+                aria-label="Home 平台"
+                value={platform}
+                onChange={(event) => setPlatform(event.target.value)}
+              >
+                {HOME_PLATFORMS.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="ghost"
+                disabled={homeBusy}
+                onClick={() => void subscribe("subscribe")}
+              >
+                订阅
+              </button>
+              <button
+                type="button"
+                className="ghost"
+                disabled={homeBusy}
+                onClick={() => void subscribe("unsubscribe")}
+              >
+                退订
+              </button>
+            </div>
+            {homeMessage ? <p className="muted">{homeMessage}</p> : null}
+          </Section>
         </div>
       ) : (
         <p className="empty">任务不存在。</p>

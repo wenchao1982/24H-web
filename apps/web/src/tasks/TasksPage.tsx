@@ -1,7 +1,18 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { api } from "../api/client";
 import { ConfirmDialog, EmptyState, Skeleton, Tag, type TagTone } from "../ui";
-import { CRON_TEMPLATES, nextCronRun, normalizeCronJobs, type CronJob } from "./cron";
+import {
+  CRON_TEMPLATES,
+  nextCronRun,
+  normalizeBlueprints,
+  normalizeCronJobs,
+  normalizeDeliveryTargets,
+  normalizeRuns,
+  type CronBlueprint,
+  type CronJob,
+  type CronRun,
+  type DeliveryTarget,
+} from "./cron";
 
 type CronAction = "pause" | "resume" | "remove" | "trigger";
 
@@ -35,6 +46,10 @@ export default function TasksPage() {
   const [name, setName] = useState("");
   const [schedule, setSchedule] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [targets, setTargets] = useState<DeliveryTarget[]>([]);
+  const [blueprints, setBlueprints] = useState<CronBlueprint[]>([]);
+  const [runsJob, setRunsJob] = useState<string | null>(null);
+  const [runs, setRuns] = useState<CronRun[]>([]);
 
   const preview = useMemo(() => {
     if (!schedule.trim()) {
@@ -46,7 +61,14 @@ export default function TasksPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setJobs(normalizeCronJobs(await api<unknown>("/api/hermes/cron/jobs")));
+      const [jobsPayload, targetsPayload, blueprintsPayload] = await Promise.all([
+        api<unknown>("/api/hermes/cron/jobs"),
+        api<unknown>("/api/hermes/cron/delivery-targets").catch(() => null),
+        api<unknown>("/api/hermes/cron/blueprints").catch(() => null),
+      ]);
+      setJobs(normalizeCronJobs(jobsPayload));
+      setTargets(targetsPayload ? normalizeDeliveryTargets(targetsPayload) : []);
+      setBlueprints(blueprintsPayload ? normalizeBlueprints(blueprintsPayload) : []);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "加载任务列表失败");
@@ -54,6 +76,31 @@ export default function TasksPage() {
       setLoading(false);
     }
   }, []);
+
+  const instantiate = async (blueprintId: string) => {
+    setBusy(`bp:${blueprintId}`);
+    try {
+      await api("/api/hermes/cron/blueprints/instantiate", {
+        method: "POST",
+        body: JSON.stringify({ blueprint_id: blueprintId }),
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "实例化蓝图失败");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const showRuns = async (id: string) => {
+    setRunsJob(id);
+    setRuns([]);
+    try {
+      setRuns(normalizeRuns(await api<unknown>(`/api/hermes/cron/jobs/${encodeURIComponent(id)}/runs`)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "加载运行历史失败");
+    }
+  };
 
   useEffect(() => {
     void load();
@@ -207,6 +254,9 @@ export default function TasksPage() {
                         >
                           立即运行
                         </button>
+                        <button type="button" onClick={() => void showRuns(job.id)}>
+                          运行历史
+                        </button>
                         <button
                           type="button"
                           className="danger"
@@ -224,6 +274,72 @@ export default function TasksPage() {
           </>
         )}
       </div>
+
+      <div className="card">
+        <h3>投递目标</h3>
+        {targets.length === 0 ? (
+          <p className="muted">暂无投递目标。</p>
+        ) : (
+          <div className="row">
+            {targets.map((target) => (
+              <Tag key={target.id} tone="neutral">
+                {target.label}
+                {target.platform ? ` · ${target.platform}` : ""}
+              </Tag>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="card">
+        <h3>蓝图</h3>
+        {blueprints.length === 0 ? (
+          <p className="muted">暂无蓝图。</p>
+        ) : (
+          <ul className="task-detail-list">
+            {blueprints.map((blueprint) => (
+              <li key={blueprint.id}>
+                <strong>{blueprint.name}</strong>
+                {blueprint.description ? <span className="muted"> — {blueprint.description}</span> : null}
+                <button
+                  type="button"
+                  className="ghost"
+                  disabled={busy !== null}
+                  onClick={() => void instantiate(blueprint.id)}
+                >
+                  实例化
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {runsJob ? (
+        <div className="card">
+          <div className="row">
+            <h3>运行历史 · {runsJob}</h3>
+            <button type="button" className="ghost" onClick={() => setRunsJob(null)}>
+              关闭
+            </button>
+          </div>
+          {runs.length === 0 ? (
+            <p className="muted">暂无记录或全部成功。</p>
+          ) : (
+            <ul className="task-detail-list">
+              {runs.map((entry) => (
+                <li key={entry.id}>
+                  <Tag tone={entry.status.toLowerCase().includes("fail") ? "danger" : "neutral"}>
+                    {entry.status || "unknown"}
+                  </Tag>
+                  <span className="muted"> {entry.startedAt}</span>
+                  {entry.message ? <span> — {entry.message}</span> : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
 
       <ConfirmDialog
         open={deleteTarget !== null}

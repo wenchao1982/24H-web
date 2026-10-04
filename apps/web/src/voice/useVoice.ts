@@ -10,6 +10,8 @@ export interface UseVoiceOptions {
 
 export interface VoiceController {
   listening: boolean;
+  /** 本轮聆听累积的转写文本（供 VoiceOverlay 实时显示）。 */
+  transcript: string;
   toggle: () => void;
   stop: () => void;
   /** TTS 朗读（`voice.tts`）；打断由 `voice.interrupted` 事件处理。 */
@@ -26,6 +28,7 @@ export interface VoiceController {
 export function useVoice({ sessionId, onTranscript }: UseVoiceOptions): VoiceController {
   const gateway = useGateway();
   const [listening, setListening] = useState(false);
+  const [transcript, setTranscript] = useState("");
   const handler = useRef(onTranscript);
   handler.current = onTranscript;
 
@@ -41,6 +44,7 @@ export function useVoice({ sessionId, onTranscript }: UseVoiceOptions): VoiceCon
         }
         const text = typeof payload.text === "string" ? payload.text.trim() : "";
         if (text) {
+          setTranscript((current) => (current ? `${current} ${text}` : text));
           handler.current(text);
         }
       }),
@@ -65,7 +69,14 @@ export function useVoice({ sessionId, onTranscript }: UseVoiceOptions): VoiceCon
             ...(sid ? { session_id: sid } : {}),
           }),
         )
-        .then((result) => setListening(action === "start" && result?.status === "recording"))
+        .then((result) => {
+          if (action === "start" && result?.status === "recording") {
+            setTranscript("");
+            setListening(true);
+          } else {
+            setListening(false);
+          }
+        })
         .catch(() => setListening(false));
     },
     [gateway, sessionId],
@@ -104,5 +115,5 @@ export function useVoice({ sessionId, onTranscript }: UseVoiceOptions): VoiceCon
     [gateway, sessionId],
   );
 
-  return { listening, toggle, stop, speak };
+  return { listening, transcript, toggle, stop, speak };
 }

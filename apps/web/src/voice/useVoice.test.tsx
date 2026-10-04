@@ -49,6 +49,22 @@ describe("useVoice (M19)", () => {
     expect(onTranscript).toHaveBeenCalledWith("你好世界");
   });
 
+  it("accumulates voice.transcript during a listening session", async () => {
+    const { gateway, result } = setup();
+
+    await act(async () => {
+      result.current.toggle();
+    });
+    act(() => {
+      gateway.emit("voice.transcript", { text: "你好" });
+    });
+    act(() => {
+      gateway.emit("voice.transcript", { text: "世界" });
+    });
+
+    expect(result.current.transcript).toBe("你好 世界");
+  });
+
   it("speaks text via voice.tts", async () => {
     const { gateway, result } = setup();
 

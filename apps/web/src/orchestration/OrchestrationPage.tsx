@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { useGateway } from "../chat/GatewayProvider";
 import {
+  deserializeFlow,
   normalizeDelegation,
+  planExecution,
+  serializeFlow,
   type DelegationTree,
+  type ExecutionStep,
   type Flow,
   type FlowKind,
   type FlowNode,
@@ -35,6 +39,11 @@ export default function OrchestrationPage() {
   const [selectedId, setSelectedId] = useState<string | null>("n-1");
   const [tree, setTree] = useState<DelegationTree | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
+  const [plan, setPlan] = useState<ExecutionStep[]>([]);
+  const [spawnPath, setSpawnPath] = useState("");
+  const [ioMessage, setIoMessage] = useState<string | null>(null);
+  const [ioBusy, setIoBusy] = useState(false);
+  const [snapshots, setSnapshots] = useState<string[]>([]);
 
   const refreshRun = useCallback(async () => {
     try {
@@ -64,6 +73,98 @@ export default function OrchestrationPage() {
 
   const nodeById = (id: string) => flow.nodes.find((node) => node.id === id);
 
+  const withGateway = async <T,>(fn: () => Promise<T>): Promise<T> => {
+    await gateway.connect().catch(() => undefined);
+    return fn();
+  };
+
+  const exportFlow = async () => {
+    setIoBusy(true);
+    setIoMessage(null);
+    try {
+      const result = await withGateway(() =>
+        gateway.request("spawn_tree.save", { subagents: serializeFlow(flow).subagents }),
+      );
+      const path =
+        result && typeof result === "object" && typeof (result as { path?: unknown }).path === "string"
+          ? (result as { path: string }).path
+          : null;
+      setIoMessage(path ? `已保存：${path}` : "已保存编排");
+    } catch (err) {
+      setIoMessage(err instanceof Error ? err.message : "导出失败");
+    } finally {
+      setIoBusy(false);
+    }
+  };
+
+  const importFlow = async () => {
+    if (spawnPath.trim() === "") {
+      return;
+    }
+    setIoBusy(true);
+    setIoMessage(null);
+    try {
+      const result = await withGateway(() =>
+        gateway.request("spawn_tree.load", { path: spawnPath.trim() }),
+      );
+      const loaded = deserializeFlow(result);
+      if (loaded.nodes.length === 0) {
+        setIoMessage("快照无可识别节点");
+        return;
+      }
+      setFlow(loaded);
+      setSelectedId(loaded.nodes[0].id);
+      setPlan([]);
+      setIoMessage(`已载入 ${loaded.nodes.length} 个节点`);
+    } catch (err) {
+      setIoMessage(err instanceof Error ? err.message : "导入失败");
+    } finally {
+      setIoBusy(false);
+    }
+  };
+
+  const listFlows = async () => {
+    setIoBusy(true);
+    setIoMessage(null);
+    try {
+      const result = await withGateway(() => gateway.request("spawn_tree.list", {}));
+      const record = result && typeof result === "object" ? (result as Record<string, unknown>) : {};
+      const raw = Array.isArray(result)
+        ? result
+        : Array.isArray(record.trees)
+          ? record.trees
+          : Array.isArray(record.items)
+            ? record.items
+            : [];
+      const paths = raw.flatMap((entry) => {
+        if (typeof entry === "string") {
+          return [entry];
+        }
+        if (entry && typeof entry === "object") {
+          const value = (entry as Record<string, unknown>).path ?? (entry as Record<string, unknown>).name;
+          return typeof value === "string" ? [value] : [];
+        }
+        return [];
+      });
+      setSnapshots(paths);
+      if (paths.length === 0) {
+        setIoMessage("无已保存快照");
+      }
+    } catch (err) {
+      setIoMessage(err instanceof Error ? err.message : "读取快照失败");
+    } finally {
+      setIoBusy(false);
+    }
+  };
+
+  const buildPlan = () => {
+    const outputs: Record<string, string> = {};
+    for (const node of flow.nodes) {
+      outputs[node.id] = `[${node.label} 输出]`;
+    }
+    setPlan(planExecution(flow, outputs));
+  };
+
   const updateLabel = (label: string) => {
     if (!selectedId) {
       return;
@@ -81,6 +182,18 @@ export default function OrchestrationPage() {
     setFlow((current) => ({
       ...current,
       nodes: current.nodes.map((node) => (node.id === selectedId ? { ...node, kind } : node)),
+    }));
+  };
+
+  const updatePrompt = (prompt: string) => {
+    if (!selectedId) {
+      return;
+    }
+    setFlow((current) => ({
+      ...current,
+      nodes: current.nodes.map((node) =>
+        node.id === selectedId ? { ...node, prompt: prompt === "" ? undefined : prompt } : node,
+      ),
     }));
   };
 
@@ -110,6 +223,15 @@ export default function OrchestrationPage() {
         </button>
         <button type="button" className="ghost" onClick={() => void refreshRun()}>
           刷新运行
+        </button>
+        <button type="button" className="ghost" disabled={ioBusy} onClick={() => void exportFlow()}>
+          导出
+        </button>
+        <button type="button" className="ghost" disabled={ioBusy} onClick={() => void listFlows()}>
+          列表
+        </button>
+        <button type="button" className="ghost" onClick={buildPlan}>
+          规划
         </button>
       </div>
 
@@ -205,6 +327,16 @@ export default function OrchestrationPage() {
                   <option value="tool">工具</option>
                 </select>
               </label>
+              <label className="orchestration-field">
+                <span>提示词</span>
+                <textarea
+                  aria-label="节点提示词"
+                  rows={3}
+                  value={nodeById(selectedId)?.prompt ?? ""}
+                  onChange={(event) => updatePrompt(event.target.value)}
+                  placeholder={"可引用上游输出，如 基于 {{node.output}}"}
+                />
+              </label>
               <button
                 type="button"
                 className="ghost danger"
@@ -242,6 +374,65 @@ export default function OrchestrationPage() {
           ) : (
             <p className="muted">暂无活动子代理。</p>
           )}
+
+          <div className="orchestration-io">
+            <p className="orchestration-inspector-title">导入（spawn_tree.load）</p>
+            <div className="orchestration-io-row">
+              <input
+                aria-label="快照路径"
+                placeholder="快照路径"
+                value={spawnPath}
+                onChange={(event) => setSpawnPath(event.target.value)}
+              />
+              <button
+                type="button"
+                className="ghost"
+                disabled={ioBusy || spawnPath.trim() === ""}
+                onClick={() => void importFlow()}
+              >
+                导入
+              </button>
+            </div>
+            {ioMessage ? <p className="muted">{ioMessage}</p> : null}
+            {snapshots.length > 0 ? (
+              <ul className="orchestration-plan-list">
+                {snapshots.map((path) => (
+                  <li key={path}>
+                    <button
+                      type="button"
+                      className="ghost"
+                      onClick={() => {
+                        setSpawnPath(path);
+                        setIoMessage(null);
+                      }}
+                    >
+                      选用
+                    </button>{" "}
+                    {path}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+
+          {plan.length > 0 ? (
+            <div className="orchestration-plan">
+              <p className="orchestration-inspector-title">执行规划（变量注入）</p>
+              <ol className="orchestration-plan-list">
+                {plan.map((step) => (
+                  <li key={step.nodeId}>
+                    <strong>{step.label}</strong>
+                    {step.inputs.length > 0 ? (
+                      <span className="muted"> ← {step.inputs.join(", ")}</span>
+                    ) : null}
+                    <pre className="orchestration-plan-prompt">
+                      {step.resolved === "" ? "（无提示词）" : step.resolved}
+                    </pre>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          ) : null}
         </aside>
       </div>
     </div>

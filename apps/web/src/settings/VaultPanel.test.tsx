@@ -4,12 +4,7 @@ import userEvent from "@testing-library/user-event";
 import VaultPanel from "./VaultPanel";
 import { GatewayProvider } from "../chat/GatewayProvider";
 import { createFakeGateway, type FakeGateway } from "../test/fakeGateway";
-import {
-  normalizeConnectors,
-  normalizeVaultEntries,
-  vaultAddParams,
-  vaultRemoveParams,
-} from "./vault";
+import { normalizeVaultEntries, vaultAddParams, vaultRemoveParams } from "./vault";
 
 function renderPanel(gateway: FakeGateway) {
   return render(
@@ -23,9 +18,6 @@ function impl(method: string): unknown {
   if (method === "vault.list") {
     return { entries: [{ name: "OPENAI_API_KEY", value: "sk-super-secret" }] };
   }
-  if (method === "connectors.list") {
-    return { connectors: [{ name: "github", connected: true }] };
-  }
   return {};
 }
 
@@ -34,7 +26,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("VaultPanel T18.13 密钥库/连接器", () => {
+describe("VaultPanel T18.13 密钥库", () => {
   it("lists entries masked and never renders the secret value", async () => {
     const gateway = createFakeGateway(impl);
     renderPanel(gateway);
@@ -42,8 +34,6 @@ describe("VaultPanel T18.13 密钥库/连接器", () => {
     expect(await screen.findByText("OPENAI_API_KEY")).toBeInTheDocument();
     expect(screen.getByLabelText("OPENAI_API_KEY 掩码值")).toHaveTextContent("••••••••");
     expect(screen.queryByText("sk-super-secret")).not.toBeInTheDocument();
-    expect(screen.getByText("github")).toBeInTheDocument();
-    expect(screen.getByText("已连接")).toBeInTheDocument();
   });
 
   it("adds and removes a vault entry", async () => {
@@ -73,9 +63,6 @@ describe("VaultPanel T18.13 密钥库/连接器", () => {
     expect(normalizeVaultEntries([{ name: "A", value: "nope" }])).toEqual([{ name: "A" }]);
     expect(normalizeVaultEntries(["B"])).toEqual([{ name: "B" }]);
     expect(normalizeVaultEntries(null)).toEqual([]);
-    expect(normalizeConnectors([{ id: "slack", state: "disconnected" }])).toEqual([
-      { name: "slack", status: "disconnected" },
-    ]);
     expect(vaultAddParams(" K ", "v")).toEqual({ name: "K", value: "v" });
     expect(vaultRemoveParams("K")).toEqual({ name: "K" });
   });

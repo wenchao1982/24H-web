@@ -8,6 +8,7 @@ import {
   exportBoard,
   fetchBoard,
   fetchBoards,
+  importBoard,
   updateTaskStatus,
   type KanbanBoard,
   type KanbanBoardSummary,
@@ -39,6 +40,9 @@ export default function KanbanPage() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [boards, setBoards] = useState<KanbanBoardSummary[]>([]);
   const [boardSlug, setBoardSlug] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [archivePath, setArchivePath] = useState("");
+  const [importSlug, setImportSlug] = useState("");
 
   const loadBoards = useCallback(async () => {
     try {
@@ -147,6 +151,9 @@ export default function KanbanPage() {
         >
           导出
         </Button>
+        <Button variant="outline" type="button" disabled={busy} onClick={() => setImportOpen(true)}>
+          导入
+        </Button>
       </div>
 
       {boards.length > 0 ? (
@@ -243,6 +250,50 @@ export default function KanbanPage() {
 
       {selectedTaskId ? (
         <TaskDetail taskId={selectedTaskId} onClose={() => setSelectedTaskId(null)} />
+      ) : null}
+
+      {importOpen ? (
+        <div className="kanban-modal" onClick={() => setImportOpen(false)}>
+          <div className="kanban-modal-card" onClick={(event) => event.stopPropagation()}>
+            <h3>导入 board</h3>
+            <Input
+              aria-label="归档路径"
+              placeholder="服务端归档路径（.tar.gz）"
+              value={archivePath}
+              onChange={(event) => setArchivePath(event.target.value)}
+            />
+            <Input
+              aria-label="新 board slug"
+              placeholder="新 board slug（可选）"
+              value={importSlug}
+              onChange={(event) => setImportSlug(event.target.value)}
+            />
+            <div className="row">
+              <Button
+                variant="primary"
+                type="button"
+                disabled={busy || archivePath.trim() === ""}
+                onClick={() =>
+                  void run(async () => {
+                    await importBoard({
+                      archive: archivePath.trim(),
+                      ...(importSlug.trim() ? { slug: importSlug.trim() } : {}),
+                      switch: true,
+                    });
+                    setImportOpen(false);
+                    setArchivePath("");
+                    setImportSlug("");
+                  }, "已导入 board")
+                }
+              >
+                确认导入
+              </Button>
+              <Button variant="ghost" type="button" onClick={() => setImportOpen(false)}>
+                取消
+              </Button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </div>
   );

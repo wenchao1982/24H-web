@@ -21,6 +21,8 @@ import SessionHeaderMenu from "./SessionHeaderMenu";
 import HeroIntro from "./HeroIntro";
 import { ComposerControls, useSessionControls, type UploadPanelKind } from "./composer";
 import { useVoice } from "../voice/useVoice";
+import VoiceOverlay from "../voice/VoiceOverlay";
+import { getAutoRead } from "../voice/autoread";
 import ContentMatches from "./ContentMatches";
 import { searchSessions, type SessionContentMatch } from "./sessionSearch";
 import { normalizeCatalog, slashResultText, type SlashCommand } from "./slash";
@@ -854,6 +856,21 @@ export default function ChatPage() {
     },
   });
 
+  // M19 自动朗读：message.complete 时按本地偏好朗读助手文本（值经 ref 取，避免重订阅）。
+  const speakRef = useRef<(text: string) => void>(() => undefined);
+  speakRef.current = voice.speak;
+  useEffect(() => {
+    return gateway.on("message.complete", (payload) => {
+      if (!getAutoRead()) {
+        return;
+      }
+      const text = typeof payload.text === "string" ? payload.text : "";
+      if (text) {
+        speakRef.current(text);
+      }
+    });
+  }, [gateway]);
+
   return (
     <div className="chat" data-narrow={narrow} data-view={view}>
       <aside className="chat-list">
@@ -1036,6 +1053,9 @@ export default function ChatPage() {
           )}
         />
         <StatusBar status={status} />
+        {voice.listening ? (
+          <VoiceOverlay transcript={voice.transcript} onStop={voice.stop} />
+        ) : null}
       </section>
     </div>
   );

@@ -393,7 +393,8 @@ hermes-achievements 6 端点：/api/plugins/hermes-achievements/{achievements,sc
 | **遗漏** | 语音/唤醒/TTS/STT | 已纳入 M19 |
 | **遗漏** | Git review/ship/worktree（21） | 未纳入（C06） |
 | **遗漏** | 会话全文搜索（FTS5） | 未纳入（C06） |
-| **遗漏** | Cron blueprints/delivery/incidents | 未纳入（C06） |
+| **已纳入** | Cron blueprints/delivery/runs；Git review/ship | 已交付（C06） |
+| **明确排除** | 反向 MCP serve / ACP | 非企业 web 端目标（C06） |
 | **遗漏** | 反向 MCP serve / ACP / batch | 未纳入（C06，可选） |
 | **遗漏** | Pets / Skins / Achievements | 未纳入（可排除） |
 | **增强** | vault secret sources、memory providers OAuth、display/Bot Screen、egress/security-audit、profiles 全量、providers custom-endpoints | 部分/浅，按需增强 |

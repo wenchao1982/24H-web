@@ -173,6 +173,30 @@ export async function exportBoard(slug: string): Promise<unknown> {
   });
 }
 
+/** 从归档导入为新 board（archive 为服务端可见路径）。 */
+export function importBoard(input: {
+  archive: string;
+  slug?: string;
+  switch?: boolean;
+}): Promise<unknown> {
+  return api(`${BASE}/boards/import`, { method: "POST", body: JSON.stringify(input) });
+}
+
+/** 订阅/退订任务到某平台 home 频道。 */
+export function subscribeHome(taskId: string, platform: string): Promise<unknown> {
+  return api(
+    `${BASE}/tasks/${encodeURIComponent(taskId)}/home-subscribe/${encodeURIComponent(platform)}`,
+    { method: "POST", body: JSON.stringify({}) },
+  );
+}
+
+export function unsubscribeHome(taskId: string, platform: string): Promise<unknown> {
+  return api(
+    `${BASE}/tasks/${encodeURIComponent(taskId)}/home-subscribe/${encodeURIComponent(platform)}`,
+    { method: "DELETE" },
+  );
+}
+
 export function createTask(input: {
   title: string;
   assignee?: string;

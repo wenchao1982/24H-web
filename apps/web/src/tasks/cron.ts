@@ -158,6 +158,88 @@ export function nextCronRun(expr: string, from: Date = new Date()): Date | null 
   return null;
 }
 
+export interface DeliveryTarget {
+  id: string;
+  label: string;
+  platform: string;
+}
+
+function pickList(payload: unknown, ...keys: string[]): unknown[] {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+  const raw = asRecord(payload);
+  for (const key of keys) {
+    if (Array.isArray(raw[key])) {
+      return raw[key] as unknown[];
+    }
+  }
+  return [];
+}
+
+/** `GET /api/cron/delivery-targets`。 */
+export function normalizeDeliveryTargets(payload: unknown): DeliveryTarget[] {
+  return pickList(payload, "targets", "target")
+    .map((item) => {
+      const source = asRecord(item);
+      const id = readString(source, "id", "target_id", "name");
+      if (!id) {
+        return null;
+      }
+      return {
+        id,
+        label: readString(source, "label", "name", "title") || id,
+        platform: readString(source, "platform", "channel", "kind"),
+      };
+    })
+    .filter((value): value is DeliveryTarget => value !== null);
+}
+
+export interface CronBlueprint {
+  id: string;
+  name: string;
+  description: string;
+}
+
+/** `GET /api/cron/blueprints`。 */
+export function normalizeBlueprints(payload: unknown): CronBlueprint[] {
+  return pickList(payload, "blueprints", "items")
+    .map((item) => {
+      const source = asRecord(item);
+      const id = readString(source, "id", "blueprint_id", "name");
+      if (!id) {
+        return null;
+      }
+      return {
+        id,
+        name: readString(source, "name", "title", "label") || id,
+        description: readString(source, "description", "summary"),
+      };
+    })
+    .filter((value): value is CronBlueprint => value !== null);
+}
+
+export interface CronRun {
+  id: string;
+  status: string;
+  startedAt: string;
+  message: string;
+}
+
+/** `GET /api/cron/jobs/{id}/runs`（含失败事件）。 */
+export function normalizeRuns(payload: unknown): CronRun[] {
+  return pickList(payload, "runs", "items", "history")
+    .map((item, index) => {
+      const source = asRecord(item);
+      const id = readString(source, "id", "run_id") || `run-${index}`;
+      const status = readString(source, "status", "state", "result");
+      const startedAt = readString(source, "started_at", "startedAt", "timestamp", "created_at");
+      const message = readString(source, "error", "message", "detail", "summary");
+      return { id, status, startedAt, message };
+    })
+    .filter((run) => run.status.toLowerCase().includes("fail") || run.status.toLowerCase().includes("error") || run.message !== "" || run.status !== "");
+}
+
 /** 列表响应兼容 `[...]` / `{jobs:[...]}`；字段兼容 snake_case 与 camelCase。 */
 export function normalizeCronJobs(payload: unknown): CronJob[] {
   const raw = asRecord(payload);

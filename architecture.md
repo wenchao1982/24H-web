@@ -158,13 +158,13 @@ Hermes `SERVER_REQUESTS` 实际 **13** 类，客户端必须**逐类同 `id` 回
 
 - 插件 REST `/api/plugins/kanban/*`（47：board / tasks CRUD + attachments / comments / links / bulk / runs / terminate / reclaim / specify / reassign / estimate / dispatch / orchestration / stats / boards CRUD + export/import/switch / profiles / model-options / home-subscribe）→ BFF `/api/hermes/plugins/kanban/*`。
 - 事件 WS `/api/plugins/kanban/events` → BFF `/api/hermes/stream`。
-- **固定 4 列** `Todo/Doing/Review/Done`；卡片指派 agent/profile；`dispatch` 触发 worker；导入导出 board。
+- 列 = Hermes `BOARD_COLUMNS`（`triage/todo/scheduled/ready/running/blocked/review/done`，8 列）；卡片指派 agent/profile；`dispatch` 触发 worker；导入导出 board（`boards/import|export`，UI 已接）；`home-subscribe` 订阅/退订。
 
 ### 8.4 可视化编排（M21，自建执行层）
 
 - **不自研 agent 内核**：画布节点映射到 `spawn_tree.*` / `delegation.*` / `subagent.*` / MoA / groups。
 - **执行语义**：边上**上游输出注入下游**，采用**变量替换 `{{node.output}}`**（BFF 执行器在构造下游输入时替换；缺失节点输出 → 替换为空并告警，转义 `{{`）。
-- 运行视图：`delegation.status` + `subagent.*` 事件；导入导出走 `spawn_tree.save|load` + `spawn_tree.list`。
+- 运行视图：`delegation.status` + `subagent.*` 事件；导入导出走 `spawn_tree.save|load` + `spawn_tree.list`（**已实现**：`flow.ts#planExecution` 产出变量替换后的下游提示词 + `serializeFlow`/`deserializeFlow` 完成画布 ↔ `spawn_tree` 快照映射；`OrchestrationPage` 提供导出/列表/导入/规划）。
 
 ### 8.5 config path 订正（C04，schema 驱动）
 
@@ -172,6 +172,12 @@ Hermes `SERVER_REQUESTS` 实际 **13** 类，客户端必须**逐类同 `id` 回
 - 已核对（`hermes_cli/config_defaults.py`）：`gateway.api_server` **无 `enabled`**（只有 `max_concurrent_runs` 等）；`tools.tool_search.enabled` 是**字符串枚举**（`"auto"`），非布尔；**`deliverable.*` 无此 config 键**；`lsp.enabled` 为顶层布尔（正确）。`COMMON_FIELDS` 已移除三处错误项，仅保留 `lsp.enabled`。
 - 本地模型 config 键为 **`local_runtime`**（非 `local_models`；`LocalModelsPanel` 走 L2 REST）。
 - 「订阅代理 subscription」（proxy）与 **`billing.subscription.*`**（套餐/升降级/用量）是两回事。
+
+### 8.5b 遗漏能力补齐（C06）
+
+- **Git review/ship**（`/api/git/review/*`）：`GitPanel` 增「评审 / 发布」区——暂存/取消/还原、提交、推送、创建 PR（`ship-info` 展示领先/落后）。
+- **Cron 进阶**：`TasksPage` 增投递目标（`/api/cron/delivery-targets`）、蓝图实例化（`/api/cron/blueprints[/instantiate]`）、运行历史/失败事件（`/api/cron/jobs/{id}/runs`）。
+- **明确排除**：反向 MCP serve / ACP（非企业 web 端目标）。
 
 ### 8.6 概念订正
 

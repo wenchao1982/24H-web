@@ -10,6 +10,7 @@ import {
   wakeStopParams,
   type VoiceStatus,
 } from "./voice";
+import { getAutoRead, setAutoRead } from "../voice/autoread";
 
 /** 设置 → 高级 → 语音：唤醒词开关 + 状态 + 语音合成。 */
 export default function VoicePanel() {
@@ -20,6 +21,7 @@ export default function VoicePanel() {
   const [busy, setBusy] = useState(false);
   const [text, setText] = useState("");
   const [audio, setAudio] = useState<string | null>(null);
+  const [autoRead, setAutoReadState] = useState(getAutoRead);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -128,6 +130,22 @@ export default function VoicePanel() {
             {t("voice.ttsReady")}
           </p>
         ) : null}
+      </div>
+
+      <div className="card">
+        <h4>{t("voice.prefs")}</h4>
+        <label className="config-row">
+          <input
+            type="checkbox"
+            aria-label={t("voice.autoRead")}
+            checked={autoRead}
+            onChange={(event) => {
+              setAutoRead(event.target.checked);
+              setAutoReadState(event.target.checked);
+            }}
+          />
+          <span>{t("voice.autoRead")}</span>
+        </label>
       </div>
     </div>
   );
