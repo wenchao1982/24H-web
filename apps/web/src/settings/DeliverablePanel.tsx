@@ -1,12 +1,16 @@
-import ConfigFieldsPanel, { type ConfigFieldDef } from "./ConfigFieldsPanel";
+import SchemaSectionPanel from "./SchemaSectionPanel";
 
-const FIELDS: ConfigFieldDef[] = [
-  { path: "deliverable.enabled", labelKey: "deliverable.enabled", type: "boolean" },
-];
-
-/** 设置 → 渠道 → Deliverable（T23.13）：产物作为附件投递开关。 */
+/**
+ * 设置 → 渠道 → Deliverable（T23.13）。
+ * 注：Hermes 当前版本无 `deliverable.*` 配置键（C04 订正）；本面板 schema 驱动，
+ * 无匹配字段时显示说明而非无效开关。
+ */
 export default function DeliverablePanel() {
   return (
-    <ConfigFieldsPanel titleKey="deliverable.title" hintKey="deliverable.hint" fields={FIELDS} />
+    <SchemaSectionPanel
+      titleKey="deliverable.title"
+      hintKey="deliverable.hint"
+      prefix="deliverable"
+    />
   );
 }

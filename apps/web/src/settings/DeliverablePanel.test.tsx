@@ -1,50 +1,35 @@
 /** @vitest-environment jsdom */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { render, screen } from "@testing-library/react";
 import DeliverablePanel from "./DeliverablePanel";
 
-interface Call {
-  method: string;
-  body: string | null;
-}
-
-function stubFetch(config: unknown): Call[] {
-  const calls: Call[] = [];
+function stubFetch(schema: unknown): void {
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (_url: string, init: RequestInit = {}) => {
+    vi.fn(async (url: string, init: RequestInit = {}) => {
       const method = (init.method ?? "GET").toUpperCase();
-      calls.push({ method, body: typeof init.body === "string" ? init.body : null });
-      return {
-        ok: true,
-        status: 200,
-        text: async () => JSON.stringify(method === "GET" ? { config } : {}),
-      };
+      const path = String(url).split("?")[0];
+      const body =
+        method === "GET"
+          ? path.endsWith("/config/schema")
+            ? schema
+            : { config: {} }
+          : {};
+      return { ok: true, status: 200, text: async () => JSON.stringify(body) } as Response;
     }) as unknown as typeof fetch,
   );
-  return calls;
 }
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("DeliverablePanel T23.13 Deliverable Mode", () => {
-  it("toggles deliverable.enabled", async () => {
-    const calls = stubFetch({ deliverable: { enabled: false } });
+describe("DeliverablePanel T23.13（C04 订正）", () => {
+  it("shows a note because Hermes has no deliverable.* config key", async () => {
+    stubFetch({ fields: {}, category_order: [] });
     render(<DeliverablePanel />);
-
-    const toggle = await screen.findByLabelText("启用 Deliverable 模式");
-    expect(toggle).not.toBeChecked();
-
-    const user = userEvent.setup();
-    await user.click(toggle);
-    await user.click(screen.getByRole("button", { name: "保存" }));
-
-    await waitFor(() => {
-      const put = calls.find((call) => call.method === "PUT");
-      expect(put?.body).toBe(JSON.stringify({ deliverable: { enabled: true } }));
-    });
+    expect(
+      await screen.findByText("该功能在当前 Hermes 版本无对应配置项。"),
+    ).toBeInTheDocument();
   });
 });

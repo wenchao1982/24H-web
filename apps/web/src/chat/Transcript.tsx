@@ -1,7 +1,13 @@
 import ToolCard from "./ToolCard";
 import type { TranscriptItem } from "./types";
 
-export default function Transcript({ items }: { items: TranscriptItem[] }) {
+export interface TranscriptProps {
+  items: TranscriptItem[];
+  /** 提供时，助手消息显示「朗读」按钮（M19 TTS）。 */
+  onSpeak?: (text: string) => void;
+}
+
+export default function Transcript({ items, onSpeak }: TranscriptProps) {
   if (items.length === 0) {
     return <p className="empty transcript-empty">还没有消息。</p>;
   }
@@ -20,6 +26,16 @@ export default function Transcript({ items }: { items: TranscriptItem[] }) {
             >
               {item.reasoning ? <span className="bubble-label">思考过程</span> : null}
               {item.text}
+              {onSpeak && item.role === "assistant" && !item.reasoning && item.text ? (
+                <button
+                  type="button"
+                  className="bubble-speak"
+                  aria-label="朗读"
+                  onClick={() => onSpeak(item.text)}
+                >
+                  朗读
+                </button>
+              ) : null}
             </div>
           );
         }

@@ -11,10 +11,12 @@ import { adminRoutes } from "../routes/admin";
 import { adminConnectionsRoutes } from "../routes/adminConnections";
 import { hermesRoutes } from "../routes/hermes";
 import { systemRoutes } from "../routes/system";
-import { hermesWsRoutes, WS_MAX_PAYLOAD } from "../hermes/proxy";
+import { hermesStreamRoutes, hermesWsRoutes, WS_MAX_PAYLOAD } from "../hermes/proxy";
 import { integrationsRoutes } from "../routes/integrations";
+import { agentsRoutes } from "../agents/routes";
 import { skillUiRoutes } from "../routes/skillUi";
 import type { GhRunner } from "../integrations/github";
+import type { CommandRunner } from "../agents/runner";
 import { defaultSkillRoots } from "../skillui/discover";
 import { defaultWorkspaceRoot, type CallModelFn } from "../skillui/broker";
 import { llmOneshot } from "../hermes/oneshot";
@@ -31,6 +33,10 @@ export interface BuildAppOptions {
   hermesBaseUrl?: string;
   githubRunner?: GhRunner;
   skillHost?: SkillHostOptions;
+  /** 外部 agent 安装器（测试注入假实现）。 */
+  agentsRunner?: CommandRunner;
+  agentsDir?: string;
+  stateDir?: string;
 }
 
 export function buildApp(db: Db, options: BuildAppOptions = {}): FastifyInstance {
@@ -70,9 +76,19 @@ export function buildApp(db: Db, options: BuildAppOptions = {}): FastifyInstance
     db,
     defaultBaseUrl: options.hermesBaseUrl ?? config.hermesBaseUrl,
   });
+  app.register(hermesStreamRoutes, {
+    db,
+    defaultBaseUrl: options.hermesBaseUrl ?? config.hermesBaseUrl,
+  });
   app.register(integrationsRoutes, {
     db,
     ...(options.githubRunner ? { githubRunner: options.githubRunner } : {}),
+  });
+  app.register(agentsRoutes, {
+    db,
+    agentsDir: options.agentsDir ?? config.agentsDir,
+    stateDir: options.stateDir ?? config.stateDir,
+    ...(options.agentsRunner ? { runner: options.agentsRunner } : {}),
   });
 
   const hermesBaseUrl = options.hermesBaseUrl ?? config.hermesBaseUrl;

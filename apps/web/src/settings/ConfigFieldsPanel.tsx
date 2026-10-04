@@ -3,14 +3,27 @@ import { api } from "../api/client";
 import { t, type TranslationKey } from "../i18n";
 import { buildPatch, normalizeConfig, readPath } from "./config";
 
-export type ConfigFieldType = "boolean" | "string" | "number";
+export type ConfigFieldType = "boolean" | "string" | "number" | "select";
 
 export interface ConfigFieldDef {
-  /** 配置点路径，如 `api_server.enabled`。 */
+  /** 配置点路径，如 `gateway.api_server.max_concurrent_runs`。 */
   path: string;
-  labelKey: TranslationKey;
+  /** i18n key（手写面板用）。 */
+  labelKey?: TranslationKey;
+  /** 直接标签（schema 驱动时用 `description`）。 */
+  label?: string;
   type: ConfigFieldType;
+  /** `select` 的可选项。 */
+  options?: string[];
   placeholderKey?: TranslationKey;
+}
+
+/** 解析字段标签：直接 `label` 优先，其次 i18n key，最后回退路径。 */
+export function fieldLabel(field: ConfigFieldDef): string {
+  if (field.label) {
+    return field.label;
+  }
+  return field.labelKey ? t(field.labelKey) : field.path;
 }
 
 export interface ConfigFieldsPanelProps {
@@ -124,19 +137,36 @@ export default function ConfigFieldsPanel({ titleKey, hintKey, fields }: ConfigF
             <label className="config-row" key={field.path}>
               <input
                 type="checkbox"
-                aria-label={t(field.labelKey)}
+                aria-label={fieldLabel(field)}
                 checked={draft[field.path] === true}
                 onChange={(event) =>
                   setDraft((current) => ({ ...current, [field.path]: event.target.checked }))
                 }
               />
-              <span>{t(field.labelKey)}</span>
+              <span>{fieldLabel(field)}</span>
+            </label>
+          ) : field.type === "select" ? (
+            <label className="config-row" key={field.path}>
+              <span>{fieldLabel(field)}</span>
+              <select
+                aria-label={fieldLabel(field)}
+                value={String(draft[field.path] ?? "")}
+                onChange={(event) =>
+                  setDraft((current) => ({ ...current, [field.path]: event.target.value }))
+                }
+              >
+                {(field.options ?? []).map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
             </label>
           ) : (
             <label className="config-row" key={field.path}>
-              <span>{t(field.labelKey)}</span>
+              <span>{fieldLabel(field)}</span>
               <input
-                aria-label={t(field.labelKey)}
+                aria-label={fieldLabel(field)}
                 type={field.type === "number" ? "number" : "text"}
                 placeholder={field.placeholderKey ? t(field.placeholderKey) : undefined}
                 value={String(draft[field.path] ?? "")}

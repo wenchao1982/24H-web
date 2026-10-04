@@ -172,8 +172,7 @@ describe("SettingsPage T8.4 配置中心", () => {
         status: 200,
         body: {
           config: {
-            api_server: { enabled: false },
-            tool_search: { enabled: true },
+            lsp: { enabled: false },
           },
         },
       },
@@ -185,11 +184,10 @@ describe("SettingsPage T8.4 配置中心", () => {
     render(<SettingsPage />);
     await user.click(screen.getByRole("button", { name: "配置中心" }));
 
-    const apiServer = await screen.findByLabelText("API Server");
-    expect(apiServer).not.toBeChecked();
-    expect(screen.getByLabelText("工具搜索")).toBeChecked();
+    const lsp = await screen.findByLabelText("LSP");
+    expect(lsp).not.toBeChecked();
 
-    await user.click(apiServer);
+    await user.click(lsp);
     await user.click(screen.getByRole("button", { name: "保存" }));
 
     await waitFor(() => {
@@ -200,7 +198,7 @@ describe("SettingsPage T8.4 配置中心", () => {
       );
       expect(call).toBeTruthy();
       expect(JSON.parse(String((call?.[1] as RequestInit).body))).toEqual({
-        api_server: { enabled: true },
+        lsp: { enabled: true },
       });
     });
     expect(await screen.findByText("已保存")).toBeInTheDocument();

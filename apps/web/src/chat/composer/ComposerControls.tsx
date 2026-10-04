@@ -43,6 +43,10 @@ export interface ComposerControlsProps {
   canSend?: boolean;
   onSend?: () => void;
   onStop?: () => void;
+
+  /** 语音（M19）：提供时渲染 mic（按住说话 STT）。 */
+  onMicToggle?: () => void;
+  listening?: boolean;
 }
 
 /**
@@ -105,6 +109,18 @@ export default function ComposerControls(props: ComposerControlsProps) {
         />
         <span className="composer-spacer" aria-hidden="true" />
         {modelPicker}
+        {props.onMicToggle ? (
+          <button
+            type="button"
+            className="icon-btn composer-mic"
+            aria-label={t("composer.voice")}
+            aria-pressed={props.listening === true}
+            data-listening={props.listening === true}
+            onClick={props.onMicToggle}
+          >
+            🎙
+          </button>
+        ) : null}
         {props.running ? (
           <button
             type="button"

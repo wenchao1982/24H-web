@@ -20,6 +20,9 @@ import PersonalityPanel from "./PersonalityPanel";
 import SessionHeaderMenu from "./SessionHeaderMenu";
 import HeroIntro from "./HeroIntro";
 import { ComposerControls, useSessionControls, type UploadPanelKind } from "./composer";
+import { useVoice } from "../voice/useVoice";
+import ContentMatches from "./ContentMatches";
+import { searchSessions, type SessionContentMatch } from "./sessionSearch";
 import { normalizeCatalog, slashResultText, type SlashCommand } from "./slash";
 import {
   appendDelta,
@@ -42,15 +45,13 @@ import {
   toolResult,
   turnStatus,
   upsertTool,
+  REQUEST_KINDS,
   type PendingRequest,
-  type RequestKind,
   type SessionIdentity,
   type SessionSummary,
   type StatusInfo,
   type TranscriptItem,
 } from "./types";
-
-const REQUEST_KINDS: RequestKind[] = ["approval", "clarify", "sudo", "secret", "mcp.setup"];
 
 type ResolvedSession = { runtimeId: string; items: TranscriptItem[] };
 
@@ -74,6 +75,7 @@ export default function ChatPage() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [identity, setIdentity] = useState<SessionIdentity | null>(null);
   const [filter, setFilter] = useState("");
+  const [contentMatches, setContentMatches] = useState<SessionContentMatch[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [items, setItems] = useState<TranscriptItem[]>([]);
@@ -307,10 +309,29 @@ export default function ChatPage() {
 
   useEffect(() => {
     const unsubscribes = REQUEST_KINDS.map((kind) =>
-      gateway.onServerRequest(kind, (params, respond) => {
+      gateway.onServerRequest(kind, (params, respond, requestId) => {
         const id = nextId();
         respondersRef.current.set(id, respond);
-        setPending((current) => [...current, { id, kind, params }]);
+        setPending((current) => [...current, { id, kind, params, rpcId: requestId }]);
+      }),
+    );
+    // 后端撤回挂起请求（timeout/interrupted/shutdown/resolved/session_closed）→ 清除对应卡。
+    unsubscribes.push(
+      gateway.on("request.cancel", (payload) => {
+        const cancelId =
+          typeof payload.id === "string" ? payload.id : String(payload.id ?? "");
+        if (!cancelId) {
+          return;
+        }
+        setPending((current) =>
+          current.filter((entry) => {
+            const hit = entry.rpcId === cancelId || entry.params.request_id === cancelId;
+            if (hit) {
+              respondersRef.current.delete(entry.id);
+            }
+            return !hit;
+          }),
+        );
       }),
     );
     return () => {
@@ -798,6 +819,41 @@ export default function ChatPage() {
     }
   }, [renameDraft, renameSession]);
 
+  // C06 会话全文检索（FTS5）：标题过滤之外，防抖查询 `/api/sessions/search`。
+  useEffect(() => {
+    const q = filter.trim();
+    if (!q) {
+      setContentMatches([]);
+      return;
+    }
+    let alive = true;
+    const timer = setTimeout(() => {
+      searchSessions(q)
+        .then((matches) => {
+          if (alive) {
+            setContentMatches(matches);
+          }
+        })
+        .catch(() => {
+          if (alive) {
+            setContentMatches([]);
+          }
+        });
+    }, 250);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [filter]);
+
+  // M19 语音：按住说话 → voice.transcript → 直接发送（与手输同一 handleSend 路径）。
+  const voice = useVoice({
+    sessionId: () => activePair()?.runtimeId ?? null,
+    onTranscript: (text) => {
+      void handleSend(text);
+    },
+  });
+
   return (
     <div className="chat" data-narrow={narrow} data-view={view}>
       <aside className="chat-list">
@@ -814,6 +870,7 @@ export default function ChatPage() {
           onPrune={pruneSessions}
           onBulkDelete={bulkDeleteSessions}
         />
+        <ContentMatches matches={contentMatches} onSelect={selectSession} />
       </aside>
 
       <section className="chat-main" data-variant={controls.variant}>
@@ -919,7 +976,7 @@ export default function ChatPage() {
           <HeroIntro sessions={sessions} onSelect={selectSession} />
         ) : (
           <>
-            <Transcript items={items} />
+            <Transcript items={items} onSpeak={voice.speak} />
             {pending.length > 0 ? (
               <div className="pending-requests">
                 {pending.map((request) => (
@@ -973,6 +1030,8 @@ export default function ChatPage() {
               canSend={canSend}
               onSend={submit}
               onStop={handleStop}
+              onMicToggle={voice.toggle}
+              listening={voice.listening}
             />
           )}
         />

@@ -10,6 +10,9 @@
   "scripts": {
     "dev:web": "npm -w @24h/web run dev",
     "dev:server": "npm -w @24h/server run dev",
+    "dev:demo": "npm -w @24h/demo run dev",
+    "build:demo": "npm -w @24h/demo run build",
+    "check:demo": "npm -w @24h/demo run check",
     "build": "npm -w @24h/web run build && npm -w @24h/server run build",
     "start": "npm -w @24h/server run start",
     "typecheck": "npm -w @24h/web run typecheck && npm -w @24h/server run typecheck && npm -w @24h/shared run typecheck",

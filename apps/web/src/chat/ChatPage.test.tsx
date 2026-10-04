@@ -245,6 +245,64 @@ describe("ChatPage T6.6 其它服务端请求", () => {
 
     expect(respond).toHaveBeenCalledWith({ value: "sk-123" });
   });
+
+  it("answers a vault.code request with the ValueResult {value}", async () => {
+    const gateway = createFakeGateway((method) =>
+      method === "session.list" ? { sessions: [{ id: "s1", title: "会话一" }] } : {},
+    );
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await list().findByRole("button", { name: "会话一" }));
+
+    let respond!: ReturnType<typeof gateway.emitServerRequest>;
+    act(() => {
+      respond = gateway.emitServerRequest("vault.code", { site: "example.com", hint: "手机验证码" });
+    });
+
+    expect(screen.getByText("验证码")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("验证码输入"), "123456");
+    await user.click(screen.getByRole("button", { name: "提交" }));
+
+    expect(respond).toHaveBeenCalledWith({ value: "123456" });
+  });
+
+  it("skips a web-unsupported bridge request (terminal.read) with an empty value", async () => {
+    const gateway = createFakeGateway((method) =>
+      method === "session.list" ? { sessions: [{ id: "s1", title: "会话一" }] } : {},
+    );
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await list().findByRole("button", { name: "会话一" }));
+
+    let respond!: ReturnType<typeof gateway.emitServerRequest>;
+    act(() => {
+      respond = gateway.emitServerRequest("terminal.read", {});
+    });
+
+    expect(screen.getByText("读取终端")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "无法处理（跳过）" }));
+
+    expect(respond).toHaveBeenCalledWith({ value: "" });
+  });
+
+  it("clears a pending card when the backend sends request.cancel", async () => {
+    const gateway = createFakeGateway((method) =>
+      method === "session.list" ? { sessions: [{ id: "s1", title: "会话一" }] } : {},
+    );
+    renderChat(gateway);
+    const user = userEvent.setup();
+    await user.click(await list().findByRole("button", { name: "会话一" }));
+
+    act(() => {
+      gateway.emitServerRequest("vault.code", { site: "example.com" }, "rpc-9");
+    });
+    expect(screen.getByText("验证码")).toBeInTheDocument();
+
+    act(() => {
+      gateway.emit("request.cancel", { id: "rpc-9", method: "vault.code", reason: "timeout" });
+    });
+    expect(screen.queryByText("验证码")).not.toBeInTheDocument();
+  });
 });
 
 describe("ChatPage T6.7 中断", () => {

@@ -52,8 +52,10 @@
 | `/api/notifications` | **BFF 自有** | 通知中心 |
 | `/api/integrations` | **BFF 自有** | GitHub 等第三方集成 |
 | `/api/skill-host` | **BFF 自有** | Skill UI 宿主 broker |
-| `/api/hermes/*` | **代理** | 转发到 Hermes L2 REST（注入内部 token + profile 守卫） |
+| `/api/hermes/*` | **代理** | 转发到 Hermes L2 REST（注入内部 token + profile 守卫）；含 `/api/hermes/plugins/<name>/*`（插件 REST，如 Kanban） |
 | `/api/hermes/ws` | **代理** | 认证后代理到 Hermes L1 `/api/ws`（WS JSON-RPC） |
+| `/api/hermes/stream` | **代理（M19/M20 新增）** | 认证 + profile 守卫后代理 Hermes 事件/音频 WS（`/api/events` · `/api/plugins/kanban/events` · `/api/audio/speak-stream`），**default-deny 同 `/api/hermes/ws`** |
+| `/api/agents/*` | **BFF 自有（M22 新增）** | 外部 agent 运行时管理（catalog/install/check-update/delete/update-policy）；读=认证，写=`super_admin`；Hermes 侧仅 `session.foreign.*`/`import-agent` |
 
 ## 4. 数据表（SQLite）
 
@@ -137,7 +139,56 @@ interface SessionIdentity { storedId: string; runtimeId: string }
 - **补偿控制**：① 前端**预筛**——单文件 >10MB、单批 >10 个在**读取内容之前**拒绝；② **REQ-018 / REQ-018b** 为 BFF WS 显式设 `maxPayload = 16 MiB`（**双 socket**）与 `pending` 队列上限（**条数 `WS_MAX_PENDING_COUNT = 256` 独立 + 累计字节 `K = 4` → `pendingBytes ≤ 64 MiB`**，不依赖 `ws` 库默认值）与 `outbound` **对称**上限（`WS_MAX_OUTBOUND_COUNT = 256` / `WS_MAX_OUTBOUND_BYTES = 64 MiB`），命中任一即超限、回可读错误并**仅**终止该连接；③ 单文件 >2MB 显示等待态，失败重试**复用 identity**、不重复 `session.create`；④ 端到端可达性以**实测**为准；网关拒绝则原样透传 message。
 - **服务端内容类型校验：R10 已闭合（REQ-023，2026-09-30）**。Hermes 只做**扩展名嗅探**：`tui_gateway/prompt_attachments.py:64-71` `_sniff_image_ext` 按 filename 后缀优先、否则魔数（WebP 识别 RIFF 容器）、未知默认 `.png`，**只推断扩展名、不拒绝**（实测 41 字节非图片文本经 `image.attach_bytes` 被接受，`attached:true`）；`methods_prompt.py:775-776` 仅判扩展名是否在允许集合。PDF 的 `%PDF-` 校验（`methods_prompt.py:1106-1107`）存在，但 `:797-798` 先检查 `pdftoppm`，本机缺 poppler-utils → 一律回 **5028**，该分支**不可达**。客户端 `File.type` 仅 UX 预筛，**不**作安全边界。→ **处置（已落地）**：在 **BFF WS 代理**侧补**前缀** magic bytes 校验（REQ-023，见 §7.2）：`image.attach_bytes`/`pdf.attach` 的 base64 载荷只解码前 48 个字符（≈36 字节；覆盖 PNG/JPEG/GIF/BMP/WebP/TIFF/ICO/CUR 及 SVG 文本前缀）比对魔数，不合规同 `id` 回 `INVALID_ATTACHMENT_TYPE` 且不转发。
 
-## 8. 详见
+## 8. M19–M21 新增代理 / 执行层 / 概念订正
+
+### 8.1 服务端请求（订正为 13 类）
+
+Hermes `SERVER_REQUESTS` 实际 **13** 类，客户端必须**逐类同 `id` 回包**（不回包则 turn 卡住）：
+`approval` · `clarify` · `sudo` · `secret` · `vault.unlock_prompt` · `vault.save_login` · `vault.code` · `terminal.read` · `preview.read` · `window.read` · `preview.act` · `tour` · `display.install.sudo`。
+**订正**：旧文档的 `mcp.setup` **不存在**（MCP 安装走 `connectors.*` / `connection.request` / L2 `/api/mcp/*`）；事件旧名 `done`/`thinking` 应为 `message.complete` 与 `thinking.delta` + `reasoning.delta/available`。
+
+### 8.2 语音 / 唤醒 / TTS / STT（M19）
+
+- L1：`voice.toggle` / `voice.record` / `voice.tts`；`wake.start|stop|pause|resume|status|feed`；事件 `voice.status|transcript|interrupted` + `wake.detected`。
+- L2：`/api/audio/{transcribe,speak,tts-lease,voice-config,voice-live/*,elevenlabs/voices}`；WS `/api/audio/speak-stream` → 经 BFF `/api/hermes/stream`。
+- config：`tts` / `stt` / `voice` / `wake_word`；slash `/voice` `/wake`。
+- 范围：按住说话 STT + TTS 朗读（可选）+ **唤醒词常驻监听（默认关）**；打断可中止。
+
+### 8.3 看板 Kanban（M20）
+
+- 插件 REST `/api/plugins/kanban/*`（47：board / tasks CRUD + attachments / comments / links / bulk / runs / terminate / reclaim / specify / reassign / estimate / dispatch / orchestration / stats / boards CRUD + export/import/switch / profiles / model-options / home-subscribe）→ BFF `/api/hermes/plugins/kanban/*`。
+- 事件 WS `/api/plugins/kanban/events` → BFF `/api/hermes/stream`。
+- **固定 4 列** `Todo/Doing/Review/Done`；卡片指派 agent/profile；`dispatch` 触发 worker；导入导出 board。
+
+### 8.4 可视化编排（M21，自建执行层）
+
+- **不自研 agent 内核**：画布节点映射到 `spawn_tree.*` / `delegation.*` / `subagent.*` / MoA / groups。
+- **执行语义**：边上**上游输出注入下游**，采用**变量替换 `{{node.output}}`**（BFF 执行器在构造下游输入时替换；缺失节点输出 → 替换为空并告警，转义 `{{`）。
+- 运行视图：`delegation.status` + `subagent.*` 事件；导入导出走 `spawn_tree.save|load` + `spawn_tree.list`。
+
+### 8.5 config path 订正（C04，schema 驱动）
+
+- 设置面板改为 **schema 驱动**：从 `GET /api/hermes/config/schema`（`{fields:{<dot.path>:{type,description,category,options?}}}`）取字段动态渲染（`settings/schema.ts` + `SchemaSectionPanel`），避免硬编码错误 path/类型。
+- 已核对（`hermes_cli/config_defaults.py`）：`gateway.api_server` **无 `enabled`**（只有 `max_concurrent_runs` 等）；`tools.tool_search.enabled` 是**字符串枚举**（`"auto"`），非布尔；**`deliverable.*` 无此 config 键**；`lsp.enabled` 为顶层布尔（正确）。`COMMON_FIELDS` 已移除三处错误项，仅保留 `lsp.enabled`。
+- 本地模型 config 键为 **`local_runtime`**（非 `local_models`；`LocalModelsPanel` 走 L2 REST）。
+- 「订阅代理 subscription」（proxy）与 **`billing.subscription.*`**（套餐/升降级/用量）是两回事。
+
+### 8.6 概念订正
+
+- **智能体** = 原生 agent 运行时（默认 Hermes agent；Claude Code/Codex… 走 `session.foreign.*` / `import-agent` / ACP），**不是** SOUL 人设。
+- **档案** = Hermes profile（租户/人设/资产）；**技能** = SKILL.md（渐进披露 + 工具），**无 iframe 沙箱**概念。
+- **Connectors ≠ Vault**；**用量**须含计费/订阅（`billing.*`/`subscription.*`/`usage.bars`）。
+
+### 8.7 外部 agent 原生安装（M22，BFF `coding-agents` 模块）
+
+- **边界**：外部 agent（`Claude Code / Codex / OpenCode / Pi / Grok / DSH`）由 **BFF** 在主安装/管理，**不碰 Hermes 内核**；Hermes 侧仅做会话导入（`session.foreign.list/preview/import`）与注册（`hermes import-agent`）。能力（技能/MCP/工具）**只作用于 Hermes agent（profile）**，外部 agent 用各自配置。
+- **BFF 模块** `apps/server/src/agents/`：`definitions`（id/vendor/packageName/bin/installKind/check）· `registry`（版本探测 + catalog）· `installer`（受管 prefix 安装 + PATH 提升）· `updatePolicy`（自动更新策略）。
+- **端点**（BFF 自有）：`GET /api/agents` · `GET /api/agents/catalog` · `POST /api/agents/:id/install` · `POST /api/agents/:id/check-update` · `DELETE /api/agents/:id` · `GET/PUT /api/agents/update-policy`+`/:id/update-policy`。**读=认证；写=`super_admin`**。
+- **安装机制**：`npm install -g --prefix <受管目录> <packageName>`，并把受管 bin **提升到 PATH 最前**（防系统旧版遮蔽）；`shell:false` + 参数数组；**白名单 packageName**（仅 `definitions.ts` 登记项可装）；`pinnedVersion` 可选（缺省 `@latest` 并回读实际版本，登记为待补固定版本）；**禁 `curl | sh`**；装/卸评 `audit`。安装为 **host 级**（`AGENTS_DIR`，默认 `~/.24h/agents`）；profile 隔离留待后续。策略文件 `agents-update-policy.json`（`STATE_DIR`，0600，fail-closed）。
+- **更新策略**：策略持久化 `agent-update-policy.json`（0600，缺失/损坏 fail-closed 手动）；调度 60s tick，`checkedAt` > 6h 重查，仅 `autoUpdate && safelyManaged && status∈{available,waiting}` 才装；**空闲 60s** 且**运行中拒绝（409）**；最终资格判定到加锁间不 await（防竞态）；`safelyManaged` 仅限有已知 packageName 的运行时。
+- **UI（方案 C）**：智能体页左列表分组 **Hermes（=profile）** / **外部 agent**；外部 agent 卡片模型 = logo · vendor · `Installed` · 版本 · Settings · Check for update · Delete · Automatic updates。
+
+## 9. 详见
 
 - 完整分层与关键流：[`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
 - 接口清单（BFF / L1 / L2）：[`docs/INTERFACES.md`](./docs/INTERFACES.md)

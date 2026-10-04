@@ -15,6 +15,18 @@ import AgentDetail from "./AgentDetail";
 import AgentCreatePanel, { type CreateProfileParams } from "./AgentCreatePanel";
 import AgentEditPanel, { type ConfigureProfileParams } from "./AgentEditPanel";
 import AgentImportPanel, { type ImportProfileParams } from "./AgentImportPanel";
+import RuntimeList from "./RuntimeList";
+import RuntimeDetail from "./RuntimeDetail";
+import {
+  checkRuntimeUpdate,
+  getUpdatePolicies,
+  installRuntime,
+  listRuntimes,
+  removeRuntime,
+  setUpdatePolicy,
+  type AgentRuntime,
+  type PolicyMap,
+} from "./runtimes";
 import { Button, ConfirmDialog } from "../ui";
 import { t, type TranslationKey } from "../i18n";
 import SkillsPanel from "./SkillsPanel";
@@ -82,6 +94,44 @@ export default function AgentsPage() {
 
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarError, setAvatarError] = useState<string | null>(null);
+
+  // 方案 C：外部 agent 分组（BFF `/api/agents`）。失败一律降级为空，不阻断 Hermes 分组。
+  const [runtimes, setRuntimes] = useState<AgentRuntime[]>([]);
+  const [policies, setPolicies] = useState<PolicyMap>({});
+  const [selectedRuntime, setSelectedRuntime] = useState<string | null>(null);
+  const [runtimeBusy, setRuntimeBusy] = useState(false);
+
+  const loadRuntimes = useCallback(async () => {
+    try {
+      setRuntimes(await listRuntimes());
+    } catch {
+      setRuntimes([]);
+    }
+    try {
+      setPolicies(await getUpdatePolicies());
+    } catch {
+      setPolicies({});
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadRuntimes();
+  }, [loadRuntimes]);
+
+  const activeRuntime = runtimes.find((runtime) => runtime.id === selectedRuntime) ?? null;
+
+  const withRuntimeBusy = useCallback(
+    async (action: () => Promise<unknown>) => {
+      setRuntimeBusy(true);
+      try {
+        await action();
+        await loadRuntimes();
+      } finally {
+        setRuntimeBusy(false);
+      }
+    },
+    [loadRuntimes],
+  );
 
   const loadAgents = useCallback(async () => {
     setListLoading(true);
@@ -406,6 +456,7 @@ export default function AgentsPage() {
               onFilterChange={setFilter}
               onSelect={(name) => {
                 setSelected(name);
+                setSelectedRuntime(null);
                 setEditing(false);
                 setDeleteTarget(null);
                 setOpMessage(null);
@@ -420,9 +471,36 @@ export default function AgentsPage() {
               avatars={avatarUrl && selected ? { [selected]: avatarUrl } : undefined}
             />
           )}
+          <RuntimeList
+            runtimes={runtimes}
+            activeId={selectedRuntime}
+            onSelect={(id) => {
+              setSelectedRuntime(id);
+              setSelected(null);
+              setEditing(false);
+              setDeleteTarget(null);
+              setOpMessage(null);
+            }}
+          />
         </aside>
 
         <section className="agents-main">
+          {activeRuntime ? (
+            <RuntimeDetail
+              runtime={activeRuntime}
+              autoUpdate={policies[activeRuntime.id]?.autoUpdate ?? false}
+              busy={runtimeBusy}
+              onInstall={() => withRuntimeBusy(() => installRuntime(activeRuntime.id))}
+              onCheckUpdate={() => checkRuntimeUpdate(activeRuntime.id)}
+              onRemove={() => withRuntimeBusy(() => removeRuntime(activeRuntime.id))}
+              onToggleAuto={(enabled) =>
+                withRuntimeBusy(async () => {
+                  setPolicies(await setUpdatePolicy(activeRuntime.id, enabled));
+                })
+              }
+            />
+          ) : (
+          <>
           {create ? (
             <AgentCreatePanel
               mode={create.mode}
@@ -573,6 +651,8 @@ export default function AgentsPage() {
             {tab === "plugins" ? <PluginsPanel /> : null}
             {tab === "bot-screen" ? <BotScreenPanel /> : null}
           </div>
+          </>
+          )}
         </section>
       </div>
 

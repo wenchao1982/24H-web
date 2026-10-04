@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { useSession } from "../auth/SessionProvider";
 import { Button, Field, Input, Stack } from "../ui";
+import { BrandMark } from "../ui/icons";
 
 type Step = "login" | "change";
 
@@ -67,7 +68,10 @@ export default function LoginPage() {
   return (
     <div className="login-page">
       <div className="login-card">
-        <span className="brand-mark">24H</span>
+        <div className="login-brand">
+          <BrandMark size={36} />
+          <p className="login-tagline">企业多用户 · Hermes 智能工作台</p>
+        </div>
 
         {step === "login" ? (
           <form onSubmit={submitLogin}>

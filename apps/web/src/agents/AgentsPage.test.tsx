@@ -694,3 +694,54 @@ describe("AgentsPage T16.5 头像", () => {
   });
 });
 
+describe("AgentsPage M22 方案 C 外部 agent", () => {
+  it("renders the external agent group and drives install", async () => {
+    const fetchMock = stubFetch([
+      {
+        path: "/api/agents",
+        method: "GET",
+        status: 200,
+        body: {
+          agents: [
+            {
+              id: "claude-code",
+              name: "Claude Code",
+              vendor: "Anthropic",
+              bin: "claude",
+              packageName: "@anthropic-ai/claude-code",
+              installable: true,
+              installed: false,
+              version: null,
+            },
+          ],
+        },
+      },
+      { path: "/api/agents/update-policy", method: "GET", status: 200, body: { policies: {} } },
+      {
+        path: "/api/agents/claude-code/install",
+        method: "POST",
+        status: 200,
+        body: { id: "claude-code", installed: true, version: "1.0.42" },
+      },
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+
+    const user = userEvent.setup();
+    renderAgents();
+
+    const runtime = await screen.findByRole("button", { name: /Claude Code/ });
+    await user.click(runtime);
+
+    const install = await screen.findByRole("button", { name: "安装" });
+    await user.click(install);
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find((entry) =>
+        String(entry[0]).endsWith("/api/agents/claude-code/install"),
+      );
+      expect(call).toBeTruthy();
+      expect((call?.[1] as RequestInit).method).toBe("POST");
+    });
+  });
+});
+

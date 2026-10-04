@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { t } from "../i18n";
 import NotificationsBell from "../notifications/NotificationsBell";
-import { Icon } from "../ui/icons";
+import { BrandMark, Icon } from "../ui/icons";
 import { BOTTOM_NAV, PRIMARY_NAV, type NavItem } from "./nav";
 
 export interface SidebarProps {
@@ -56,7 +56,8 @@ export default function Sidebar({
       aria-label={t("sidebar.aria")}
     >
       <div className="brand">
-        <span className="brand-mark">{t("sidebar.brand")}</span>
+        <BrandMark size={22} />
+        <span className="brand-name">{t("sidebar.brand")}</span>
         {version ? <span className="brand-version">{version}</span> : null}
         <button
           type="button"

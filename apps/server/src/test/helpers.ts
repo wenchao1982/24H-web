@@ -7,6 +7,7 @@ import { migrate } from "../db/migrate";
 import { ensureFirstAdmin } from "../users/repo";
 import { buildApp, type SkillHostOptions } from "../http/app";
 import type { GhRunner } from "../integrations/github";
+import type { CommandRunner } from "../agents/runner";
 
 export const TEST_ADMIN_USERNAME = "admin";
 export const TEST_ADMIN_PASSWORD = "test-admin-password";
@@ -47,7 +48,14 @@ export interface TestContext {
 }
 
 export async function createTestContext(
-  options: { hermesBaseUrl?: string; githubRunner?: GhRunner; skillHost?: SkillHostOptions } = {},
+  options: {
+    hermesBaseUrl?: string;
+    githubRunner?: GhRunner;
+    skillHost?: SkillHostOptions;
+    agentsRunner?: CommandRunner;
+    agentsDir?: string;
+    stateDir?: string;
+  } = {},
 ): Promise<TestContext> {
   const dir = mkdtempSync(join(tmpdir(), "24h-test-"));
   const db = openDb(join(dir, "test.db"));
@@ -62,6 +70,9 @@ export async function createTestContext(
     ...(options.hermesBaseUrl ? { hermesBaseUrl: options.hermesBaseUrl } : {}),
     ...(options.githubRunner ? { githubRunner: options.githubRunner } : {}),
     ...(options.skillHost ? { skillHost: options.skillHost } : {}),
+    ...(options.agentsRunner ? { agentsRunner: options.agentsRunner } : {}),
+    ...(options.agentsDir ? { agentsDir: options.agentsDir } : {}),
+    ...(options.stateDir ? { stateDir: options.stateDir } : {}),
   });
 
   return {

@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { useGateway } from "../chat/GatewayProvider";
-import { requestPrompt, type RequestKind } from "../chat/types";
+import { requestPrompt, REQUEST_KINDS, type RequestKind } from "../chat/types";
 import { t, type TranslationKey } from "../i18n";
 import {
   markAllRead as markAllReadItems,
@@ -20,14 +20,20 @@ import {
 } from "./store";
 import type { NotificationItem } from "./types";
 
-const REQUEST_KINDS: RequestKind[] = ["approval", "clarify", "sudo", "secret", "mcp.setup"];
-
 const REQUEST_TITLE: Record<RequestKind, TranslationKey> = {
   approval: "notifications.request.approval",
   clarify: "notifications.request.clarify",
   sudo: "notifications.request.sudo",
   secret: "notifications.request.secret",
-  "mcp.setup": "notifications.request.mcp.setup",
+  "vault.unlock_prompt": "notifications.request.vault.unlock_prompt",
+  "vault.save_login": "notifications.request.vault.save_login",
+  "vault.code": "notifications.request.vault.code",
+  "terminal.read": "notifications.request.terminal.read",
+  "preview.read": "notifications.request.preview.read",
+  "window.read": "notifications.request.window.read",
+  "preview.act": "notifications.request.preview.act",
+  tour: "notifications.request.tour",
+  "display.install.sudo": "notifications.request.display.install.sudo",
 };
 
 function sessionIdOf(payload: Record<string, unknown>): string | null {
@@ -50,8 +56,8 @@ const NotificationsContext = createContext<NotificationsContextValue>({
 });
 
 /**
- * 通知中心（纯客户端）：订阅网关的挂起请求（审批/澄清/sudo/secret/MCP）与
- * `done` 活动事件，聚合为未读通知；点击直达会话。无后端依赖。
+ * 通知中心（纯客户端）：订阅网关的 13 类挂起请求（审批/澄清/sudo/secret/vault/桥接）
+ * 与 `done` 活动事件，聚合为未读通知；点击直达会话。无后端依赖。
  */
 export function NotificationsProvider({ children }: { children: ReactNode }) {
   const gateway = useGateway();

@@ -17,12 +17,59 @@ export interface SessionIdentity {
 
 export type ToolStatus = "start" | "generating" | "complete" | "interrupted";
 
-export type RequestKind = "approval" | "clarify" | "sudo" | "secret" | "mcp.setup";
+/** Hermes `SERVER_REQUESTS` 共 13 类（`contracts/server_requests.py`）。 */
+export type RequestKind =
+  | "approval"
+  | "clarify"
+  | "sudo"
+  | "secret"
+  | "vault.unlock_prompt"
+  | "vault.save_login"
+  | "vault.code"
+  | "terminal.read"
+  | "preview.read"
+  | "window.read"
+  | "preview.act"
+  | "tour"
+  | "display.install.sudo";
+
+/** 全部服务端请求类型（订阅/重放共用）。 */
+export const REQUEST_KINDS: readonly RequestKind[] = [
+  "approval",
+  "clarify",
+  "sudo",
+  "secret",
+  "vault.unlock_prompt",
+  "vault.save_login",
+  "vault.code",
+  "terminal.read",
+  "preview.read",
+  "window.read",
+  "preview.act",
+  "tour",
+  "display.install.sudo",
+];
+
+/**
+ * 服务端请求回包载荷：`clarify→{answer}`；`approval→{choice}`；
+ * 其余（Hermes `ValueResult`，含 vault/desktop bridge）→`{value}`（`''`=跳过/拒绝）。
+ */
+export function requestResult(kind: RequestKind, value: string): Record<string, unknown> {
+  if (kind === "clarify") {
+    return { answer: value };
+  }
+  if (kind === "approval") {
+    return { choice: value };
+  }
+  return { value };
+}
 
 export interface PendingRequest {
   id: string;
   kind: RequestKind;
   params: Record<string, unknown>;
+  /** 后端 JSON-RPC 请求 id（`request.cancel` 匹配用）。 */
+  rpcId?: string;
   answered?: boolean;
   answer?: string;
 }
@@ -400,13 +447,9 @@ function lastToolIndex(items: TranscriptItem[], id: string): number {
   return -1;
 }
 
-const METHOD_KIND: Record<string, RequestKind> = {
-  approval: "approval",
-  clarify: "clarify",
-  sudo: "sudo",
-  secret: "secret",
-  "mcp.setup": "mcp.setup",
-};
+const METHOD_KIND: Record<string, RequestKind> = Object.fromEntries(
+  REQUEST_KINDS.map((kind) => [kind, kind]),
+);
 
 /**
  * `session.events.since` 返回的**待处理服务端请求快照**（断线重放）。

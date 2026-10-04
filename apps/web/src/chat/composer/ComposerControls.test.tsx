@@ -85,7 +85,7 @@ describe("ComposerControls（REQ-002 / REQ-003）", () => {
     expect(bottomOrder(container)).toEqual(BOTTOM_ORDER);
   });
 
-  it("不渲染语音与 git 分支 pill", () => {
+  it("默认（未提供 onMicToggle）不渲染语音与 git 分支 pill", () => {
     for (const variant of ["hero", "docked"] as const) {
       const { container, unmount } = renderControls(variant);
       expect(container.querySelector(".voice-live")).toBeNull();
@@ -95,6 +95,17 @@ describe("ComposerControls（REQ-002 / REQ-003）", () => {
       expect(screen.queryByLabelText("语音")).not.toBeInTheDocument();
       unmount();
     }
+  });
+
+  it("提供 onMicToggle 时渲染 mic 并回调（M19）", async () => {
+    const user = userEvent.setup();
+    const onMicToggle = vi.fn();
+    renderControls("docked", { onMicToggle });
+
+    const mic = screen.getByLabelText("语音");
+    expect(mic).toHaveClass("composer-mic");
+    await user.click(mic);
+    expect(onMicToggle).toHaveBeenCalledTimes(1);
   });
 
   it("running 时主操作切为停止", async () => {

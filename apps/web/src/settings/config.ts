@@ -6,12 +6,14 @@ export interface CommonField {
   type: "boolean" | "string";
 }
 
-/** 常用且安全的配置字段（布尔开关）。 */
+/**
+ * 常用且**经核对**的配置字段（布尔开关）。
+ * C04 订正：`api_server.enabled`（不存在，属 `gateway.api_server` 且无 `enabled`）、
+ * `tool_search.enabled`（实为 `tools.tool_search.enabled` 的字符串枚举）、
+ * `deliverable.enabled`（Hermes 无此键）已移除；相关面板改用 `SchemaSectionPanel`（schema 驱动）。
+ */
 export const COMMON_FIELDS: CommonField[] = [
-  { path: "api_server.enabled", label: "API Server", type: "boolean" },
-  { path: "tool_search.enabled", label: "工具搜索", type: "boolean" },
   { path: "lsp.enabled", label: "LSP", type: "boolean" },
-  { path: "deliverable.enabled", label: "Deliverable 模式", type: "boolean" },
 ];
 
 function asRecord(value: unknown): Record<string, unknown> {

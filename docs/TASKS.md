@@ -78,9 +78,9 @@
 | T6.3 | 流式消息 | `prompt.submit` → `message.delta/complete` → transcript | T6.2 | L1 | 流式显示 |
 | T6.4 | 工具卡 | `tool.start/generating/complete` 渲染 | T6.3 | L1 | 工具可见 |
 | T6.5 | 审批/澄清 | server request `approval`/`clarify` 回包 | T6.3 | L1 | 可点 |
-| T6.6 | 其它服务端请求 | `sudo`/`secret`/`mcp.setup` 回包 | T6.5 | L1 | 不卡 turn |
+| T6.6 | 其它服务端请求 | `sudo`/`secret` 回包（**订正**：Hermes 实际 13 类，见 task-list 订正 C02） | T6.5 | L1 | 不卡 turn |
 | T6.7 | 中断 | `session.interrupt` | T6.3 | L1 | 可停止 |
-| T6.8 | 状态条 | 上下文/用量/速率（`thinking`/`done`/`error`） | T6.3 | L1 | 显示统计 |
+| T6.8 | 状态条 | 上下文/用量/速率（事件 `thinking.delta`/`message.complete`/`error`；**订正**旧名 `done`/`thinking`） | T6.3 | L1 | 显示统计 |
 | T6.9 | 会话管理 | 重命名/删除/恢复（`session.title/delete/resume`） | T6.1 | L1 | 操作生效 |
 | T6.10 | 断线重放 | `session.events.since` 重建挂起状态 | T6.3 | L1 | 刷新可续 |
 | T6.11 | 附件 | 图片/文件/PDF 上传（`image.attach_bytes` / `file.attach{data_url}` / `pdf.attach{content_base64}`）；**延迟绑定**（先入 chip，发送时才 attach） | T6.3 | L1 | 可发送 |

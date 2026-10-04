@@ -1,12 +1,12 @@
-import ConfigFieldsPanel, { type ConfigFieldDef } from "./ConfigFieldsPanel";
+import SchemaSectionPanel from "./SchemaSectionPanel";
 
-const FIELDS: ConfigFieldDef[] = [
-  { path: "tool_search.enabled", labelKey: "toolSearch.enabled", type: "boolean" },
-];
-
-/** 设置 → 高级 → Tool Search（T23.10）：工具延迟加载开关。 */
+/** 设置 → 高级 → Tool Search（T23.10）：工具延迟加载（schema 驱动，C04）。 */
 export default function ToolSearchPanel() {
   return (
-    <ConfigFieldsPanel titleKey="toolSearch.title" hintKey="toolSearch.hint" fields={FIELDS} />
+    <SchemaSectionPanel
+      titleKey="toolSearch.title"
+      hintKey="toolSearch.hint"
+      prefix="tools.tool_search"
+    />
   );
 }

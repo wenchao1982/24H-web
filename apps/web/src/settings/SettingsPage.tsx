@@ -12,6 +12,7 @@ import ChannelsPanel from "./ChannelsPanel";
 import IntegrationsPanel from "./IntegrationsPanel";
 import AdvancedSettingsPanel from "./AdvancedSettingsPanel";
 import UpgradePanel from "./UpgradePanel";
+import VoicePanel from "./VoicePanel";
 import { t, type TranslationKey } from "../i18n";
 
 interface SectionDef {
@@ -23,6 +24,7 @@ const SECTIONS: SectionDef[] = [
   { id: "keys", labelKey: "settings.section.keys" },
   { id: "model", labelKey: "settings.section.model" },
   { id: "appearance", labelKey: "settings.section.appearance" },
+  { id: "voice", labelKey: "settings.section.voice" },
   { id: "config", labelKey: "settings.section.config" },
   { id: "approvals", labelKey: "settings.section.approvals" },
   { id: "oauth", labelKey: "settings.section.oauth" },
@@ -68,6 +70,7 @@ export default function SettingsPage() {
         {section === "keys" ? <KeysPanel /> : null}
         {section === "model" ? <ModelPanel /> : null}
         {section === "appearance" ? <AppearancePanel /> : null}
+        {section === "voice" ? <VoicePanel /> : null}
         {section === "config" ? <ConfigPanel /> : null}
         {section === "approvals" ? <ApprovalPanel /> : null}
         {section === "oauth" ? <OAuthPanel /> : null}

@@ -15,6 +15,8 @@ export const PRIMARY_NAV: NavItem[] = [
   { id: "agents", labelKey: "nav.agents", icon: "agents" },
   { id: "groups", labelKey: "nav.groups", icon: "groups" },
   { id: "tasks", labelKey: "nav.tasks", icon: "tasks" },
+  { id: "kanban", labelKey: "nav.kanban", icon: "kanban" },
+  { id: "orchestration", labelKey: "nav.orchestration", icon: "workflow" },
   { id: "usage", labelKey: "nav.usage", icon: "usage" },
   { id: "skillhost", labelKey: "nav.skillhost", icon: "skillhost" },
 ];

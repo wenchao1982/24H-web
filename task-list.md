@@ -77,7 +77,7 @@
 | T6.3 | M5 | 流式消息（`prompt.submit` → delta/complete） | T6.2 | 流式显示 | 已验收 |
 | T6.4 | M5 | 工具卡（`tool.start/generating/complete`） | T6.3 | 工具可见 | 已验收 |
 | T6.5 | M5 | 审批/澄清（`approval`/`clarify` 回包） | T6.3 | 可点 | 已验收 |
-| T6.6 | M5 | 其它服务端请求（`sudo`/`secret`/`mcp.setup`） | T6.5 | 不卡 turn | 已验收 |
+| T6.6 | M5 | 其它服务端请求（`sudo`/`secret`；**订正**：Hermes 实际 13 类，另见 C02） | T6.5 | 不卡 turn | 已验收 |
 | T6.7 | M5 | 中断 `session.interrupt` | T6.3 | 可停止 | 已验收 |
 | T6.8 | M5 | 状态条（上下文/用量/速率） | T6.3 | 显示统计 | 已验收 |
 | T6.9 | M5 | 会话管理（重命名/删除/恢复） | T6.1 | 操作生效 | 已验收 |
@@ -287,6 +287,115 @@
 | TASK-026 | M17 | Wave4 （可选，单独跑）e2e：hero 上传（点击 + 拖拽）→ 发送 → docked | TASK-023 | `npm run test:e2e` | 已验收 |
 | TASK-027 | M17 | Wave5 `npm run check` 全绿 + 基线一致性复核（防漂移，含 REQ-010a/011a/018a/018b/020/021/022） | TASK-001..026, TASK-028..037 | `npm run check` + 人工比对清单 | 已验收 |
 
+## M18 前端 Demo（先定稿，再回填生产）
+
+> 背景：M0–M17 功能齐全，但视觉层未达 `docs/UI.md` 基线（对照 `docs/refs/dsh-home.png`），且缺一个**脱离后端、用 mock 数据演示**的成品。
+> 策略（已确认）：**先做独立高保真 Demo 锁定视觉语言 → 评审定稿 → 逐页回填 `apps/web`**。
+> Demo 落在**独立 workspace `apps/demo`**（Vite + React 19 + TS + Tailwind v4 + Radix + lucide + cva/clsx），
+> **不进根 `npm run check`**（独立 `check:demo`），**不碰生产代码/后端**；回填时仍遵守 AGENTS.md §8「不引 UI 库、手写 CSS + `--ds-*`」。
+> 首轮范围：核心 4 屏（登录 / 对话 hero / 对话 docked / 智能体）。
+
+| 编号 | 模块 | 描述 | 前置依赖 | 验收标准 | 状态 |
+| --- | --- | --- | --- | --- | --- |
+| T24.1 | M18 | 基线登记：task-list.md M18 段 + AGENTS.md/ui-spec.md 最小声明 | — | 关键词命中 `apps/demo` / `先 Demo 定稿` | 已验收 |
+| T24.2 | M18 | 建 `apps/demo` workspace 骨架（Vite+React19+TS+Tailwind v4 + `--ds-*` 映射 + Radix/lucide/cva） | T24.1 | `npm -w @24h/demo run build` 通过；根 `npm run check` 不受影响 | 进行中 |
+| T24.3 | M18 | mock 数据层（profiles/sessions/messages/agents/models） | T24.2 | 类型化、无网络、可被 4 屏复用 | 待开始 |
+| T24.4 | M18 | AppFrame 三栏骨架 + 侧栏 + 主题切换 | T24.2,T24.3 | 三栏可切/可折叠、日/夜切换、对照 dsh | 待开始 |
+| T24.5 | M18 | 对话 hero 屏样板 + light/dark 截图评审 | T24.4 | 截图归档 `docs/refs/demo-chat-hero-*.png`，用户确认后继续 | 待开始 |
+| T24.6 | M18 | 登录屏 | T24.4 | 含首登改密分支，截图评审 | 待开始 |
+| T24.7 | M18 | 对话 docked 屏（transcript 工具卡/思考/审批 + 贴底输入） | T24.5 | 截图评审 | 待开始 |
+| T24.8 | M18 | 智能体屏（列表 + 详情 Tab） | T24.5 | 截图评审 | 待开始 |
+| T24.9 | M18 | `demo → production` 映射表（token/组件/交互） | T24.5..8 | 文档产出，作为回填依据 | 已验收 |
+| T24.10 | M18 | Demo 定稿 → 回填生产 `apps/web`（逐屏） | T24.9 | `npm run check` 全绿 + 视觉复核对齐 Demo | 进行中 |
+
+> T24.10 已完成（核心 4 屏视觉回填，`apps/web` 手写 CSS + `--ds-*`，`npm run check` 全绿）：
+> 侧栏品牌（`BrandMark` + `.brand-name`）、对话 hero（大标识/标题/卡片式最近会话/隐藏重复「对话」标题）、
+> composer hero+docked（实线描边/圆角/阴影）、登录页（品牌区/居中卡片）、
+> docked transcript（居中 820/气泡圆角）、工具卡/审批卡（warning 态弱底）、智能体详情头/概览/chips；
+> 新增 token `--ds-warning-weak`。生产对照截图 `docs/refs/impl2-*.png`。
+> 备注：智能体屏因 e2e 无 profile 数据无法可视化验证，仅样式层回填，待真机数据复看。
+>
+> **Demo IA v2（对齐 Hermes 接口域）+ 智能体重定义 + 功能面板**：
+> 菜单去重：`管理>系统运维` 并入 `设置>系统`；`设置>用量/项目` 上移一级；技能/MCP市场只入智能体。
+> 分组 IA：工作台（对话/群聊/任务）· 智能体（智能体）· 洞察（用量/记忆）· 工作区（项目/文件）· 底部（设置/管理/账户/通知）。
+> **智能体重定义**：原生 agent 运行时管理（默认仅 Hermes agent；可安装 Claude Code/Codex/OpenCode/Pi/Grok…），
+> 每 agent 含 概览(版本/检查更新/更新/卸载/启停/模型覆盖) · 技能 · MCP · 工具 · 市场（技能市场 + MCP 市场）；模型默认全局、建会话/入房间可选。
+> **右侧功能面板**（关联对话工作区：文件树 + HTML/PDF/Word/MD/CSV/图片预览；附加 产物/日志/Git）；**群聊成员增删改 + 新建选模型**；**任务可编辑**。
+> **洞察**：用量（缓存命中率 / 真实费用 / 缓存节省 / 按智能体对比）+ **新增监控**（CPU/内存/磁盘/进程 + 后端健康，从设置移出）+ 记忆（分类/作用域/提供方/搜索/增删改）。
+> **智能体**：每个 agent 加能力描述与擅长标签；**工作区（项目）**完善（默认工作区 / 文件夹增删 / 关联计数）。
+> **设置重排**：通用（外观/字号/**语言**）· 模型与密钥（主流+自定义/辅助/MoA/路由/回退/凭证池/OAuth）· 渠道（消息平台+交付）· 集成（Webhooks/插件/GitHub）· 数据与目录 · 连接 · 系统（升级/运维/审批）· 高级（API Server/Hooks/Tool Gateway/Tool Search/LSP/Computer Use/订阅/Codex/本地模型/配对），各对接模块标注 Hermes 接口路径。
+> 截图 `docs/refs/demo-*.png`；`build:demo` / `check:demo` 通过。
+> 注：以上**暂只进 Demo**；生产 `apps/web` 仍维持原实现（基线 UI 文档回填时同步）。
+>
+> **Demo 追加（M18 续）**：菜单加 **工作台>看板**、**编排** 组；新增 **看板（固定 4 列 Todo/Doing/Review/Done）**、**编排画布（`{{node.output}}` 注入 + 运行子代理树）**、**语音（composer mic + 聆听浮层）**；**智能体页改「方案 C 混合」**（左列表分组 `Hermes·profile` / `外部 agent`，外部 agent 卡片=logo·vendor·Installed·版本·Settings·Check for update·Delete·Automatic updates）。截图 `docs/refs/demo-{kanban,orchestration,voice,agents,agents-runtime,agents-install}-*.png`。
+
+## 订正（Hermes 接口/概念核对 · 2026-10）
+
+> 依据 `hermes-agent` 源码（contracts 237 方法 / 13 服务端请求 / 74 事件；L2 280 REST）核对。**先改基线再改代码**。
+
+| 编号 | 模块 | 描述 | 前置依赖 | 验收标准 | 状态 |
+| --- | --- | --- | --- | --- | --- |
+| C01 | 接口 | 重写 `docs/INTERFACES.md`：L1 全量（237/13/74）+ L2 全量（280）+ 差异节 | 基线 | 与 `contracts/*.py`、`web_routers/*.py` 一致 | 已验收 |
+| C02 | 高危 | 客户端服务端请求补齐至 **13 类**（含 vault/terminal/preview/window/tour/display.install.sudo）；移除不存在的 `mcp.setup` | 基线 | 每类可回包同 `id`；`mcp.setup` 零引用 | 已验收 |
+| C03 | 概念 | 智能体=原生运行时 · 技能=SKILL.md（去 iframe 沙箱）· Connectors 独立于 Vault · 用量含计费 | C01 | 文档 + UI 命名一致 | 待开始 |
+| C04 | 配置 | **schema 驱动重构已交付**（`settings/schema.ts`+`SchemaSectionPanel`；ApiServer/ToolSearch/Deliverable 面板改 schema 驱动；`COMMON_FIELDS` 移除错误项）；`local_runtime`/订阅代理 属独立项 | C01 | 设置字段来自 `/api/config/schema` | 已验收 |
+| C05 | 文档 | 订正 `architecture.md`/`INTERFACES.md` 的 `mcp.setup` 与事件 `done`/`thinking` | — | 全文零命中 | 已验收 |
+| C06 | 遗漏 | **会话全文搜索(FTS5) 已交付**（侧栏「内容匹配」）；Git review/ship · Cron blueprints/incidents · 反向 MCP serve/ACP **待定** | C01 | 明确纳入或排除 | 进行中 |
+| C07 | 配置 | **设置面板 RPC/path 全量核对**：前端 55 方法逐一比对契约；修正 `subscription.status`→`subscription.state`（BillingPanel）；`tool_gateway.*` 无此 config 键 → ToolGatewayPanel 改 schema 驱动（显示说明）；`VoicePanel` 的 `voice.status`/`wake.set` → `wake.status`/`wake.start`/`wake.stop` | C01 | 无「猜契约」残留 | 已验收 |
+
+## M19 语音 / 唤醒 / TTS / STT
+
+> 原排除项撤销。范围：按住说话 STT + TTS 朗读（可选）+ **唤醒词常驻监听（默认关）**；打断可中止。
+
+| 编号 | 模块 | 描述 | 前置依赖 | 验收标准 | 状态 |
+| --- | --- | --- | --- | --- | --- |
+| T25.1 | M19 | BFF：`/api/hermes/stream` WS 代理（`/api/audio/speak-stream` + `/api/events`，白名单）+ `/api/audio/*` 走泛 REST 代理 | 订正 C01,C05 | 白名单单测 + 守卫 | 已验收 |
+| T25.2 | M19 | 前端 `apps/web/src/voice/useVoice.ts`（`voice.record` start/stop + `voice.status/transcript/interrupted`）+ ComposerControls 可选 `composer-mic` | T25.1 | 组件/单测（按住→转写、打断） | 已验收 |
+| T25.3 | M19 | Composer mic 接入 ChatPage（转写→`handleSend`）+ 打断 | T25.2 | 集成测试 | 已验收（测试待补） |
+| T25.4 | M19 | **已交付**：TTS 朗读（`useVoice.speak` + 助手气泡「朗读」）；设置**「语音」独立分区**（从「高级」移出）；`/voice` `/wake` 经 `commands.catalog` 自动可用；**RPC 订正**：`VoicePanel` 误用的 `voice.status`/`wake.set` → 正确的 `wake.status`/`wake.start`/`wake.stop`。**待补**：`VoiceOverlay`（实时转写浮层）+ 自动朗读开关 + STT/TTS 提供方选择 | T25.2 | 面板/集成测试 | 进行中 |
+| T25.5 | M19 | `npm run check` 全绿（server 286 / web 511） | T25.1–4 | 全绿 | 已验收 |
+
+## M20 看板（Kanban，插件）
+
+> 原排除项撤销。列对齐 Hermes `BOARD_COLUMNS`（`triage/todo/scheduled/ready/running/blocked/review/done`，8 列）。
+
+| 编号 | 模块 | 描述 | 前置依赖 | 验收标准 | 状态 |
+| --- | --- | --- | --- | --- | --- |
+| T26.1 | M20 | BFF：插件 REST 代理（复用泛代理）+ **`/api/hermes/stream` WS 代理**（白名单 events/kanban/speak-stream + 双向上游 + 队列上限） | 订正 C01 | 白名单单测 + 守卫 | 已验收 |
+| T26.2 | M20 | 前端 `apps/web/src/kanban/`：`KanbanPage` + `kanban.ts`（**8 列**对齐 `BOARD_COLUMNS`；归一化容错）+ 新建/移动/删除/dispatch | T26.1 | 组件/归一化测试（4 例） | 已验收 |
+| T26.3 | M20 | 菜单「工作台」加 看板（`nav.ts`/`ShellLayout`/`App`/图标/i18n） | T26.2 | 路由可达 | 已验收 |
+| T26.4 | M20 | **已交付**：`TaskDetail`（评论/附件/runs/links）+ **board 切换**（`/boards` + `?board=`）+ **导出**（`POST /boards/:slug/export`）；**待开始**：board 导入（需 archive 路径/上传）+ home 订阅 | T26.2 | 交互验收 | 进行中 |
+| T26.5 | M20 | 事件 WS 已接线；`npm run check` 全绿（488 测试） | T26.1,T26.4 | 全绿 | 进行中 |
+
+## M21 可视化编排（自建执行层）
+
+> 原排除项撤销。**不自研 agent 内核**：底层复用 `spawn_tree.*` / `delegation.*` / `subagent.*` / MoA / groups。
+> **执行语义**：上游输出注入下游采用**变量替换 `{{node.output}}`**。
+
+| 编号 | 模块 | 描述 | 前置依赖 | 验收标准 | 状态 |
+| --- | --- | --- | --- | --- | --- |
+| T27.1 | M21 | BFF：`spawn_tree.*`/`delegation.*`/`subagent.*` 经现有 `/api/hermes/ws` 代理（**已可用**）；**编排执行器**（`{{node.output}}` 注入执行，画布→spawn_tree 映射）**待补** | 订正 C01 | 执行器单测（注入/回退/转义） | 进行中 |
+| T27.2 | M21 | 前端 `apps/web/src/orchestration/`：`flow.ts`（画布模型 + `substituteNodeOutput` + `normalizeDelegation`）+ `OrchestrationPage`（SVG 画布/节点属性/添加删除） | — | 组件/纯函数测试（9 例） | 已验收 |
+| T27.3 | M21 | 运行视图：`delegation.status` + `subagent.*` 事件订阅（委派树） | T27.2 | 集成测试 | 已验收 |
+| T27.4 | M21 | 导入导出走 `spawn_tree.save|load` + `spawn_tree.list` | T27.1 | 集成测试 | 待开始 |
+| T27.5 | M21 | `npm run check` 全绿（web 497） | T27.1–4 | 全绿 | 进行中 |
+
+## M22 外部 agent 原生安装（BFF `coding-agents` + 方案 C）
+
+> 外部 agent（Claude Code / Codex / OpenCode / Pi / Grok / DSH）由 **BFF 在主机原生安装/管理**，不碰 Hermes 内核；
+> Hermes 侧仅 `session.foreign.*`（会话导入）+ `import-agent`（注册）。**写=super_admin；`shell:false` + 白名单 + 固定版本 + 审计；禁 `curl|sh`。**
+> UI 采用**方案 C 混合智能体页**（Hermes 分组 = profile；外部 agent 分组 = 运行时卡片）。
+
+| 编号 | 模块 | 描述 | 前置依赖 | 验收标准 | 状态 |
+| --- | --- | --- | --- | --- | --- |
+| T28.1 | M22 | BFF `agents/{definitions,runner,registry}.ts`（白名单定义 + `shell:false` 执行器 + PATH 提升 + 版本探测 + catalog） | 订正 C01 | 单测（探测/PATH/归一化） | 已验收 |
+| T28.2 | M22 | BFF `agents/installer.ts`：`npm -g --prefix` 安装/卸载 + `npm view` 检查更新；装/卸写 `audit` | T28.1 | 单测（命令构造、非白名单拒绝） | 已验收 |
+| T28.3 | M22 | BFF `agents/updatePolicy.ts`：`agents-update-policy.json`(0600) + fail-closed + 非安全托管拒绝（调度器 60s tick 待补） | T28.1 | 单测（策略/fail-closed） | 已验收 |
+| T28.4 | M22 | BFF 路由 `/api/agents/*`（status/catalog/install/check-update/delete/update-policy）；读=认证，写=super_admin | T28.1–3 | 路由测试 + 权限断言 | 已验收 |
+| T28.5 | M22 | 前端智能体页**方案 C**（生产 `apps/web`，接 `/api/agents`）：左列表分组 Hermes/外部 agent；外部 agent 详情（版本/检查更新/卸载/自动更新） | T28.4 | 组件/集成测试 | 已验收 |
+| T28.6 | M22 | 自动更新调度器（60s tick / 6h 重查 / 空闲 60s / busy 跳过 / audit） | T28.3 | 单测（竞态/fail-closed） | 已验收 |
+| T28.7 | M22 | `npm run check` 全绿 | T28.5,T28.6 | 全绿 | 已验收 |
+
 ## 后续任务（待开发）
 
 | 编号 | 模块 | 描述 | 前置依赖 | 验收标准 | 状态 |
@@ -311,7 +420,8 @@
 
 ## 明确不做
 
-- Kanban（任务看板）
-- 可视化编排画布（Ekko 式）
+- **自研 agent 内核**（对话/会话/工具/技能/模型复用官方 Hermes）
+- **自研编排内核**（编排为自建执行层，复用 `spawn_tree.*`/`delegation.*`/`subagent.*`/MoA/groups）
+- 本地多模态 **设备端**能力（本地图像生成等；语音已纳入见 M19）
 
-> 以上依产品决策不做。
+> 以上依产品决策不做。已撤销的旧排除项（现纳入）：Kanban（M20）、可视化编排画布（M21）、语音/唤醒/TTS/STT（M19）。

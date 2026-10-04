@@ -9,6 +9,8 @@ const ROUTES: Record<string, string> = {
   agents: "/agents",
   groups: "/group-chat",
   tasks: "/tasks",
+  kanban: "/kanban",
+  orchestration: "/orchestration",
   usage: "/usage",
   skillhost: "/skills-ui",
   settings: "/settings",

@@ -5,7 +5,7 @@ import { t } from "../i18n";
 import { normalizeBilling, type BillingInfo } from "./billing";
 import { formatUsage, normalizePortal, type PortalInfo } from "./portal";
 
-/** 设置 → 高级 → 计费/套餐：L1 `billing.state`/`subscription.status` + L2 门户（只读）。 */
+/** 设置 → 高级 → 计费/套餐：L1 `billing.state`/`subscription.state` + L2 门户（只读）。 */
 export default function BillingPanel() {
   const gateway = useGateway();
   const [billing, setBilling] = useState<BillingInfo>({});
@@ -18,7 +18,7 @@ export default function BillingPanel() {
     try {
       const [billingState, subscription, portalRaw] = await Promise.all([
         gateway.request("billing.state", {}).catch(() => null),
-        gateway.request("subscription.status", {}).catch(() => null),
+        gateway.request("subscription.state", {}).catch(() => null),
         api<unknown>("/api/hermes/portal").catch(() => null),
       ]);
       const merged = normalizeBilling(billingState, subscription, portalRaw);

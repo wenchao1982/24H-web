@@ -15,6 +15,8 @@ const PlaceholderPage = lazy(() => import("./pages/PlaceholderPage"));
 const AgentsPage = lazy(() => import("./agents/AgentsPage"));
 const GroupChatPage = lazy(() => import("./groups/GroupChatPage"));
 const TasksPage = lazy(() => import("./tasks/TasksPage"));
+const KanbanPage = lazy(() => import("./kanban/KanbanPage"));
+const OrchestrationPage = lazy(() => import("./orchestration/OrchestrationPage"));
 const UsagePage = lazy(() => import("./usage/UsagePage"));
 const SkillsHostPage = lazy(() => import("./skillhost/SkillsHostPage"));
 const SettingsPage = lazy(() => import("./settings/SettingsPage"));
@@ -44,6 +46,8 @@ export function AppRoutes() {
             <Route path="/group-chat" element={<GroupChatPage />} />
             <Route path="/groups" element={<Navigate to="/group-chat" replace />} />
             <Route path="/tasks" element={<TasksPage />} />
+            <Route path="/kanban" element={<KanbanPage />} />
+            <Route path="/orchestration" element={<OrchestrationPage />} />
             <Route path="/usage" element={<UsagePage />} />
             <Route path="/skills-ui" element={<SkillsHostPage />} />
             <Route path="/settings" element={<SettingsPage />} />

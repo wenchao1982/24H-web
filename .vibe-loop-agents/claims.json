@@ -54,5 +54,12 @@
     "claimedAt": "2026-09-30T14:46:41.034Z",
     "status": "done",
     "result": "按证据结案（非「未处理」）。\n· F5（WS 重连后 per-connection sessionOwners 清空 → (A) 类带旧 session_id 被 fail-closed 403）：安全方向正确；grep 全仓确认 **SPA 不调用任何 (A) 类方法**（tools.list/toolsets.list/tools.show/skills.reload/complete.slash/model.save_key/model.disconnect 仅出现在 server 守卫与测试）→ 对本应用**零功能影响**。已写明未来需要时的处置：重连后前端先 session.resume 重新登记，或将归属表持久化（按需项）。\n· F6（model.save_key/model.disconnect 入 fail-closed 清单）：设置页走 REST `/api/hermes/model/*`（ModelPanel.tsx:35-76），不经 WS → 无影响；若未来改经 WS 须显式带 session_id/profile。\n· F9（批帧逐元素 resolveDefaultProfile 性能）：受 maxPayload 约束（≤16MiB，元素数有限），本轮不改；如需可加 per-call 缓存。\n证据落地：contracts-evidence.md 新增 §10「(A) 类方法的调用方核查（F5/F6 结案）」——含可复核 grep 命令 + 7 行「方法→全仓引用位置→是否 SPA 调用」表（结论均为「否」）；requirements.md §10 追加 F5 附注 + 新增 F6 行；manifest changes 追加。另清理死代码：slash.ts 删除 normalizeCompletions（唯一调用方是测试），slash.test.ts 等价改写（3→3）。提交 6d82618。npm run check 全绿（server 267 / web 473）。"
+  },
+  {
+    "agentId": "spec-agent-003",
+    "taskId": "muni8gxxg66i",
+    "claimedAt": "2026-09-30T14:54:55.282Z",
+    "status": "done",
+    "result": "按事实订正后结案。\n· ① 「经 BFF 端到端 10MB」**已闭合**：proxy.largePayload.test.ts 实测 13,981,124B（≈13.33MiB）帧经 BFF WS 代理成功转发并注入 profile:\"alpha\"（148.2ms，上游为 mock）；>16MiB → close(1009)；近 16MiB × 4 → 1013/QUEUE_OVERFLOW（字节预算）；300 小帧 → 第 257 帧（条数预算）；冷启动 5 小帧全通过。直连真机 ≈13.98MB/290ms 佐证上游侧。→ R15 由「未实测」改为「部分闭合」。\n· ② `config.set confirm_required:true`：需真实昂贵模型环境（本机全为 false）；前端 confirm 分支已有单测覆盖，未实测的是网关侧触发条件 → **登记为外部依赖**（保持未闭合）。\n· ③ 跨 profile 租户作用域差异：需第二个 profile 的 HERMES_HOME → **登记为外部依赖**（保持未闭合），并注明**不得擅自创建**（避免改动用户 Hermes 主目录）。\n文档同步：requirements.md §1/§9 R15/§10（新增 2 行外部依赖）；manifest.json knownGaps 6→8 条 + changes；contracts-evidence.md §8.6 加交叉引用（消除「只测了直连」的误读）。提交 f0f3dc2。npm run check 全绿（93 files / 473 tests）。"
   }
 ]

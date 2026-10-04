@@ -5,6 +5,8 @@ export type GatewayEventHandler = (payload: GatewayEventPayload) => void;
 export type GatewayServerRequestHandler = (
   params: GatewayEventPayload,
   respond: (result: GatewayEventPayload) => void,
+  /** JSON-RPC 请求 id（字符串化），用于 `request.cancel` 匹配挂起卡。 */
+  requestId: string,
 ) => void;
 
 /** 退订函数：调用后移除对应的 handler（StrictMode/切页时释放订阅）。 */
@@ -161,7 +163,7 @@ export class GatewayClient implements Gateway {
       const handlers = this.serverRequests.get(frame.method);
       if (handlers && handlers.size > 0) {
         for (const handler of handlers) {
-          handler(frame.params ?? {}, respond);
+          handler(frame.params ?? {}, respond, String(frame.id));
         }
       } else {
         respond({});

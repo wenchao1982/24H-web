@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import VoicePanel from "./VoicePanel";
 import { GatewayProvider } from "../chat/GatewayProvider";
 import { createFakeGateway, type FakeGateway } from "../test/fakeGateway";
-import { normalizeTtsResult, normalizeVoiceStatus, wakeParams } from "./voice";
+import { normalizeTtsResult, normalizeVoiceStatus, wakeStartParams } from "./voice";
 
 function renderPanel(gateway: FakeGateway) {
   return render(
@@ -15,8 +15,8 @@ function renderPanel(gateway: FakeGateway) {
 }
 
 function impl(method: string): unknown {
-  if (method === "voice.status") {
-    return { available: true, wake: false, voice: "elevenlabs" };
+  if (method === "wake.status") {
+    return { available: true, enabled: false, listening: false, provider: "elevenlabs" };
   }
   if (method === "voice.tts") {
     return { url: "https://x/a.mp3" };
@@ -28,8 +28,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("VoicePanel T18.7 语音", () => {
-  it("reads status and toggles the wake word", async () => {
+describe("VoicePanel T18.7 语音（C04 订正：wake.status/start/stop）", () => {
+  it("reads wake.status and toggles the wake word via wake.start", async () => {
     const gateway = createFakeGateway(impl);
     renderPanel(gateway);
 
@@ -39,7 +39,7 @@ describe("VoicePanel T18.7 语音", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "切换唤醒词" }));
     await waitFor(() => {
-      expect(gateway.paramsOf("wake.set")).toEqual([{ enabled: true }]);
+      expect(gateway.paramsOf("wake.start")).toEqual([{ surface: "gui", persist: true }]);
       expect(screen.getByLabelText("语音状态")).toHaveTextContent("唤醒词已开启");
     });
   });
@@ -59,17 +59,15 @@ describe("VoicePanel T18.7 语音", () => {
   });
 
   it("normalizes tolerant shapes", () => {
-    expect(normalizeVoiceStatus({ active: true, wake_word: true })).toEqual({
-      available: true,
-      wake: true,
-      listening: true,
-    });
+    expect(
+      normalizeVoiceStatus({ available: true, enabled: true, listening: true, provider: "x" }),
+    ).toEqual({ available: true, wake: true, listening: true, voice: "x" });
     expect(normalizeVoiceStatus(null)).toEqual({
       available: false,
       wake: false,
       listening: false,
     });
     expect(normalizeTtsResult({ audio_url: "https://x/a.mp3" })).toBe("https://x/a.mp3");
-    expect(wakeParams(false)).toEqual({ enabled: false });
+    expect(wakeStartParams()).toEqual({ surface: "gui", persist: true });
   });
 });

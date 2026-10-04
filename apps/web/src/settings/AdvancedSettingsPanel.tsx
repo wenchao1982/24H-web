@@ -4,7 +4,6 @@ import PairingPanel from "./PairingPanel";
 import PortalPanel from "./PortalPanel";
 import OpsPanel from "./OpsPanel";
 import BrowserPanel from "./BrowserPanel";
-import VoicePanel from "./VoicePanel";
 import ExecPanel from "./ExecPanel";
 import QuickCompletePanel from "./QuickCompletePanel";
 import ProjectFactsPanel from "./ProjectFactsPanel";
@@ -35,7 +34,6 @@ const TABS: TabDef[] = [
   { id: "portal", labelKey: "advanced.tab.portal" },
   { id: "ops", labelKey: "advanced.tab.ops" },
   { id: "browser", labelKey: "advanced.tab.browser" },
-  { id: "voice", labelKey: "advanced.tab.voice" },
   { id: "exec", labelKey: "advanced.tab.exec" },
   { id: "oneshot", labelKey: "advanced.tab.oneshot" },
   { id: "facts", labelKey: "advanced.tab.facts" },
@@ -80,7 +78,6 @@ export default function AdvancedSettingsPanel() {
       {tab === "portal" ? <PortalPanel /> : null}
       {tab === "ops" ? <OpsPanel /> : null}
       {tab === "browser" ? <BrowserPanel /> : null}
-      {tab === "voice" ? <VoicePanel /> : null}
       {tab === "exec" ? <ExecPanel /> : null}
       {tab === "oneshot" ? <QuickCompletePanel /> : null}
       {tab === "facts" ? <ProjectFactsPanel /> : null}

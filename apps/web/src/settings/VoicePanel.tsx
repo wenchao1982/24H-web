@@ -5,8 +5,9 @@ import {
   normalizeTtsResult,
   normalizeVoiceStatus,
   ttsParams,
-  voiceStatusParams,
-  wakeParams,
+  wakeStartParams,
+  wakeStatusParams,
+  wakeStopParams,
   type VoiceStatus,
 } from "./voice";
 
@@ -23,7 +24,7 @@ export default function VoicePanel() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setStatus(normalizeVoiceStatus(await gateway.request("voice.status", voiceStatusParams())));
+      setStatus(normalizeVoiceStatus(await gateway.request("wake.status", wakeStatusParams())));
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("voice.error.load"));
@@ -40,7 +41,10 @@ export default function VoicePanel() {
     const next = !(status?.wake ?? false);
     setBusy(true);
     try {
-      await gateway.request("wake.set", wakeParams(next));
+      await gateway.request(
+        next ? "wake.start" : "wake.stop",
+        next ? wakeStartParams() : wakeStopParams(),
+      );
       setStatus((current) => (current ? { ...current, wake: next } : current));
       setError(null);
     } catch (err) {

@@ -87,13 +87,16 @@
 
 | 区 | 侧栏列表 | 主区 |
 | --- | --- | --- |
-| **对话** | 会话列表（搜索/新建/重命名/删除/恢复） | 会话头 + transcript + 输入框（含搜索/导入导出/工作区）；slash 命令菜单（/goal 等）；@ 引用 / personality |
-| **智能体** | agent 列表（头像·名称·模型·版本灯·状态） | agent 详情：SOUL / 模型 / Skills / MCP / Toolsets / 版本灯 / 头像、技能安装/内容编辑、从经验生成 skill（/learn）；操作：新建/克隆/编辑/删除/导入导出、上下文文件/搜索配置 |
-| **群聊** | 房间列表（成员数·最新·needs-you） | 房间内多 agent 对话（@成员 / @user / 线程） |
-| **任务** | 任务列表 | Cron 详情 + 新增/暂停/恢复/删除/立即运行 |
-| **用量** | —（无列表） | 概览卡片 + 按模型费用 |
-| **设置** | 分区列表 | 分区详情 |
-| **管理** * | 分区列表 | 用户与角色 / 审计 / 系统运维 |
+| **对话** | 会话列表（搜索/全文检索/新建/重命名/删除/恢复） | 会话头 + transcript + 输入框（含搜索/导入导出/工作区）；slash 命令菜单（/goal 等）；@ 引用 / personality；**语音**（按住说话 / TTS 朗读 / 唤醒默认关） |
+| **智能体（方案 C 混合）** | 左列表两组：**Hermes**（= profile：SOUL/技能/工具/MCP/插件/Bot 屏幕/市场）· **外部 agent**（Claude Code/Codex/OpenCode/Pi/Grok/DSH，版本灯/状态） | Hermes 详情=现有 profile 能力；外部 agent 卡片=logo·vendor·`Installed`·版本·Settings·Check for update·Delete·**Automatic updates**；由 BFF `coding-agents` 原生安装管理 |
+| **群聊** | 房间列表（成员数·最新·needs-you） | 房间内多 agent 对话（@成员 / @user / 线程）+ 成员增删改 + Bot 回传 |
+| **任务** | 任务列表 | Cron 详情 + 新增/编辑/暂停/恢复/删除/立即运行 + blueprints/投递目标/失败事件 |
+| **看板** | —（board 切换） | **Kanban 列对齐 Hermes `BOARD_COLUMNS`** = `triage/todo/scheduled/ready/running/blocked/review/done`（8 列）；卡片=标题+指派 agent/profile+标签/附件数+run 状态；详情/评论/链接/附件/估算；dispatch/终止/回收/导入导出 |
+| **编排** | —（无列表） | 画布（节点=agent/子代理/工具/判定；边=委托 + 上游输出注入下游 `{{node.output}}`）；运行视图（子代理树 / MoA）；导入导出 `spawn_tree.*` |
+| **用量** | —（无列表） | 概览卡片 + 缓存命中率 + 按智能体对比 + 按模型费用 + 计费/订阅/充值 |
+| **洞察** | 分区（用量/监控/记忆） | 监控=本机 CPU/内存/磁盘/进程 + 后端健康；记忆=分类/作用域/提供方/图谱 |
+| **设置** | 分区列表 | 通用（外观/字号/语言）/ 模型与密钥 / 渠道 / 集成 / 数据与目录 / 连接 / 系统 / 高级 / 语音 |
+| **管理** * | 分区列表 | 用户与角色 / 审计（系统运维并入 `设置>系统`） |
 
 **设置分区**：模型与密钥（含路由/回退/凭证池） · 渠道（含 Deliverable） · 用量 · 监控 · 集成（记忆/Webhooks/插件/Plugin Catalog/GitHub） · 数据与目录 · 项目 · 连接 · 系统（升级 + 诊断运维 + 审批策略） · 高级（API Server / Event Hooks / Tool Gateway / Tool Search / LSP / Computer Use / Subscription Proxy / Codex Runtime）。
 
@@ -196,6 +199,11 @@
 - **升级不分开**（核心 + web 同一面板，入口在侧栏品牌行核心灯）。
 - **无 ⌘K 面板**；外观 = 日/夜一键切换；详情面板默认关闭、可拖拽、让步链自动关。
 - **无全局顶栏**（dsh 式）：状态与控制在侧栏品牌行 / 输入框 / 就地。
+- **看板列对齐 Hermes** `BOARD_COLUMNS`（`triage/todo/scheduled/ready/running/blocked/review/done`，8 列，不做自定义列）。
+- **编排执行语义 = 变量替换 `{{node.output}}`**（自建执行层，复用 Hermes 内核）。
+- **语音**：按住说话 STT + TTS 朗读（可选）+ 唤醒词常驻监听（默认关）；打断可中止。
+- **智能体 = 混合（方案 C）**：Hermes（=profile，SOUL/技能/MCP/工具/市场）+ 外部 agent（原生安装的 CLI 运行时，版本/更新/删除/自动更新）；**档案 = profile**；**技能 = SKILL.md**（无 iframe 沙箱）。
+- **外部 agent 原生安装**由 BFF 承担（`npm -g --prefix` 受管目录 + PATH 提升；`super_admin` + 审计 + 白名单 + 固定版本；禁 `curl|sh`）。
 
 ## 14. 设计已定稿
 
@@ -223,5 +231,5 @@
 ## 17. 可借鉴的其他设计
 
 - **dsh**：让步链 · 56px 轨道 · 会话行挂起点 · 轨迹(trajectory)视图 · 计划(plan)视图 · 后台 jobs · deliverables 产物 · permission-presets · message-feedback · token-meter · user-questions。
-- **Hermes**：（未采用）Kanban 状态列看板 · profile 花名册 · 会话内审批 · SOUL 人格 · 技能页 · 用量/日志页。
-- **Ekko**：（未采用）可视化编排画布（节点=agent）· 运行快照只读 · 上游输出注入下游。
+- **Hermes**：**Kanban 状态列看板（已采用 → M20）** · profile 花名册（=档案） · 会话内审批 · 技能页 · 用量/日志页 · 语音/唤醒。
+- **Ekko**：**可视化编排画布（已采用 → M21）** · 运行快照只读 · 上游输出注入下游（`{{node.output}}`）。

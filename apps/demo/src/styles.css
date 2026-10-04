@@ -1,0 +1,123 @@
+@import "tailwindcss";
+
+/* 用 data-theme 驱动 dark: 变体（与生产 data-theme 语义一致） */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/*
+ * --ds-* 设计 token —— 与 apps/web/src/styles.css 同源。
+ * Demo 用 Tailwind，但把 token 映射进 theme，保证回填生产时 1:1 翻译。
+ */
+:root {
+  color-scheme: light;
+
+  --ds-bg-base: #ffffff;
+  --ds-surface-l1: #ffffff;
+  --ds-surface-l2: #f7f8fa;
+  --ds-surface-l3: #eef0f4;
+  --ds-label-primary: #0f1115;
+  --ds-label-secondary: #61666b;
+  --ds-label-tertiary: #81858c;
+  --ds-border-l1: rgb(0 0 0 / 10%);
+  --ds-border-l2: rgb(0 0 0 / 12%);
+  --ds-accent: #4d6bfe;
+  --ds-accent-weak: rgb(77 107 254 / 12%);
+  --ds-accent-strong: #3d59e0;
+  --ds-danger: #d92d20;
+  --ds-warning: #b54708;
+  --ds-success: #067647;
+
+  --ds-radius-sm: 6px;
+  --ds-radius-md: 10px;
+  --ds-radius-lg: 16px;
+  --ds-radius-pill: 999px;
+
+  --ds-font-sans: system-ui, -apple-system, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
+  --ds-font-mono: "SF Mono", "JetBrains Mono", "Fira Code", Consolas, Menlo,
+    monospace;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --ds-bg-base: #151517;
+  --ds-surface-l1: #1c1c1f;
+  --ds-surface-l2: #202024;
+  --ds-surface-l3: #2a2a2f;
+  --ds-label-primary: #f9fafb;
+  --ds-label-secondary: #cfd3d6;
+  --ds-label-tertiary: #adb2b8;
+  --ds-border-l1: rgb(255 255 255 / 12%);
+  --ds-border-l2: rgb(255 255 255 / 16%);
+  --ds-accent-weak: rgb(77 107 254 / 22%);
+}
+
+@theme inline {
+  --color-bg: var(--ds-bg-base);
+  --color-s1: var(--ds-surface-l1);
+  --color-s2: var(--ds-surface-l2);
+  --color-s3: var(--ds-surface-l3);
+  --color-label-1: var(--ds-label-primary);
+  --color-label-2: var(--ds-label-secondary);
+  --color-label-3: var(--ds-label-tertiary);
+  --color-line-1: var(--ds-border-l1);
+  --color-line-2: var(--ds-border-l2);
+  --color-accent: var(--ds-accent);
+  --color-accent-weak: var(--ds-accent-weak);
+  --color-accent-strong: var(--ds-accent-strong);
+  --color-danger: var(--ds-danger);
+  --color-warning: var(--ds-warning);
+  --color-success: var(--ds-success);
+
+  --radius-sm: var(--ds-radius-sm);
+  --radius-md: var(--ds-radius-md);
+  --radius-lg: var(--ds-radius-lg);
+  --radius-pill: var(--ds-radius-pill);
+
+  --font-sans: var(--ds-font-sans);
+  --font-mono: var(--ds-font-mono);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    margin: 0;
+    background: var(--ds-bg-base);
+    color: var(--ds-label-primary);
+    font-family: var(--ds-font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  button {
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+  * {
+    box-sizing: border-box;
+  }
+}
+
+/* 细滚动条：指针不在栏内时低调，悬停时才明显 */
+@layer utilities {
+  .thin-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--ds-border-l2) transparent;
+  }
+  .thin-scroll::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .thin-scroll::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 999px;
+  }
+  .thin-scroll:hover::-webkit-scrollbar-thumb {
+    background: var(--ds-border-l2);
+  }
+}

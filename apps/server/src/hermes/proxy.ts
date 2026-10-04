@@ -586,3 +586,140 @@ export const hermesWsRoutes: FastifyPluginAsync<HermesWsOptions> = async (app, o
     });
   });
 };
+
+/**
+ * 允许经 `/api/hermes/stream` 代理的 Hermes WS 路径（**白名单**，防开放代理/SSRF）。
+ * - `/api/events`：会话事件流
+ * - `/api/plugins/kanban/events`：看板事件流（M20）
+ * - `/api/audio/speak-stream`：语音合成流（M19）
+ */
+const STREAM_PATHS: ReadonlySet<string> = new Set([
+  "/api/events",
+  "/api/plugins/kanban/events",
+  "/api/audio/speak-stream",
+]);
+
+export function isAllowedStreamPath(path: string): boolean {
+  return STREAM_PATHS.has(path);
+}
+
+/**
+ * 事件/音频流代理（M19/M20）：认证后打开上游 WS 并**双向**透传（事件多为服务端推送，
+ * `speak-stream` 需客户端上行）。default-deny 同 `/api/hermes/ws`：仅白名单路径；帧上限沿用
+ * `WS_MAX_PAYLOAD` 与 `pending`/`outbound` 双上限；二进制帧原样透传。
+ */
+async function streamBridge(
+  socket: WebSocket,
+  request: FastifyRequest,
+  options: HermesWsOptions,
+  path: string,
+): Promise<void> {
+  const db = options.db;
+  const target = resolveTarget(db, options.defaultBaseUrl, readConnectionId(request));
+  const upstream = hermesUpstream({ hermesBaseUrl: options.defaultBaseUrl }, target.baseUrl);
+  const token = target.token ?? (await getHermesToken(upstream.baseUrl));
+
+  const pending: PendingFrame[] = [];
+  const outbound: PendingFrame[] = [];
+  let pendingBytes = 0;
+  let outboundBytes = 0;
+
+  const ws = new WebSocket(`${upstream.wsBaseUrl}${path}?token=${encodeURIComponent(token)}`, {
+    maxPayload: WS_MAX_PAYLOAD,
+  });
+
+  const flushToClient = () => {
+    if (socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    for (const frame of outbound.splice(0)) {
+      socket.send(frame.data, { binary: frame.isBinary });
+    }
+    outboundBytes = 0;
+  };
+
+  ws.on("open", () => {
+    for (const frame of pending.splice(0)) {
+      ws.send(frame.data, { binary: frame.isBinary });
+    }
+    pendingBytes = 0;
+    flushToClient();
+  });
+
+  ws.on("message", (data: RawData, isBinary: boolean) => {
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(data, { binary: isBinary });
+      return;
+    }
+    const bytes = frameBytes(data);
+    if (shouldRejectOutbound(outbound.length, outboundBytes + bytes)) {
+      logAudit(db, {
+        actorId: request.user?.id ?? null,
+        action: "ws.outbound.overflow",
+        targetType: "hermes_stream",
+        targetId: path,
+        ip: request.ip,
+        detail: null,
+      });
+      socket.close(1013, "QUEUE_OVERFLOW");
+      return;
+    }
+    outbound.push({ data, isBinary, bytes });
+    outboundBytes += bytes;
+  });
+
+  ws.on("close", () => {
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.close(1000, "UPSTREAM_CLOSED");
+    }
+  });
+  ws.on("error", () => {
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.close(1011, "UPSTREAM_ERROR");
+    } else {
+      socket.terminate();
+    }
+  });
+
+  socket.on("message", (data: RawData, isBinary: boolean) => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(data, { binary: isBinary });
+      return;
+    }
+    const bytes = frameBytes(data);
+    if (pending.length >= WS_MAX_PENDING_COUNT || pendingBytes + bytes > WS_MAX_PENDING_BYTES) {
+      socket.close(1013, "QUEUE_OVERFLOW");
+      return;
+    }
+    pending.push({ data, isBinary, bytes });
+    pendingBytes += bytes;
+  });
+  socket.on("close", () => {
+    ws.close();
+  });
+  socket.on("error", () => {
+    ws.terminate();
+  });
+
+  if (socket.readyState === WebSocket.OPEN) {
+    flushToClient();
+  } else {
+    socket.once("open", flushToClient);
+  }
+}
+
+export const hermesStreamRoutes: FastifyPluginAsync<HermesWsOptions> = async (app, opts) => {
+  app.get("/api/hermes/stream", { websocket: true, preHandler: requireAuth }, (socket, request) => {
+    const raw = (request.query as Record<string, unknown> | undefined)?.path;
+    const path = typeof raw === "string" ? raw : "";
+    if (!isAllowedStreamPath(path)) {
+      socket.close(1008, "STREAM_PATH_NOT_ALLOWED");
+      return;
+    }
+    void streamBridge(socket, request, opts, path).catch(() => {
+      if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+        socket.close(1011, "HERMES_STREAM_ERROR");
+      }
+    });
+  });
+};

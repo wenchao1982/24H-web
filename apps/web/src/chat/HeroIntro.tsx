@@ -1,4 +1,5 @@
 import { t } from "../i18n";
+import { BrandMark } from "../ui/icons";
 import type { SessionSummary } from "./types";
 
 export interface HeroIntroProps {
@@ -21,7 +22,8 @@ export default function HeroIntro({ sessions, onSelect, limit = 5 }: HeroIntroPr
   return (
     <div className="chat-hero">
       <div className="chat-hero-brand" aria-hidden="true">
-        24H
+        <BrandMark size={30} />
+        <span className="chat-hero-brand-name">24H</span>
       </div>
       <h1 className="chat-hero-title">{t("chat.hero.title")}</h1>
       <section className="chat-hero-recent" aria-label={t("chat.hero.recent")}>

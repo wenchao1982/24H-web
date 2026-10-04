@@ -76,7 +76,8 @@ describe("ChatPage StrictMode 重复助手气泡调查", () => {
 
     expect(registrations, "非 StrictMode 下 message.complete 注册次数").toBe(1);
     expect(assistantBubbles, "非 StrictMode 下助手气泡数量").toHaveLength(1);
-    expect(texts).toEqual(["你好，世界"]);
+    // M19：助手气泡含「朗读」按钮，故断言包含消息文本而非全等。
+    expect(texts[0]).toContain("你好，世界");
   });
 
   it("StrictMode：一个 message.complete 事件只应产生一个助手气泡", async () => {
@@ -86,9 +87,9 @@ describe("ChatPage StrictMode 重复助手气泡调查", () => {
     expect.soft(assistantBubbles, `StrictMode 下助手气泡数量（文本=${texts.join(" | ")}）`).toHaveLength(
       1,
     );
-    expect.soft(texts, `StrictMode 下助手气泡文本（文本=${texts.join(" | ")}）`).toEqual([
+    expect.soft(texts[0], `StrictMode 下助手气泡文本（文本=${texts.join(" | ")}）`).toContain(
       "你好，世界",
-    ]);
+    );
   });
 });
 

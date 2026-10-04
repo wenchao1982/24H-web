@@ -28,6 +28,8 @@
 - `packages/shared` — 前后端共享类型。
 - `apps/web` — React SPA（React 19 + Vite + react-router）。
 - `apps/server` — BFF（Fastify），子域：认证、用户/角色、profile 租户、Hermes 代理、审计。
+- `apps/demo` — **独立高保真前端 Demo**（Vite + Tailwind v4 + Radix；mock 数据，不碰后端）。
+  **先 Demo 定稿 → 再回填写手写 CSS 的生产页**（§11.1）；Demo 独立 `check:demo`，**不进** 根 `npm run check`。
 
 ## 4. 认证与运行时
 
@@ -47,7 +49,7 @@
 - 前端 → BFF：`/api/auth/*`、`/api/admin/*`、`/api/hermes/*`（代理）。
 - BFF → Hermes：官方 **L1 `/api/ws`** + **L2 `/api/*`**；契约以官方生成文件为准
   （`gateway-contract.generated.ts` / OpenRPC），**不要猜 Hermes 内部 schema**。
-- 服务端 → 客户端请求（`approval`/`clarify`/`sudo`/`secret`）必须回包（同一 `id`）。
+- 服务端 → 客户端请求（**13 类**：`approval` / `clarify` / `sudo` / `secret` / `vault.unlock_prompt` / `vault.save_login` / `vault.code` / `terminal.read` / `preview.read` / `window.read` / `preview.act` / `tour` / `display.install.sudo`）必须回包（同一 `id`）；旧文档的 `mcp.setup` **不存在**（MCP 走 `connectors.*`/`connection.request`/L2 `/api/mcp/*`）。
 - **WS 租户守卫**：BFF 代理对含 `method` 的帧 **default-deny**（数组批帧逐元素；二进制/解析失败一律拒绝），
   越权以同 `id` 回 403 `PROFILE_FORBIDDEN` 且不转发；响应侧对 `profiles.list` 按白名单过滤，
   **仅「成功但结构不符」fail-closed，上游错误帧（`{id,error}`）原样透传**；
@@ -105,6 +107,7 @@ npm run check     # typecheck（web + server + shared）+ vitest（server + web�
 | `apps/web/src/api/ws.ts` | 对话 WS JSON-RPC 客户端 |
 | `apps/web/src/pages/` | 登录 / 用户管理 |
 | `apps/web/src/{chat,agents,groups,tasks,usage,settings,details,notifications}/` | 各功能模块与设置面板 |
+| `apps/web/src/{kanban,orchestration,voice}/` | **M19–M21 规划落点**：看板 / 编排画布 / 语音 |
 | `apps/web/src/chat/composer/` | 对话页输入区控件（hero/docked 双态、pill、上传、菜单；**M17 规划落点**） |
 | `apps/server/src/index.ts` | BFF 入口：开库 → 迁移 → `ensureFirstAdmin` → listen |
 | `apps/server/src/config.ts` | env：`PORT` / `HERMES_BASE_URL` / `DB_PATH` |
@@ -127,8 +130,9 @@ npm run check     # typecheck（web + server + shared）+ vitest（server + web�
 ## 10. 状态 / 规格来源 / 未采用
 
 - **M0–M17 已完成**；功能拆解见 `docs/TASKS.md`（M17 = 对话页重构，Spec 见 `.psd/specs/003-composer-redesign/`）。
+- **M18 = 前端 Demo**（进行中）：`apps/demo` 独立高保真 Demo，**先定稿视觉语言再回填 `apps/web`**；见 `task-list.md` M18。
+- **M19–M21 规划**（原排除项撤销，先补齐方案）：M19 语音/唤醒/TTS/STT · M20 看板（Kanban，固定 4 列）· M21 可视化编排画布（自建执行层，`{{node.output}}`）；见 `task-list.md`。
 - 规格来源：`docs/{ARCHITECTURE,INTERFACES,TASKS,UI}.md`（改接口先看这些，契约为准）。
-- **未采用**：Kanban 状态列看板；可视化编排画布（节点=agent）——见 `docs/UI.md`。
 - **TODO(future)**：IdP 接入（新增 `AuthProvider` 的 `oidc` 实现）。
 
 ## 11. 红线规则（Spec 工作流）

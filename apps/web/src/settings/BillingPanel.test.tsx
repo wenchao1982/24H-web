@@ -35,7 +35,7 @@ describe("BillingPanel T18.14 计费/套餐", () => {
       if (method === "billing.state") {
         return { plan: "Pro", status: "active", seats: 5, balance: { amount: 20, currency: "USD" } };
       }
-      if (method === "subscription.status") {
+      if (method === "subscription.state") {
         return {};
       }
       return {};

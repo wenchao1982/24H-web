@@ -98,11 +98,12 @@ export class FakeGateway implements Gateway {
   emitServerRequest(
     method: string,
     params: GatewayEventPayload = {},
+    requestId = `rpc-${this.serverRequests.length + 1}`,
   ): ReturnType<typeof vi.fn<(result: GatewayEventPayload) => void>> {
     const respond = vi.fn<(result: GatewayEventPayload) => void>();
     this.serverRequests.push({ method, params, respond });
     for (const handler of this.serverHandlers.get(method) ?? []) {
-      handler(params, respond);
+      handler(params, respond, requestId);
     }
     return respond;
   }

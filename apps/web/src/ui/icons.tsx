@@ -6,6 +6,8 @@ export type IconName =
   | "agents"
   | "groups"
   | "tasks"
+  | "kanban"
+  | "workflow"
   | "usage"
   | "skillhost"
   | "settings"
@@ -57,6 +59,20 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <path d="M9 11l3 3L22 4" />
       <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+    </>
+  ),
+  kanban: (
+    <>
+      <rect x="3" y="4" width="5" height="16" rx="1" />
+      <rect x="10" y="4" width="5" height="10" rx="1" />
+      <rect x="17" y="4" width="4" height="13" rx="1" />
+    </>
+  ),
+  workflow: (
+    <>
+      <rect x="3" y="3" width="6" height="6" rx="1" />
+      <rect x="15" y="15" width="6" height="6" rx="1" />
+      <path d="M6 9v3a3 3 0 0 0 3 3h6" />
     </>
   ),
   usage: (
@@ -195,6 +211,30 @@ export interface IconProps {
   name: IconName;
   size?: number;
   className?: string;
+}
+
+/** 品牌标记（填充强调色圆角方块 + 白色笔画）；纯装饰。 */
+export function BrandMark({ size = 22, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      className={className}
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <rect width="24" height="24" rx="7" fill="var(--ds-accent)" />
+      <path
+        d="M6.5 16.5V7.5l5.5 5.5 5.5-5.5v9"
+        stroke="#fff"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
 
 /** 统一的线性内联图标（aria-hidden，纯装饰）。 */

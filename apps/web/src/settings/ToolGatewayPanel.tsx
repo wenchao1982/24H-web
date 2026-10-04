@@ -1,15 +1,16 @@
-import ConfigFieldsPanel, { type ConfigFieldDef } from "./ConfigFieldsPanel";
+import SchemaSectionPanel from "./SchemaSectionPanel";
 
-const FIELDS: ConfigFieldDef[] = [
-  { path: "tool_gateway.web", labelKey: "toolGateway.web", type: "boolean" },
-  { path: "tool_gateway.image", labelKey: "toolGateway.image", type: "boolean" },
-  { path: "tool_gateway.tts", labelKey: "toolGateway.tts", type: "boolean" },
-  { path: "tool_gateway.browser", labelKey: "toolGateway.browser", type: "boolean" },
-];
-
-/** 设置 → 高级 → Tool Gateway（T23.9）：Nous Portal 工具网关（web/image/TTS/browser）。 */
+/**
+ * 设置 → 高级 → Tool Gateway（T23.9）。
+ * 注：Hermes 当前版本无 `tool_gateway.*` 配置键（C04 同源订正）；托管工具网关由 Nous 订阅/
+ * toolset 默认驱动。本面板 schema 驱动，无匹配字段时显示说明而非无效开关。
+ */
 export default function ToolGatewayPanel() {
   return (
-    <ConfigFieldsPanel titleKey="toolGateway.title" hintKey="toolGateway.hint" fields={FIELDS} />
+    <SchemaSectionPanel
+      titleKey="toolGateway.title"
+      hintKey="toolGateway.hint"
+      prefix="tool_gateway"
+    />
   );
 }
