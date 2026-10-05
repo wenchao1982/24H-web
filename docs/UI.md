@@ -74,7 +74,7 @@
 | 文件 | 工作区文件浏览/读取 |
 | 预览 | 文件/HTML 预览 |
 | 日志 | 读取/过滤 |
-| Git | 状态/差异 |
+| Git | 状态/差异/评审（stage·commit·push·PR） |
 
 可拖拽缩放；让步链先缩后关；隐藏不销毁（保留滚动/状态）。
 
@@ -98,7 +98,7 @@
 | **设置** | 分区列表 | 通用（外观/字号/语言）/ 模型与密钥 / 渠道 / 集成 / 数据与目录 / 连接 / 系统 / 高级 / 语音 |
 | **管理** * | 分区列表 | 用户与角色 / 审计（系统运维并入 `设置>系统`） |
 
-**设置分区**：模型与密钥（含路由/回退/凭证池） · 渠道（含 Deliverable） · 用量 · 监控 · 集成（记忆/Webhooks/插件/Plugin Catalog/GitHub） · 数据与目录 · 项目 · 连接 · 系统（升级 + 诊断运维 + 审批策略） · 高级（API Server / Event Hooks / Tool Gateway / Tool Search / LSP / Computer Use / Subscription Proxy / Codex Runtime）。
+**设置分区**：模型与密钥（含路由/回退/凭证池） · 渠道（含 Deliverable） · 语音 · 用量 · 监控 · 集成（记忆/**连接器**/Webhooks/插件/Plugin Catalog/GitHub） · 数据与目录 · 项目 · 连接 · 系统（升级 + 诊断运维 + 审批策略） · 高级（API Server / Event Hooks / Tool Gateway / Tool Search / LSP / Computer Use / Subscription Proxy / Codex Runtime）。
 
 ## 8. 快捷键（无 ⌘K 面板）
 

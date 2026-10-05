@@ -46,15 +46,18 @@
 | `screens/ChatHero.tsx` | `chat/HeroIntro.tsx` + `chat/ChatPage.tsx`（hero 态） | 大标识+标题+Preview、最近会话网格 |
 | `screens/ChatDocked.tsx` | `chat/ChatPage.tsx`（docked 态） | 会话头 + transcript + 贴底输入 |
 | `screens/Login.tsx` | `pages/LoginPage.tsx` + `.login-*` | 居中卡片、品牌、首登改密 |
-| `screens/Agents.tsx` | `agents/AgentList.tsx` + `AgentDetail.tsx` + 各 Panel | 列表头像/版本灯、详情 Tab 视觉 |
+| `screens/AgentManager.tsx` | `agents/AgentList.tsx` + `AgentDetail.tsx` + 各 Panel | 列表头像/版本灯、详情 Tab 视觉（方案 C 分组） |
 | `screens/Groups.tsx` | `groups/GroupChatPage.tsx` | 房间卡 + 成员头像 + 多 agent 对话 |
-| `screens/Tasks.tsx` | `tasks/TasksPage.tsx` | 左列表 + Cron 详情/操作/运行记录 |
+| `screens/Tasks.tsx` | `tasks/TasksPage.tsx` | 左列表 + Cron 详情/操作/运行记录 + 蓝图/投递目标 |
+| `screens/Kanban.tsx` | `kanban/KanbanPage.tsx` | 8 列 `BOARD_COLUMNS` + 卡片/详情 + dispatch |
+| `screens/Orchestration.tsx` | `orchestration/OrchestrationPage.tsx` | 画布 + `{{node.output}}` 注入 + 运行子代理树 |
 | `screens/Usage.tsx` | `usage/UsagePage.tsx` | 指标卡 + 占比条 + 费用表 |
-| `screens/Tools.tsx` | `settings/ToolsetsPanel` + `agents/McpPanel` | 工具集 / MCP / 工具三 Tab |
+| `screens/Monitor.tsx` | `insights/MonitorPanel` | 本机 CPU/内存/磁盘/进程 + 后端健康 |
+| `screens/SkillHost.tsx` | `settings/ToolsetsPanel` + `agents/McpPanel` + `skillui/*` | 技能宿主 / 工具集 / MCP / 工具 |
 | `screens/Memory.tsx` | `settings/MemoryPanel.tsx` | provider 选择 + 记忆条目 |
 | `screens/Projects.tsx` | `settings/ProjectsPanel.tsx` | 具名多文件夹工作区 |
-| `screens/Files.tsx` | `shell/DetailsPanel.tsx`（文件/预览/日志/Git） | 文件树 + 内容预览 |
-| `screens/Settings.tsx` | `settings/SettingsPage.tsx` | 分区列表 + 分区详情 |
+| `screens/Files.tsx` | `shell/DetailsPanel.tsx`（文件/预览/日志/Git） | 文件树 + 内容预览 + Git 评审/发布 |
+| `screens/Settings.tsx` | `settings/SettingsPage.tsx` | 分区列表 + 分区详情（含语音/连接器） |
 | `screens/Admin.tsx` | `pages/AdminUsersPage.tsx` | 用户表 / 审计 / 运维 |
 | `screens/Notifications.tsx` | `notifications/*` | 未读聚合 + 偏好 |
 | `components/Pill.tsx` | `chat/composer/ComposerControls.tsx` | pill 外观 + 徽标 |
@@ -72,14 +75,14 @@
 
 **智能体（方案 C 混合）**：左列表分组 **Hermes**（= profile：SOUL/技能/工具/MCP/插件/Bot 屏幕/市场）与 **外部 agent**（Claude Code/Codex/OpenCode/Pi/Grok/DSH：原生安装 + 版本/检查更新/删除/自动更新 + 外部会话）。外部 agent 由 BFF `coding-agents` 安装管理（`npm -g --prefix` 受管目录 + PATH 提升；`super_admin` + 审计 + 白名单 + 固定版本；禁 `curl|sh`）。
 
-**设置分区（对接 Hermes 接口）**：通用（外观/字号/语言）· 模型与密钥（`/api/model/*`、`/api/providers/oauth/*`、`/api/config`: routing/fallback/credential_pools）· 渠道（`/api/messaging/*`、deliverable）· 集成（`/api/webhooks`、`plugins.manage`、GitHub）· 数据与目录（`/api/files`、`/api/sessions/import|export`）· 连接（`/api/admin/connections`）· 系统（`/api/system/*`、`/api/ops/*`、approvals）· 高级（`/api/config` + `/api/tools/*`：api_server/hooks/tool_search/lsp/deliverable/subscription/computer-use、本地模型、配对）。**监控移入洞察**。
+**设置分区（对接 Hermes 接口）**：通用（外观/字号/语言）· 模型与密钥（`/api/model/*`、`/api/providers/oauth/*`、`/api/config`: routing/fallback/credential_pools）· 渠道（`/api/messaging/*`、deliverable）· **语音**（STT/TTS 提供方 + 自动朗读 + 唤醒词；`voice.*`/`wake.*`）· 集成（**连接器**（独立于密钥库，`connectors.list`）/ 记忆 / Webhooks / 插件 / Plugin Catalog / GitHub）· 数据与目录（`/api/files`、`/api/sessions/import|export`）· 连接（`/api/admin/connections`）· 系统（`/api/system/*`、`/api/ops/*`、approvals）· 高级（`/api/config` + `/api/tools/*`：api_server/hooks/tool_search/lsp/deliverable/subscription/computer-use、本地模型、配对）。**监控移入洞察**。
 
 **去重**：`管理>系统运维` 并入 `设置>系统`；`设置>用量/项目` 上移为一级；技能市场 / MCP 市场只放智能体详情，不设独立菜单。
 
 **智能体（重定义）**：不是角色扮演，而是**原生 agent 运行时**（默认仅 `Hermes agent`；
 可安装 Claude Code / Codex / OpenCode / Pi / Grok …）。每个 agent 详情 Tab：概览（版本/检查更新/更新/卸载/启停/模型覆盖）· 技能 · MCP · 工具 · 市场。模型默认全局（设置>模型与密钥），建会话/入房间时可选。
 
-**右侧功能面板**：`components/DetailsDock.tsx` → 生产 `shell/DetailsPanel.tsx`（关联对话工作区：文件树 + HTML/PDF/Word/MD/CSV/图片预览；附加 产物/日志/Git）。
+**右侧功能面板**：`components/DetailsDock.tsx` → 生产 `shell/DetailsPanel.tsx`（关联对话工作区：文件树 + HTML/PDF/Word/MD/CSV/图片预览；附加 产物/日志/**Git（状态/差异/评审发布）**）。
 
 > 依据 `docs/INTERFACES.md` 功能域；生产侧栏当前为平铺结构（UI.md §3），回填时需同步 `ui-spec.md`/`UI.md`。
 

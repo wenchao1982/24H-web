@@ -78,7 +78,7 @@ BFF 用 esbuild 打成单文件 ESM bundle（`packages: external`，依赖不内
 ## 校验
 
 ```bash
-npm run check       # typecheck + 两套 vitest（server + web），当前 400+ 用例
+npm run check       # typecheck + 两套 vitest（server + web），当前 799 用例（server 286 / web 513）
 npm run test:e2e    # Playwright e2e（隔离 temp DB + 首启 admin；不进 check）
 ```
 
@@ -93,10 +93,11 @@ BFF bundle 与 SPA，真实 Chromium 走一遍登录 → 强制改密 → 主壳
 
 ## 里程碑
 
-M0–M16 已完成。功能拆解与最小实现顺序见 [`docs/TASKS.md`](./docs/TASKS.md)：
+M0–M22 已完成。功能拆解与最小实现顺序见 [`docs/TASKS.md`](./docs/TASKS.md)：
 M0 工程基线 · M1 BFF+认证 · M2 用户管理 · M3 代理 · M4 前端骨架 · M5 对话 · M6 技能/工具/设置 ·
 M7 任务/用量/面板 · M8 Agent/Profile · M9 体验 · M10 协作与集成 · M11 运维与高级 · M12 未来增强 ·
-M13 项目 · M14 通知中心 · M15 会话命令 · M16 上下文/路由/集成。
+M13 项目 · M14 通知中心 · M15 会话命令 · M16 上下文/路由/集成 · M17 对话页重构 ·
+M18 前端 Demo · M19 语音 · M20 看板 · M21 可视化编排 · M22 外部 agent 原生安装。
 
 ## License
 

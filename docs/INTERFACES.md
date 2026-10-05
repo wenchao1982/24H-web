@@ -388,15 +388,14 @@ hermes-achievements 6 端点：/api/plugins/hermes-achievements/{achievements,sc
 | **概念** | Connectors 塞进 Vault | 两者不同（托管账号 vs 密钥库） |
 | **概念** | 用量 = analytics | 须含 billing/subscription/usage.bars |
 | **配置** | `api_server` / `tool_search` / `deliverable` / `local_runtime` | 嵌套（gateway/tools）/feature 键/`local_runtime` |
-| **遗漏** | Kanban | 已纳入 M20 |
-| **遗漏** | 可视化编排 / spawn_tree | 已纳入 M21 |
-| **遗漏** | 语音/唤醒/TTS/STT | 已纳入 M19 |
-| **遗漏** | Git review/ship/worktree（21） | 未纳入（C06） |
-| **遗漏** | 会话全文搜索（FTS5） | 未纳入（C06） |
-| **已纳入** | Cron blueprints/delivery/runs；Git review/ship | 已交付（C06） |
-| **明确排除** | 反向 MCP serve / ACP | 非企业 web 端目标（C06） |
-| **遗漏** | 反向 MCP serve / ACP / batch | 未纳入（C06，可选） |
-| **遗漏** | Pets / Skins / Achievements | 未纳入（可排除） |
+| **已纳入** | Kanban | M20 |
+| **已纳入** | 可视化编排 / spawn_tree | M21 |
+| **已纳入** | 语音/唤醒/TTS/STT | M19 |
+| **已纳入** | 会话全文搜索（FTS5） | C06 |
+| **已纳入** | Git review/ship | C06（`/api/git/review/*`；worktree 端点保留未接 UI） |
+| **已纳入** | Cron blueprints/delivery/runs | C06 |
+| **明确排除** | 反向 MCP serve / ACP / batch | 非企业 web 端目标（C06） |
+| **明确排除** | Pets / Skins / Achievements | 非目标（可排除） |
 | **增强** | vault secret sources、memory providers OAuth、display/Bot Screen、egress/security-audit、profiles 全量、providers custom-endpoints | 部分/浅，按需增强 |
 | **有意分离** | Hermes `/api/auth/*`（dashboard auth） | 我们用 BFF 自有认证，勿混用 |
 

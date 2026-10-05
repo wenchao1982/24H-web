@@ -26,9 +26,10 @@
 ├── AGENTS.md  requirement.md  ui-spec.md  architecture.md
 ├── task-list.md  test-report.md  deploy.md  CONTRIBUTING.md
 ├── apps/
-│   ├── web/                # React 19 + Vite SPA（src/{shell,chat,agents,...}）
-│   └── server/             # BFF（Fastify）
-│       └── src/{config,index,paths,http,db,auth,users,session,hermes,audit,integrations,routes,skillui,bin}
+│   ├── web/                # React 19 + Vite SPA（src/{shell,chat,agents,kanban,orchestration,voice,...}）
+│   ├── server/             # BFF（Fastify）
+│   │   └── src/{config,index,paths,http,db,auth,users,session,hermes,agents,audit,integrations,routes,skillui,bin}
+│   └── demo/               # 独立高保真 Demo（mock 数据，不进根 check）
 ├── packages/
 │   └── shared/             # 共享类型
 ├── docs/                   # ARCHITECTURE / INTERFACES / TASKS / UI / DEPLOY
@@ -139,7 +140,7 @@ interface SessionIdentity { storedId: string; runtimeId: string }
 - **补偿控制**：① 前端**预筛**——单文件 >10MB、单批 >10 个在**读取内容之前**拒绝；② **REQ-018 / REQ-018b** 为 BFF WS 显式设 `maxPayload = 16 MiB`（**双 socket**）与 `pending` 队列上限（**条数 `WS_MAX_PENDING_COUNT = 256` 独立 + 累计字节 `K = 4` → `pendingBytes ≤ 64 MiB`**，不依赖 `ws` 库默认值）与 `outbound` **对称**上限（`WS_MAX_OUTBOUND_COUNT = 256` / `WS_MAX_OUTBOUND_BYTES = 64 MiB`），命中任一即超限、回可读错误并**仅**终止该连接；③ 单文件 >2MB 显示等待态，失败重试**复用 identity**、不重复 `session.create`；④ 端到端可达性以**实测**为准；网关拒绝则原样透传 message。
 - **服务端内容类型校验：R10 已闭合（REQ-023，2026-09-30）**。Hermes 只做**扩展名嗅探**：`tui_gateway/prompt_attachments.py:64-71` `_sniff_image_ext` 按 filename 后缀优先、否则魔数（WebP 识别 RIFF 容器）、未知默认 `.png`，**只推断扩展名、不拒绝**（实测 41 字节非图片文本经 `image.attach_bytes` 被接受，`attached:true`）；`methods_prompt.py:775-776` 仅判扩展名是否在允许集合。PDF 的 `%PDF-` 校验（`methods_prompt.py:1106-1107`）存在，但 `:797-798` 先检查 `pdftoppm`，本机缺 poppler-utils → 一律回 **5028**，该分支**不可达**。客户端 `File.type` 仅 UX 预筛，**不**作安全边界。→ **处置（已落地）**：在 **BFF WS 代理**侧补**前缀** magic bytes 校验（REQ-023，见 §7.2）：`image.attach_bytes`/`pdf.attach` 的 base64 载荷只解码前 48 个字符（≈36 字节；覆盖 PNG/JPEG/GIF/BMP/WebP/TIFF/ICO/CUR 及 SVG 文本前缀）比对魔数，不合规同 `id` 回 `INVALID_ATTACHMENT_TYPE` 且不转发。
 
-## 8. M19–M21 新增代理 / 执行层 / 概念订正
+## 8. M19–M22 新增代理 / 执行层 / 概念订正
 
 ### 8.1 服务端请求（订正为 13 类）
 

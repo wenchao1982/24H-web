@@ -107,8 +107,8 @@ npm run check     # typecheck（web + server + shared）+ vitest（server + web�
 | `apps/web/src/api/ws.ts` | 对话 WS JSON-RPC 客户端 |
 | `apps/web/src/pages/` | 登录 / 用户管理 |
 | `apps/web/src/{chat,agents,groups,tasks,usage,settings,details,notifications}/` | 各功能模块与设置面板 |
-| `apps/web/src/{kanban,orchestration,voice}/` | **M19–M21 规划落点**：看板 / 编排画布 / 语音 |
-| `apps/web/src/chat/composer/` | 对话页输入区控件（hero/docked 双态、pill、上传、菜单；**M17 规划落点**） |
+| `apps/web/src/{kanban,orchestration,voice}/` | **M19–M21 已落地**：看板 / 编排画布 / 语音 |
+| `apps/web/src/chat/composer/` | 对话页输入区控件（hero/docked 双态、pill、上传、菜单；**M17 已落地**） |
 | `apps/server/src/index.ts` | BFF 入口：开库 → 迁移 → `ensureFirstAdmin` → listen |
 | `apps/server/src/config.ts` | env：`PORT` / `HERMES_BASE_URL` / `DB_PATH` |
 | `apps/server/src/http/app.ts` | Fastify 装配：统一错误 + CSRF + 会话中间件 + 路由 |
@@ -129,9 +129,9 @@ npm run check     # typecheck（web + server + shared）+ vitest（server + web�
 
 ## 10. 状态 / 规格来源 / 未采用
 
-- **M0–M17 已完成**；功能拆解见 `docs/TASKS.md`（M17 = 对话页重构，Spec 见 `.psd/specs/003-composer-redesign/`）。
-- **M18 = 前端 Demo**（进行中）：`apps/demo` 独立高保真 Demo，**先定稿视觉语言再回填 `apps/web`**；见 `task-list.md` M18。
-- **M19–M21 规划**（原排除项撤销，先补齐方案）：M19 语音/唤醒/TTS/STT · M20 看板（Kanban，固定 4 列）· M21 可视化编排画布（自建执行层，`{{node.output}}`）；见 `task-list.md`。
+- **M0–M22 已完成并验收**（M17 = 对话页重构，Spec 见 `.psd/specs/003-composer-redesign/`）；功能拆解见 `docs/TASKS.md`，验收状态见 `task-list.md`。
+- **M18 = 前端 Demo**（已完成）：`apps/demo` 独立高保真 Demo（18 屏，mock 数据），**先定稿视觉语言再回填 `apps/web`**；已反向补登 C03/C06/M19–M21 生产能力；见 `task-list.md` M18。
+- **M19–M22 已落地**：M19 语音/唤醒/TTS/STT · M20 看板（Kanban，**8 列**对齐 `BOARD_COLUMNS`）· M21 可视化编排画布（自建执行层，`{{node.output}}`）· M22 外部 agent 原生安装（BFF `coding-agents` + 方案 C）。
 - 规格来源：`docs/{ARCHITECTURE,INTERFACES,TASKS,UI}.md`（改接口先看这些，契约为准）。
 - **TODO(future)**：IdP 接入（新增 `AuthProvider` 的 `oidc` 实现）。
 

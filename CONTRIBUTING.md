@@ -50,7 +50,7 @@ npm install                 # Node >= 20
 - [ ] 基线文档与代码一致（先文档后代码）。
 - [ ] `task-list.md` 对应任务已置 `已验收`。
 - [ ] `test-report.md` 已追加本次结果。
-- [ ] `npm run check` 全绿（400+ 用例）。
+- [ ] `npm run check` 全绿（server 286 / web 513）。
 - [ ] `deploy.md` / `docs/*` 已同步；无密钥入仓。
 
 ## 5. 红线规则

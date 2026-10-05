@@ -1,7 +1,7 @@
 # 任务看板（24H Web）
 
 > 详细任务见 [`docs/TASKS.md`](./docs/TASKS.md)；本文件为**工作看板**，动态更新。
-> 状态取值：`待开始` / `进行中` / `已验收`。M0–M17 全部任务均已实现并验收（M17 = 对话页重构，见下）。
+> 状态取值：`待开始` / `进行中` / `已验收`。M0–M22 全部任务均已实现并验收（M17 = 对话页重构，见下）。
 
 ## M0 工程基线
 
@@ -327,7 +327,7 @@
 > 截图 `docs/refs/demo-*.png`；`build:demo` / `check:demo` 通过。
 > 注：以上**暂只进 Demo**；生产 `apps/web` 仍维持原实现（基线 UI 文档回填时同步）。
 >
-> **Demo 追加（M18 续）**：菜单加 **工作台>看板**、**编排** 组；新增 **看板（固定 4 列 Todo/Doing/Review/Done）**、**编排画布（`{{node.output}}` 注入 + 运行子代理树）**、**语音（composer mic + 聆听浮层）**；**智能体页改「方案 C 混合」**（左列表分组 `Hermes·profile` / `外部 agent`，外部 agent 卡片=logo·vendor·Installed·版本·Settings·Check for update·Delete·Automatic updates）。截图 `docs/refs/demo-{kanban,orchestration,voice,agents,agents-runtime,agents-install}-*.png`。看板列已对齐 **Hermes `BOARD_COLUMNS`（triage…done，8 列）**。
+> **Demo 追加（M18 续）**：菜单加 **工作台>看板**、**编排** 组；新增 **看板（8 列，`triage…done`，对齐 Hermes `BOARD_COLUMNS`）**、**编排画布（`{{node.output}}` 注入 + 运行子代理树）**、**语音（composer mic + 聆听浮层）**；**智能体页改「方案 C 混合」**（左列表分组 `Hermes·profile` / `外部 agent`，外部 agent 卡片=logo·vendor·Installed·版本·Settings·Check for update·Delete·Automatic updates）。截图 `docs/refs/demo-{kanban,orchestration,voice,agents,agents-runtime,agents-install}-*.png`。
 >
 > **Demo 反向补登（C03/C06/M19–M21 生产能力）**：`DetailsDock` Git 页补 **评审/发布**（ship-info 领先/落后 · 暂存/还原 · 提交/推送/PR）；`Tasks` 补 **蓝图实例化 + 投递目标 + 失败事件**；`Settings` 新增 **「语音」分区**（STT/TTS 提供方 + **自动朗读** + **唤醒词**开关）与 **「连接器」分组（独立于密钥库）**；`Composer`（docked）加 **自动朗读** 开关。`check:demo` / `build:demo` 通过。
 
@@ -353,9 +353,9 @@
 | --- | --- | --- | --- | --- | --- |
 | T25.1 | M19 | BFF：`/api/hermes/stream` WS 代理（`/api/audio/speak-stream` + `/api/events`，白名单）+ `/api/audio/*` 走泛 REST 代理 | 订正 C01,C05 | 白名单单测 + 守卫 | 已验收 |
 | T25.2 | M19 | 前端 `apps/web/src/voice/useVoice.ts`（`voice.record` start/stop + `voice.status/transcript/interrupted`）+ ComposerControls 可选 `composer-mic` | T25.1 | 组件/单测（按住→转写、打断） | 已验收 |
-| T25.3 | M19 | Composer mic 接入 ChatPage（转写→`handleSend`）+ 打断 | T25.2 | 集成测试 | 已验收（测试待补） |
+| T25.3 | M19 | Composer mic 接入 ChatPage（转写→`handleSend`）+ 打断 | T25.2 | 集成测试 | 已验收 |
 | T25.4 | M19 | **已交付**：TTS 朗读（`useVoice.speak` + 助手气泡「朗读」）；设置**「语音」独立分区**（从「高级」移出）；`/voice` `/wake` 经 `commands.catalog` 自动可用；**RPC 订正**：`VoicePanel` 误用的 `voice.status`/`wake.set` → 正确的 `wake.status`/`wake.start`/`wake.stop`。**已补**：`VoiceOverlay`（实时转写浮层）；**自动朗读开关**（`autoread` localStorage + `message.complete` 触发）；**STT/TTS 提供方选择**（`SchemaSectionPanel` prefix `tts`/`stt`） | T25.2 | 面板/集成测试 | 已验收 |
-| T25.5 | M19 | `npm run check` 全绿（server 286 / web 511） | T25.1–4 | 全绿 | 已验收 |
+| T25.5 | M19 | `npm run check` 全绿（server 286 / web 513） | T25.1–4 | 全绿 | 已验收 |
 
 ## M20 看板（Kanban，插件）
 

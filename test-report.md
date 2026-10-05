@@ -6,7 +6,8 @@
 
 | 项 | 命令 | 结果 |
 | --- | --- | --- |
-| 类型检查 + 单元测试 | `npm run check` | ✅ **400+ 用例**（server 130 / web 280）green |
+| 类型检查 + 单元测试 | `npm run check` | ✅ **799 用例**（server 286 / web 513）green |
+| Demo 独立检查 | `npm run check:demo` / `build:demo` | ✅ tsc + vite build 通过 |
 | 端到端（Playwright headless） | `npm run test:e2e` | ✅ 2 通过 |
 | 真实 Hermes e2e（对话 / 群聊） | 隔离环境 + 真实 `hermes serve` | ✅ 通过 |
 
@@ -40,3 +41,5 @@
 | 类型检查 + 单元测试 | server/web/shared | `npm run check` | 通过（400+，server 130 / web 280） | — | 2026-09-29 |
 | 端到端 | e2e | `npm run test:e2e`（2 用例） | 通过 | — | 2026-09-29 |
 | 真实 Hermes e2e | 整链 | 对话 / 群聊 | 通过 | — | 2026-09-29 |
+| 类型检查 + 单元测试 | server/web/shared | `npm run check` | 通过（server 286 / web 513） | — | 2026-10-05 |
+| Demo 构建 | demo | `npm run check:demo` + `build:demo` | 通过 | — | 2026-10-05 |
