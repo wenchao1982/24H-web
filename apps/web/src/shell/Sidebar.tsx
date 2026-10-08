@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { t } from "../i18n";
 import NotificationsBell from "../notifications/NotificationsBell";
 import { BrandMark, Icon } from "../ui/icons";
-import { BOTTOM_NAV, PRIMARY_NAV, type NavItem } from "./nav";
+import { BOTTOM_NAV, NAV_GROUPS, type NavItem } from "./nav";
 
 export interface SidebarProps {
   active?: string;
@@ -88,24 +88,31 @@ export default function Sidebar({
         )}
       </div>
 
-      <ul className="nav-primary" aria-label={t("sidebar.nav.primary")}>
-        {PRIMARY_NAV.map((item) => (
-          <li key={item.id}>
-            <button
-              type="button"
-              className="nav-btn"
-              data-active={active === item.id}
-              aria-current={active === item.id ? "page" : undefined}
-              onClick={() => onNavigate?.(item.id)}
-            >
-              <span className="nav-icon" aria-hidden="true">
-                <Icon name={item.icon} size={18} />
-              </span>
-              <span className="nav-label">{t(item.labelKey)}</span>
-            </button>
-          </li>
+      <div className="nav-primary" aria-label={t("sidebar.nav.primary")}>
+        {NAV_GROUPS.map((group) => (
+          <div className="nav-group" key={group.id}>
+            <div className="nav-group-title">{t(group.labelKey)}</div>
+            <ul className="nav-group-items">
+              {group.items.map((item) => (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    className="nav-btn"
+                    data-active={active === item.id}
+                    aria-current={active === item.id ? "page" : undefined}
+                    onClick={() => onNavigate?.(item.id)}
+                  >
+                    <span className="nav-icon" aria-hidden="true">
+                      <Icon name={item.icon} size={18} />
+                    </span>
+                    <span className="nav-label">{t(item.labelKey)}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         ))}
-      </ul>
+      </div>
 
       <div className="sidebar-list">{children}</div>
 

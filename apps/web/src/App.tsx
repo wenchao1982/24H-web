@@ -11,16 +11,21 @@ import { t } from "./i18n";
 
 // 路由级代码分割：每个页面单独成 chunk，首屏不再一次性加载全部页面。
 const LoginPage = lazy(() => import("./pages/LoginPage"));
-const PlaceholderPage = lazy(() => import("./pages/PlaceholderPage"));
 const AgentsPage = lazy(() => import("./agents/AgentsPage"));
 const GroupChatPage = lazy(() => import("./groups/GroupChatPage"));
 const TasksPage = lazy(() => import("./tasks/TasksPage"));
 const KanbanPage = lazy(() => import("./kanban/KanbanPage"));
 const OrchestrationPage = lazy(() => import("./orchestration/OrchestrationPage"));
 const UsagePage = lazy(() => import("./usage/UsagePage"));
+const MonitorPage = lazy(() => import("./insights/MonitorPage"));
+const MemoryPage = lazy(() => import("./insights/MemoryPage"));
+const ProjectsPage = lazy(() => import("./workspace/ProjectsPage"));
+const FilesPage = lazy(() => import("./workspace/FilesPage"));
 const SkillsHostPage = lazy(() => import("./skillhost/SkillsHostPage"));
 const SettingsPage = lazy(() => import("./settings/SettingsPage"));
 const AdminUsersPage = lazy(() => import("./pages/AdminUsersPage"));
+const AccountPage = lazy(() => import("./pages/AccountPage"));
+const NotificationsPage = lazy(() => import("./notifications/NotificationsPage"));
 const ChatPage = lazy(() => import("./chat/ChatPage"));
 
 /** 懒加载占位：chunk 下载期间显示。 */
@@ -49,13 +54,17 @@ export function AppRoutes() {
             <Route path="/kanban" element={<KanbanPage />} />
             <Route path="/orchestration" element={<OrchestrationPage />} />
             <Route path="/usage" element={<UsagePage />} />
+            <Route path="/monitor" element={<MonitorPage />} />
+            <Route path="/memory" element={<MemoryPage />} />
+            <Route path="/projects" element={<ProjectsPage />} />
+            <Route path="/files" element={<FilesPage />} />
             <Route path="/skills-ui" element={<SkillsHostPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route element={<RequireSuperAdmin />}>
               <Route path="/admin/users" element={<AdminUsersPage />} />
             </Route>
-            <Route path="/account" element={<PlaceholderPage title={t("page.account")} />} />
-            <Route path="/notifications" element={<PlaceholderPage title={t("page.notifications")} />} />
+            <Route path="/account" element={<AccountPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="*" element={<Navigate to="/chat" replace />} />
           </Route>
         </Route>

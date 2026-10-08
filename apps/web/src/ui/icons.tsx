@@ -9,6 +9,10 @@ export type IconName =
   | "kanban"
   | "workflow"
   | "usage"
+  | "monitor"
+  | "memory"
+  | "projects"
+  | "files"
   | "skillhost"
   | "settings"
   | "admin"
@@ -79,6 +83,30 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <path d="M3 3v18h18" />
       <path d="M7 16v-5M12 16V7M17 16v-3" />
+    </>
+  ),
+  monitor: (
+    <>
+      <rect x="3" y="4" width="18" height="12" rx="2" />
+      <path d="M8 20h8M12 16v4" />
+    </>
+  ),
+  memory: (
+    <>
+      <rect x="6" y="3" width="12" height="18" rx="2" />
+      <path d="M10 3v18M14 3v18" />
+    </>
+  ),
+  projects: (
+    <>
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <path d="M3 11h18" />
+    </>
+  ),
+  files: (
+    <>
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+      <path d="M14 3v5h5" />
     </>
   ),
   skillhost: (

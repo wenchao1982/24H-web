@@ -2,6 +2,7 @@ node_modules/
 dist/
 apps/server/dist/
 apps/server/data/
+/data/
 .env
 .env.*
 *.log

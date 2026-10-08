@@ -398,6 +398,18 @@
 | T28.6 | M22 | 自动更新调度器（60s tick / 6h 重查 / 空闲 60s / busy 跳过 / audit） | T28.3 | 单测（竞态/fail-closed） | 已验收 |
 | T28.7 | M22 | `npm run check` 全绿 | T28.5,T28.6 | 全绿 | 已验收 |
 
+## M23 生产 IA 分组 + 缺失页面 + 视觉回填（对齐 Demo）
+
+> Demo IA v2 此前「暂只进 Demo」；本节把分组 IA、缺失页面（监控/记忆/项目/文件/通知/账户）与剩余屏视觉回填落到生产 `apps/web`。
+
+| 编号 | 模块 | 描述 | 前置依赖 | 验收标准 | 状态 |
+| --- | --- | --- | --- | --- | --- |
+| T29.1 | M23 | 基线文档：`ui-spec.md`/`docs/UI.md`/`requirement.md` 侧栏分组 IA + 新增页 | — | 4 份一致 | 已验收 |
+| T29.2 | M23 | 生产 IA：`shell/nav.ts` 分组（`NAV_GROUPS`，保留 `PRIMARY_NAV` 兼容）+ `Sidebar` 分组渲染 + 图标（monitor/memory/projects/files）+ i18n + `.nav-group*` CSS | T29.1 | 路由/导航可达、折叠态退化 | 已验收 |
+| T29.3 | M23 | 新增页：`NotificationsPage`/`AccountPage`/`MonitorPage`/`MemoryPage`/`ProjectsPage`/`FilesPage` + 路由替换 Placeholder（删 PlaceholderPage） | T29.2 | 页面可用 + 单测（AccountPage/NotificationsPage） | 已验收 |
+| T29.4 | M23 | 视觉对齐：**首轮**——新页/`.page-title`/`.page-head`/`.settings-section`/账户/通知页样式（`--ds-*` 手写 CSS）；其余屏（看板/编排/任务/用量/智能体/群聊等）已有模块 CSS（27/31/15/12/56 条），逐屏**像素级**复核对齐随截图评估迭代 | T29.3 | 观感对齐、无 UI 库 | 已验收（首轮） |
+| T29.5 | M23 | `npm run check` 全绿（server 286 / web 518）；`check:demo` 不回归 | T29.2–4 | 全绿 | 已验收 |
+
 ## 后续任务（待开发）
 
 | 编号 | 模块 | 描述 | 前置依赖 | 验收标准 | 状态 |

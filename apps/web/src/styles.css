@@ -194,7 +194,34 @@ button {
   padding: var(--ds-space-2);
   display: flex;
   flex-direction: column;
+  gap: var(--ds-space-3);
+  overflow-y: auto;
+}
+
+.nav-group {
+  display: flex;
+  flex-direction: column;
   gap: var(--ds-space-1);
+}
+
+.nav-group-title {
+  padding: 0 var(--ds-space-2);
+  color: var(--ds-label-tertiary);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.nav-group-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-1);
+}
+
+.sidebar[data-collapsed="true"] .nav-group-title {
+  display: none;
 }
 
 .nav-btn {
@@ -1268,6 +1295,74 @@ button {
 .page {
   max-width: 960px;
   margin: 0 auto;
+}
+
+.page-title {
+  margin: 0 0 var(--ds-space-2);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.page-head {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+}
+
+.page-head .page-title {
+  margin-bottom: 0;
+}
+
+.page-head .ghost {
+  margin-left: auto;
+}
+
+/* 设置/集成等分区容器（被多处引用，统一纵向节奏）。 */
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-3);
+}
+
+.ok {
+  color: var(--ds-success);
+  font-size: var(--ds-font-size-sm);
+}
+
+/* ---------- 账户页（M23） ---------- */
+.account-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-4);
+  margin: 0;
+}
+.account-facts div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.account-facts dt {
+  color: var(--ds-label-tertiary);
+  font-size: 11px;
+}
+.account-facts dd {
+  margin: 0;
+  color: var(--ds-label-primary);
+  font-size: var(--ds-font-size-sm);
+}
+
+/* ---------- 通知页（M23） ---------- */
+.notifications-page-list {
+  list-style: none;
+  margin: var(--ds-space-3) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+}
+.notifications-page-list .notification-item {
+  width: 100%;
+  text-align: left;
 }
 
 .card {
