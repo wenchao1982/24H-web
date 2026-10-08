@@ -407,7 +407,7 @@
 | T29.1 | M23 | 基线文档：`ui-spec.md`/`docs/UI.md`/`requirement.md` 侧栏分组 IA + 新增页 | — | 4 份一致 | 已验收 |
 | T29.2 | M23 | 生产 IA：`shell/nav.ts` 分组（`NAV_GROUPS`，保留 `PRIMARY_NAV` 兼容）+ `Sidebar` 分组渲染 + 图标（monitor/memory/projects/files）+ i18n + `.nav-group*` CSS | T29.1 | 路由/导航可达、折叠态退化 | 已验收 |
 | T29.3 | M23 | 新增页：`NotificationsPage`/`AccountPage`/`MonitorPage`/`MemoryPage`/`ProjectsPage`/`FilesPage` + 路由替换 Placeholder（删 PlaceholderPage） | T29.2 | 页面可用 + 单测（AccountPage/NotificationsPage） | 已验收 |
-| T29.4 | M23 | 视觉对齐：**首轮**——新页/`.page-title`/`.page-head`/`.settings-section`/账户/通知页样式（`--ds-*` 手写 CSS）；其余屏（看板/编排/任务/用量/智能体/群聊等）已有模块 CSS（27/31/15/12/56 条），逐屏**像素级**复核对齐随截图评估迭代 | T29.3 | 观感对齐、无 UI 库 | 已验收（首轮） |
+| T29.4 | M23 | 视觉对齐：**首轮**——新页/`.page-title`/`.page-head`/`.settings-section`/账户/通知页样式；**侧栏对齐 Demo**（「+ 新建会话」按钮 + 分组可折叠箭头 + 通知徽标沿用铃铛）；**监控/用量系统统计归一化**（读取 `/api/status.overall` 健康、`/api/system/stats.process` 进程，修「健康 未知 / 进程 —」）；其余屏（看板/编排/任务/用量/智能体/群聊等）已有模块 CSS。逐屏**像素级**复核随截图评估迭代（用量页缓存条/智能体对比需 analytics 新字段，暂缓） | T29.3 | 观感对齐、无 UI 库 | 已验收（首轮） |
 | T29.5 | M23 | `npm run check` 全绿（server 286 / web 518）；`check:demo` 不回归 | T29.2–4 | 全绿 | 已验收 |
 | T29.6 | M23 | **逐菜单界面核对**（Playwright 登录后逐路由截图审计 15/15）：修复 ① **Projects 404**（`/api/hermes/projects` 改走 L1 `projects.*` RPC 并重写测试）② **chat「gateway 未连接」**（`ws.ts` 断线自愈 + 请求排队，取代「未连接即拒绝」）③ 通知页标题回退（`ShellLayout` 补 `LABELS.notifications`） | T29.2–4 | 15 路由标题/内容正确、零 `.err` | 已验收（首轮） |
 

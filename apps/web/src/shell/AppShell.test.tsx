@@ -14,7 +14,8 @@ describe("AppShell", () => {
     render(<AppShell title="对话" />);
 
     for (const label of ["对话", "智能体", "群聊", "任务", "用量", "设置", "账户", "通知"]) {
-      expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
+      // 组标题与导航项可能同名（如「智能体」），断言至少存在一个。
+      expect(screen.getAllByRole("button", { name: label }).length).toBeGreaterThan(0);
     }
   });
 

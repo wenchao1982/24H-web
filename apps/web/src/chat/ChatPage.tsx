@@ -456,6 +456,15 @@ export default function ChatPage() {
     }
   }, [gateway]);
 
+  // 侧栏「新建会话」：跨组件经 window 事件触发（导航到 /chat 后派发）。
+  useEffect(() => {
+    const handler = () => {
+      void createSession();
+    };
+    window.addEventListener("24h:new-session", handler);
+    return () => window.removeEventListener("24h:new-session", handler);
+  }, [createSession]);
+
   const renameSession = useCallback(
     async (targetStoredId: string, title: string) => {
       try {

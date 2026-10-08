@@ -51,6 +51,10 @@ export default function ShellLayout() {
       title={t(LABELS[active] ?? "app.name")}
       version="v0.1.0"
       onOpenSystem={() => navigate("/settings?section=system")}
+      onNewSession={() => {
+        navigate("/chat");
+        setTimeout(() => window.dispatchEvent(new CustomEvent("24h:new-session")), 0);
+      }}
       onOpenNotifications={(sessionId) =>
         navigate(sessionId ? `/chat?session=${encodeURIComponent(sessionId)}` : "/notifications")
       }

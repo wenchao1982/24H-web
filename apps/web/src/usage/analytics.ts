@@ -141,12 +141,16 @@ export interface SystemStats {
 
 export function normalizeSystemStats(payload: unknown): SystemStats {
   const source = asRecord(payload);
+  // `/api/system/stats` 的进程为单个 `process{pid,...}`；`/api/status` 的健康为 `overall`。
+  const processRecord = asRecord(source.process);
+  const singleProcess = typeof processRecord.pid === "number" ? 1 : null;
   return {
     cpu: readNumber(source, "cpu", "cpu_usage", "cpu_percent"),
     memory: readNumber(source, "memory", "mem", "memory_usage", "mem_percent"),
     disk: readNumber(source, "disk", "disk_usage", "disk_percent"),
-    processes: readNumber(source, "processes", "process_count", "processes_count"),
-    health: readString(source, "health", "status", "state"),
+    processes:
+      readNumber(source, "processes", "process_count", "processes_count") ?? singleProcess,
+    health: readString(source, "health", "overall", "status", "state"),
     uptime: readNumber(source, "uptime", "uptime_seconds"),
     version: readString(source, "version", "hermes_version"),
   };

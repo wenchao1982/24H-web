@@ -29,6 +29,8 @@ export interface AppShellProps {
   onOpenNotifications?: (sessionId: string | null) => void;
   /** 点击品牌行核心灯：打开系统升级。 */
   onOpenSystem?: () => void;
+  /** 「新建会话」。 */
+  onNewSession?: () => void;
   children?: ReactNode;
 }
 
@@ -51,6 +53,7 @@ export default function AppShell({
   list,
   onOpenNotifications,
   onOpenSystem,
+  onNewSession,
   children,
 }: AppShellProps) {
   const narrow = useMediaQuery("(max-width: 900px)");
@@ -230,6 +233,7 @@ export default function AppShell({
           onToggleTheme={toggleTheme}
           onOpenNotifications={onOpenNotifications}
           onOpenSystem={onOpenSystem}
+          onNewSession={onNewSession}
         >
           {list}
         </Sidebar>

@@ -58,6 +58,7 @@ export const zh = {
   "sidebar.nav.primary": "业务导航",
   "sidebar.nav.system": "系统导航",
   "sidebar.brand": "24H",
+  "sidebar.newSession": "新建会话",
   "sidebar.core": "核心",
   "sidebar.channel": "渠道",
   "sidebar.coreOnline": "核心在线",

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { t } from "../i18n";
 import NotificationsBell from "../notifications/NotificationsBell";
 import { BrandMark, Icon } from "../ui/icons";
@@ -24,6 +24,8 @@ export interface SidebarProps {
   onOpenNotifications?: (sessionId: string | null) => void;
   /** 点击品牌行核心灯：打开系统升级。 */
   onOpenSystem?: () => void;
+  /** 「新建会话」（导航到对话并触发新会话）。 */
+  onNewSession?: () => void;
 }
 
 function visibleBottom(isSuperAdmin: boolean): NavItem[] {
@@ -46,7 +48,19 @@ export default function Sidebar({
   onToggleTheme,
   onOpenNotifications,
   onOpenSystem,
+  onNewSession,
 }: SidebarProps) {
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
+  const toggleGroup = (id: string) =>
+    setCollapsedGroups((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
   return (
     <nav
       className="sidebar"
@@ -88,30 +102,48 @@ export default function Sidebar({
         )}
       </div>
 
+      <button type="button" className="sidebar-new" onClick={onNewSession}>
+        <Icon name="plus" size={16} />
+        <span className="nav-label">{t("sidebar.newSession")}</span>
+      </button>
+
       <div className="nav-primary" aria-label={t("sidebar.nav.primary")}>
-        {NAV_GROUPS.map((group) => (
-          <div className="nav-group" key={group.id}>
-            <div className="nav-group-title">{t(group.labelKey)}</div>
-            <ul className="nav-group-items">
-              {group.items.map((item) => (
-                <li key={item.id}>
-                  <button
-                    type="button"
-                    className="nav-btn"
-                    data-active={active === item.id}
-                    aria-current={active === item.id ? "page" : undefined}
-                    onClick={() => onNavigate?.(item.id)}
-                  >
-                    <span className="nav-icon" aria-hidden="true">
-                      <Icon name={item.icon} size={18} />
-                    </span>
-                    <span className="nav-label">{t(item.labelKey)}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+        {NAV_GROUPS.map((group) => {
+          const collapsedGroup = collapsedGroups.has(group.id);
+          return (
+            <div className="nav-group" key={group.id}>
+              <button
+                type="button"
+                className="nav-group-title"
+                aria-expanded={!collapsedGroup}
+                onClick={() => toggleGroup(group.id)}
+              >
+                <span>{t(group.labelKey)}</span>
+                <Icon name={collapsedGroup ? "chevronRight" : "chevronDown"} size={13} />
+              </button>
+              {collapsedGroup ? null : (
+                <ul className="nav-group-items">
+                  {group.items.map((item) => (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        className="nav-btn"
+                        data-active={active === item.id}
+                        aria-current={active === item.id ? "page" : undefined}
+                        onClick={() => onNavigate?.(item.id)}
+                      >
+                        <span className="nav-icon" aria-hidden="true">
+                          <Icon name={item.icon} size={18} />
+                        </span>
+                        <span className="nav-label">{t(item.labelKey)}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <div className="sidebar-list">{children}</div>
