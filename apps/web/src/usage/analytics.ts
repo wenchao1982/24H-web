@@ -48,19 +48,34 @@ export interface UsageSummary {
   /** 上游提供时才有；缺失为 `null`（前端据此决定是否渲染拆分指标）。 */
   inputTokens?: number | null;
   outputTokens?: number | null;
+  /** 缓存读取令牌（命中量）。 */
+  cacheRead?: number | null;
+  /** 接口调用数。 */
+  apiCalls?: number | null;
 }
 
 /** 会话/消息统计：兼容顶层与 `{totals}` 嵌套。 */
 export function normalizeUsage(payload: unknown): UsageSummary {
   const root = asRecord(payload);
   const source = Object.keys(asRecord(root.totals)).length > 0 ? asRecord(root.totals) : root;
+  const input = readNumber(source, "input_tokens", "prompt_tokens", "input", "total_input");
+  const output = readNumber(source, "output_tokens", "completion_tokens", "output", "total_output");
+  const tokens =
+    readNumber(source, "tokens", "total_tokens", "token_count") ?? (input ?? 0) + (output ?? 0);
+  const cost =
+    readNumber(source, "cost", "total_cost", "cost_usd") ??
+    readNumber(source, "total_actual_cost", "actual_cost") ??
+    readNumber(source, "total_estimated_cost", "estimated_cost") ??
+    0;
   return {
     sessions: readNumber(source, "sessions", "session_count", "total_sessions") ?? 0,
     messages: readNumber(source, "messages", "message_count", "total_messages") ?? 0,
-    tokens: readNumber(source, "tokens", "total_tokens", "token_count") ?? 0,
-    cost: readNumber(source, "cost", "total_cost", "cost_usd") ?? 0,
-    inputTokens: readNumber(source, "input_tokens", "prompt_tokens", "input"),
-    outputTokens: readNumber(source, "output_tokens", "completion_tokens", "output"),
+    tokens,
+    cost,
+    inputTokens: input,
+    outputTokens: output,
+    cacheRead: readNumber(source, "cache_read_tokens", "total_cache_read", "cache_read"),
+    apiCalls: readNumber(source, "api_calls", "total_api_calls"),
   };
 }
 
@@ -100,6 +115,10 @@ export interface UsageByModel {
   tokens: number;
   cost: number;
   messages: number;
+  /** 缓存读取令牌（用于聚合计命中率）。 */
+  cacheRead: number | null;
+  /** 缓存命中率（0–100），无法计算为 `null`。 */
+  cacheHitRate: number | null;
 }
 
 /** 按模型用量：兼容 `{models:[...]}` / `{by_model:...}` / 数组。 */
@@ -119,11 +138,24 @@ export function normalizeUsageByModel(payload: unknown): UsageByModel[] {
     if (!model) {
       continue;
     }
+    const input = readNumber(source, "input_tokens", "prompt_tokens");
+    const output = readNumber(source, "output_tokens", "completion_tokens");
+    const cacheRead = readNumber(source, "cache_read_tokens", "cache_read", "cacheRead");
+    const denom = (input ?? 0) + (cacheRead ?? 0);
     out.push({
       model,
-      tokens: readNumber(source, "tokens", "total_tokens", "input_tokens") ?? 0,
-      cost: readNumber(source, "cost", "total_cost", "cost_usd") ?? 0,
-      messages: readNumber(source, "messages", "message_count", "requests") ?? 0,
+      tokens: readNumber(source, "tokens", "total_tokens") ?? (input ?? 0) + (output ?? 0),
+      cost:
+        readNumber(source, "cost", "total_cost", "cost_usd") ??
+        readNumber(source, "actual_cost") ??
+        readNumber(source, "estimated_cost") ??
+        0,
+      messages:
+        readNumber(source, "messages", "message_count", "requests") ??
+        readNumber(source, "api_calls") ??
+        0,
+      cacheRead,
+      cacheHitRate: cacheRead != null && denom > 0 ? Math.round((cacheRead / denom) * 100) : null,
     });
   }
   return out;

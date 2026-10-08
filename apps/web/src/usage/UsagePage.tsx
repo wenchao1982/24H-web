@@ -170,11 +170,40 @@ export default function UsagePage() {
     void load();
   }, [load]);
 
+  // 同名模型可能多行（不同 profile/时段）→ 聚合为一行。
+  const aggregatedModels = useMemo(() => {
+    const map = new Map<string, UsageByModel>();
+    for (const item of models) {
+      const current = map.get(item.model);
+      if (!current) {
+        map.set(item.model, { ...item });
+        continue;
+      }
+      current.tokens += item.tokens;
+      current.cost += item.cost;
+      current.messages += item.messages;
+      current.cacheRead = (current.cacheRead ?? 0) + (item.cacheRead ?? 0);
+    }
+    for (const item of map.values()) {
+      const cacheRead = item.cacheRead ?? 0;
+      item.cacheHitRate =
+        item.cacheRead != null && item.tokens + cacheRead > 0
+          ? Math.round((cacheRead / (item.tokens + cacheRead)) * 100)
+          : item.cacheHitRate;
+    }
+    return [...map.values()];
+  }, [models]);
+
+  const cacheModels = useMemo(
+    () => aggregatedModels.filter((item) => item.cacheHitRate != null),
+    [aggregatedModels],
+  );
+
   const filteredModels = useMemo(() => {
     const keyword = query.trim().toLowerCase();
     const base = keyword
-      ? models.filter((item) => item.model.toLowerCase().includes(keyword))
-      : models;
+      ? aggregatedModels.filter((item) => item.model.toLowerCase().includes(keyword))
+      : aggregatedModels;
     if (!sort) {
       return base;
     }
@@ -189,7 +218,7 @@ export default function UsagePage() {
       return sort.dir === "asc" ? cmp : -cmp;
     });
     return copy;
-  }, [models, query, sort]);
+  }, [aggregatedModels, query, sort]);
 
   const toggleSort = (key: SortKey) => {
     setSort((prev) =>
@@ -337,8 +366,44 @@ export default function UsagePage() {
               </span>
             </div>
           ) : null}
+          {usage.cacheRead != null ? (
+            <div className="metric">
+              <span className="metric-label">缓存读取</span>
+              <span className="metric-value" aria-label="缓存读取">
+                {usage.cacheRead}
+              </span>
+            </div>
+          ) : null}
+          {usage.apiCalls != null ? (
+            <div className="metric">
+              <span className="metric-label">请求数</span>
+              <span className="metric-value" aria-label="请求数">
+                {usage.apiCalls}
+              </span>
+            </div>
+          ) : null}
         </div>
       </div>
+
+      {cacheModels.length > 0 ? (
+        <div className="card">
+          <h3>缓存命中率（按模型）</h3>
+          <div className="cache-bars">
+            {cacheModels.map((item) => (
+              <div className="cache-bar" key={item.model}>
+                <span className="cache-bar-label">{item.model}</span>
+                <span className="cache-bar-track">
+                  <span
+                    className="cache-bar-fill"
+                    style={{ width: `${item.cacheHitRate ?? 0}%` }}
+                  />
+                </span>
+                <span className="cache-bar-value">{item.cacheHitRate}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {series.length > 0 ? (
         <div className="card">
@@ -434,6 +499,7 @@ export default function UsagePage() {
                     消息
                   </button>
                 </th>
+                <th>缓存命中</th>
                 <th data-sortable aria-sort={ariaSort("cost")}>
                   <button type="button" className="th-sort" onClick={() => toggleSort("cost")}>
                     费用（USD）
@@ -448,6 +514,7 @@ export default function UsagePage() {
                   <td>{item.model}</td>
                   <td>{item.tokens}</td>
                   <td>{item.messages}</td>
+                  <td>{item.cacheHitRate == null ? "—" : `${item.cacheHitRate}%`}</td>
                   <td>{item.cost.toFixed(2)}</td>
                   <td>
                     <Button

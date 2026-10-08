@@ -30,49 +30,40 @@ function stubFetch(handlers: StubRoute[]) {
   });
 }
 
+const TWO_JOBS = {
+  jobs: [
+    {
+      id: "daily-report",
+      schedule: "0 9 * * *",
+      next_run: "2026-09-28T09:00:00Z",
+      last_status: "ok",
+      enabled: true,
+    },
+    { id: "cleanup", schedule: "*/30 * * * *", last_status: "error", enabled: false },
+  ],
+};
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("TasksPage T9.1 任务列表", () => {
-  it("renders cron jobs with schedule/next run/last status/enabled", async () => {
-    vi.stubGlobal(
-      "fetch",
-      stubFetch([
-        {
-          path: "/api/hermes/cron/jobs",
-          method: "GET",
-          status: 200,
-          body: {
-            jobs: [
-              {
-                id: "daily-report",
-                schedule: "0 9 * * *",
-                next_run: "2026-09-28T09:00:00Z",
-                last_status: "ok",
-                enabled: true,
-              },
-              {
-                id: "cleanup",
-                schedule: "*/30 * * * *",
-                next_run: "2026-09-27T10:00:00Z",
-                last_status: "error",
-                enabled: false,
-              },
-            ],
-          },
-        },
-      ]),
-    );
-
+describe("TasksPage T9.1 任务列表（列表 + 详情）", () => {
+  it("lists jobs and shows the selected job detail", async () => {
+    vi.stubGlobal("fetch", stubFetch([{ path: "/api/hermes/cron/jobs", method: "GET", status: 200, body: TWO_JOBS }]));
+    const user = userEvent.setup();
     render(<TasksPage />);
 
-    expect(await screen.findByText("daily-report")).toBeInTheDocument();
-    expect(screen.getByText("0 9 * * *")).toBeInTheDocument();
+    expect((await screen.findAllByText("daily-report")).length).toBeGreaterThan(0);
+    expect(screen.getByText("cleanup")).toBeInTheDocument();
+    expect(screen.getAllByText("0 9 * * *").length).toBeGreaterThan(0);
+
+    // 详情默认选中第一个任务。
     expect(screen.getByText("2026-09-28T09:00:00Z")).toBeInTheDocument();
     expect(screen.getByText("ok")).toBeInTheDocument();
-    expect(screen.getByText("cleanup")).toBeInTheDocument();
     expect(screen.getByText("已启用")).toBeInTheDocument();
+
+    // 选中第二个任务 → 状态切到已暂停。
+    await user.click(screen.getByText("cleanup"));
     expect(screen.getByText("已暂停")).toBeInTheDocument();
   });
 
@@ -98,24 +89,16 @@ describe("TasksPage T9.1 任务列表", () => {
 });
 
 describe("TasksPage T9.2 任务操作", () => {
-  const JOBS = {
-    jobs: [
-      { id: "daily-report", schedule: "0 9 * * *", enabled: true },
-      { id: "cleanup", schedule: "*/30 * * * *", enabled: false },
-    ],
-  };
-
-  it("pauses a job via POST /cron/jobs/:id/pause", async () => {
+  it("pauses the selected job via POST /cron/jobs/:id/pause", async () => {
     const fetchMock = stubFetch([
-      { path: "/api/hermes/cron/jobs", method: "GET", status: 200, body: JOBS },
+      { path: "/api/hermes/cron/jobs", method: "GET", status: 200, body: TWO_JOBS },
       { path: "/api/hermes/cron/jobs/daily-report/pause", method: "POST", status: 200, body: { ok: true } },
     ]);
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
     render(<TasksPage />);
-    await screen.findByText("daily-report");
-
+    await screen.findAllByText("daily-report");
     await user.click(screen.getByRole("button", { name: "暂停" }));
 
     await waitFor(() => {
@@ -128,17 +111,17 @@ describe("TasksPage T9.2 任务操作", () => {
     });
   });
 
-  it("creates a job with the exact POST body", async () => {
+  it("creates a job from the modal with the exact POST body", async () => {
     const fetchMock = stubFetch([
-      { path: "/api/hermes/cron/jobs", method: "GET", status: 200, body: JOBS },
+      { path: "/api/hermes/cron/jobs", method: "GET", status: 200, body: TWO_JOBS },
       { path: "/api/hermes/cron/jobs", method: "POST", status: 201, body: { ok: true } },
     ]);
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
     render(<TasksPage />);
-    await screen.findByText("daily-report");
-
+    await screen.findAllByText("daily-report");
+    await user.click(screen.getByRole("button", { name: "新建" }));
     await user.type(screen.getByLabelText("任务名称"), "weekly");
     await user.type(screen.getByLabelText("任务计划"), "0 0 * * 1");
     await user.click(screen.getByRole("button", { name: "新增" }));

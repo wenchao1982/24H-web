@@ -33,7 +33,14 @@ describe("analytics normalizeUsage*", () => {
       tokens: 100,
     });
     expect(normalizeUsageByModel({ models: [{ model: "x", tokens: 5, requests: 2 }] })).toEqual([
-      { model: "x", tokens: 5, cost: 0, messages: 2 },
+      { model: "x", tokens: 5, cost: 0, messages: 2, cacheRead: null, cacheHitRate: null },
+    ]);
+    expect(
+      normalizeUsageByModel({
+        models: [{ model: "y", input_tokens: 20, output_tokens: 5, cache_read_tokens: 80 }],
+      }),
+    ).toEqual([
+      { model: "y", tokens: 25, cost: 0, messages: 0, cacheRead: 80, cacheHitRate: 80 },
     ]);
   });
 });
