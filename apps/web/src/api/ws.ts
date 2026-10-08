@@ -67,6 +67,13 @@ export class GatewayClient implements Gateway {
     }
     const ws = new WebSocket(url);
     this.ws = ws;
+    // 上游若关闭连接：复位状态以便下一次 connect()/request() 重建并自愈。
+    ws.addEventListener("close", () => {
+      if (this.ws === ws) {
+        this.ws = null;
+        this.connectPromise = null;
+      }
+    });
     const promise = new Promise<void>((resolve, reject) => {
       ws.addEventListener("open", () => resolve(), { once: true });
       ws.addEventListener("error", () => reject(new Error("WebSocket 连接失败")), {
@@ -172,19 +179,17 @@ export class GatewayClient implements Gateway {
   }
 
   request<T>(method: string, params: Record<string, unknown> = {}): Promise<T> {
-    const ws = this.ws;
-    if (!ws) {
-      return Promise.reject(new Error("gateway 未连接"));
-    }
     const id = this.nextId++;
     const frame = JSON.stringify({ jsonrpc: "2.0", id, method, params });
-    if (ws.readyState === WebSocket.OPEN) {
+    const ws = this.ws;
+    if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(frame);
-    } else if (ws.readyState === WebSocket.CONNECTING) {
-      // Queue until connect() resolves so early requests are never lost.
-      this.outbox.push(frame);
     } else {
-      return Promise.reject(new Error("gateway 未连接"));
+      // 未连接/连接中/已断开：确保重连并排队，连接就绪后统一 flush（不丢请求）。
+      if (!ws || ws.readyState >= WebSocket.CLOSING) {
+        void this.connect().catch(() => undefined);
+      }
+      this.outbox.push(frame);
     }
     return new Promise<T>((resolve, reject) => {
       this.pending.set(id, { resolve: resolve as (value: unknown) => void, reject });

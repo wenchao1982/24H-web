@@ -23,9 +23,10 @@ const ROUTES: Record<string, string> = {
   notifications: "/notifications",
 };
 
-const LABELS: Record<string, TranslationKey> = Object.fromEntries(
-  [...PRIMARY_NAV, ...BOTTOM_NAV].map((item) => [item.id, item.labelKey]),
-);
+const LABELS: Record<string, TranslationKey> = {
+  ...Object.fromEntries([...PRIMARY_NAV, ...BOTTOM_NAV].map((item) => [item.id, item.labelKey])),
+  notifications: "nav.notifications",
+};
 
 function activeId(pathname: string): string {
   for (const [id, path] of Object.entries(ROUTES)) {

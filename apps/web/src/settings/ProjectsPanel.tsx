@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { api } from "../api/client";
+import { useGateway } from "../chat/GatewayProvider";
 import { t } from "../i18n";
 import {
-  buildProjectBody,
   normalizeProjects,
   parseFolders,
   readStoredProject,
@@ -10,10 +9,9 @@ import {
   type Project,
 } from "./projects";
 
-const PROJECTS_PATH = "/api/hermes/projects";
-
-/** 设置 → 项目：列表 / 切换 / 新建 / 编辑 / 删除（多文件夹 + 默认目录）。 */
+/** 项目 = 工作区。经 L1 `projects.*` RPC（无 L2 REST）：列表 / 切换 / 新建 / 编辑 / 删除。 */
 export default function ProjectsPanel() {
+  const gateway = useGateway();
   const [projects, setProjects] = useState<Project[]>([]);
   const [current, setCurrent] = useState<string | null>(() => readStoredProject());
   const [loading, setLoading] = useState(true);
@@ -29,14 +27,14 @@ export default function ProjectsPanel() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setProjects(normalizeProjects(await api<unknown>(PROJECTS_PATH)));
+      setProjects(normalizeProjects(await gateway.request("projects.list", {})));
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("projects.error.load"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [gateway]);
 
   useEffect(() => {
     void load();
@@ -75,21 +73,32 @@ export default function ProjectsPanel() {
       setError(t("projects.error.save"));
       return;
     }
-    const body = buildProjectBody({
-      name: trimmedName,
-      folders: parseFolders(foldersText),
-      defaultDir: defaultDir.trim(),
-    });
+    const folders = parseFolders(foldersText);
+    const primary = defaultDir.trim();
     setBusy(true);
     void (async () => {
       try {
         if (editingId) {
-          await api(`${PROJECTS_PATH}/${encodeURIComponent(editingId)}`, {
-            method: "PATCH",
-            body: JSON.stringify(body),
-          });
+          await gateway.request("projects.update", { id: editingId, name: trimmedName });
+          const existing = projects.find((project) => project.id === editingId);
+          const oldSet = new Set(existing?.folders ?? []);
+          const newSet = new Set(folders);
+          for (const folder of oldSet) {
+            if (!newSet.has(folder)) {
+              await gateway.request("projects.remove_folder", { id: editingId, path: folder });
+            }
+          }
+          for (const folder of newSet) {
+            if (!oldSet.has(folder)) {
+              await gateway.request("projects.add_folder", { id: editingId, path: folder });
+            }
+          }
         } else {
-          await api(PROJECTS_PATH, { method: "POST", body: JSON.stringify(body) });
+          await gateway.request("projects.create", {
+            name: trimmedName,
+            folders,
+            ...(primary ? { primary_path: primary } : {}),
+          });
         }
         closeForm();
         await load();
@@ -105,7 +114,7 @@ export default function ProjectsPanel() {
     setBusy(true);
     void (async () => {
       try {
-        await api(`${PROJECTS_PATH}/${encodeURIComponent(project.id)}`, { method: "DELETE" });
+        await gateway.request("projects.delete", { id: project.id });
         if (current === project.id) {
           setCurrent(null);
           storeProject(null);

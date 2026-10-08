@@ -164,10 +164,24 @@ describe("GatewayClient", () => {
     );
   });
 
-  it("rejects a request issued before connect()", async () => {
-    stubWebSocket();
+  it("auto-connects and queues a request issued before any connect()", async () => {
+    const sockets = stubWebSocket();
     const client = new GatewayClient();
-    await expect(client.request("session.list", {})).rejects.toThrow("gateway 未连接");
+
+    const response = client.request("session.list", {});
+    // request() 自行触发连接（取代旧的「未连接即拒绝」）。
+    expect(sockets).toHaveLength(1);
+    expect(sockets[0].sent).toEqual([]);
+
+    sockets[0].open();
+    await Promise.resolve();
+
+    expect(sockets[0].sent).toEqual([
+      JSON.stringify({ jsonrpc: "2.0", id: 1, method: "session.list", params: {} }),
+    ]);
+
+    sockets[0].receive(JSON.stringify({ jsonrpc: "2.0", id: 1, result: { sessions: [] } }));
+    await expect(response).resolves.toEqual({ sessions: [] });
   });
 
   it("rejects with an Error carrying the JSON-RPC error code", async () => {
