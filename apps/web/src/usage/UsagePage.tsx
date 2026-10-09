@@ -149,14 +149,22 @@ export default function UsagePage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [usagePayload, statsPayload, modelsPayload] = await Promise.all([
+      const [usagePayload, statsPayload, modelsPayload, statusPayload] = await Promise.all([
         api<unknown>(`/api/hermes/analytics/usage?days=${days}`),
         api<unknown>("/api/hermes/system/stats"),
         api<unknown>(`/api/hermes/analytics/models?days=${days}`),
+        // `/system/stats` 无 health → 取 `/status.overall` 补健康/版本。
+        api<unknown>("/api/hermes/status").catch(() => null),
       ]);
+      const stats = normalizeSystemStats(statsPayload);
+      const status = statusPayload ? normalizeSystemStats(statusPayload) : null;
       setUsage(normalizeUsage(usagePayload));
       setSeries(normalizeUsageSeries(usagePayload));
-      setStats(normalizeSystemStats(statsPayload));
+      setStats({
+        ...stats,
+        health: stats.health || status?.health || "",
+        version: stats.version || status?.version || "",
+      });
       setModels(normalizeUsageByModel(modelsPayload));
       setError(null);
     } catch (err) {

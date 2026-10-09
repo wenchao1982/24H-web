@@ -206,6 +206,8 @@ export const zh = {
   "page.placeholder": "该模块将在后续里程碑实现。",
 
   "account.hint": "自助资料与安全设置。",
+  "account.avatar": "头像",
+  "account.avatarSaved": "头像已更新",
   "account.username": "用户名",
   "account.role": "角色",
   "account.roleSuperAdmin": "超级管理员",

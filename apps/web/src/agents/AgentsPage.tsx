@@ -100,12 +100,15 @@ export default function AgentsPage() {
   const [policies, setPolicies] = useState<PolicyMap>({});
   const [selectedRuntime, setSelectedRuntime] = useState<string | null>(null);
   const [runtimeBusy, setRuntimeBusy] = useState(false);
+  const [runtimeError, setRuntimeError] = useState<string | null>(null);
 
   const loadRuntimes = useCallback(async () => {
     try {
       setRuntimes(await listRuntimes());
-    } catch {
+      setRuntimeError(null);
+    } catch (err) {
       setRuntimes([]);
+      setRuntimeError(err instanceof Error ? err.message : "外部 agent 探测失败");
     }
     try {
       setPolicies(await getUpdatePolicies());
@@ -471,6 +474,14 @@ export default function AgentsPage() {
               avatars={avatarUrl && selected ? { [selected]: avatarUrl } : undefined}
             />
           )}
+          {runtimeError ? (
+            <div className="runtime-error" role="alert">
+              <span className="muted">{runtimeError}</span>
+              <button type="button" className="ghost" onClick={() => void loadRuntimes()}>
+                重试
+              </button>
+            </div>
+          ) : null}
           <RuntimeList
             runtimes={runtimes}
             activeId={selectedRuntime}

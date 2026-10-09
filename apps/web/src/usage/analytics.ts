@@ -69,7 +69,11 @@ export function normalizeUsage(payload: unknown): UsageSummary {
     0;
   return {
     sessions: readNumber(source, "sessions", "session_count", "total_sessions") ?? 0,
-    messages: readNumber(source, "messages", "message_count", "total_messages") ?? 0,
+    // 上游 analytics 无 messages 字段 → 回退接口调用数。
+    messages:
+      readNumber(source, "messages", "message_count", "total_messages") ??
+      readNumber(source, "api_calls", "total_api_calls") ??
+      0,
     tokens,
     cost,
     inputTokens: input,

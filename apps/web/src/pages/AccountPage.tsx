@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import { useSession } from "../auth/SessionProvider";
 import { t } from "../i18n";
+
+const MAX_AVATAR_BYTES = 256 * 1024;
 
 /** 独立页：账户——自助资料（只读）+ 改用户名 + 改密。 */
 export default function AccountPage() {
@@ -13,6 +15,23 @@ export default function AccountPage() {
   const [error, setError] = useState<string | null>(null);
   const [savedNote, setSavedNote] = useState<string | null>(null);
   const [pwNote, setPwNote] = useState<string | null>(null);
+  const [avatar, setAvatar] = useState<string | null>(null);
+  const [avatarNote, setAvatarNote] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let alive = true;
+    api<{ data: string | null }>("/api/auth/avatar")
+      .then((payload) => {
+        if (alive) {
+          setAvatar(payload.data);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   if (!user) {
     return (
@@ -67,10 +86,62 @@ export default function AccountPage() {
     }
   };
 
+  const onPickAvatar = (file: File | undefined) => {
+    setAvatarNote(null);
+    if (!file) {
+      return;
+    }
+    if (file.type !== "image/png" && file.type !== "image/jpeg") {
+      setError("仅支持 PNG/JPEG 头像");
+      return;
+    }
+    if (file.size > MAX_AVATAR_BYTES) {
+      setError("头像不能超过 256KB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const data = String(reader.result);
+      void (async () => {
+        try {
+          await api("/api/auth/avatar", {
+            method: "PUT",
+            body: JSON.stringify({ data }),
+          });
+          setAvatar(data);
+          setError(null);
+          setAvatarNote(t("account.avatarSaved"));
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "头像保存失败");
+        }
+      })();
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div className="page account-page">
       <h2 className="page-title">{t("page.account")}</h2>
       <p className="muted">{t("account.hint")}</p>
+
+      <section className="card">
+        <h3>{t("account.avatar")}</h3>
+        <div className="account-avatar">
+          {avatar ? (
+            <img src={avatar} alt={user.username} width={56} height={56} />
+          ) : (
+            <span className="account-avatar-fallback">{user.username.slice(0, 1).toUpperCase()}</span>
+          )}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg"
+            aria-label={t("account.avatar")}
+            onChange={(event) => onPickAvatar(event.target.files?.[0])}
+          />
+        </div>
+        {avatarNote ? <p className="ok">{avatarNote}</p> : null}
+      </section>
 
       <section className="card">
         <dl className="account-facts">

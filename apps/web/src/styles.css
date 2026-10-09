@@ -4809,3 +4809,36 @@ mark {
   font-family: var(--ds-font-mono);
   color: var(--ds-label-primary);
 }
+
+/* ---------- 账户头像 + agents 探测错误（M23 优化） ---------- */
+.account-avatar {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-3);
+}
+.account-avatar img {
+  border-radius: var(--ds-radius-pill);
+  object-fit: cover;
+}
+.account-avatar-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--ds-radius-pill);
+  background: var(--ds-accent-weak);
+  color: var(--ds-accent);
+  font-size: 20px;
+  font-weight: 600;
+}
+.runtime-error {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-2) var(--ds-space-3);
+  border-bottom: var(--ds-hairline) solid var(--ds-border-l1);
+}
+.runtime-error button {
+  margin-left: auto;
+}
