@@ -25,6 +25,7 @@ export default function AdminUsersPage() {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<NewRole>("admin");
   const [pendingDelete, setPendingDelete] = useState<AdminUser | null>(null);
+  const [query, setQuery] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -140,8 +141,24 @@ export default function AdminUsersPage() {
     );
   };
 
+  const visibleUsers = query.trim()
+    ? users.filter((user) => user.username.toLowerCase().includes(query.trim().toLowerCase()))
+    : users;
+
   return (
     <div className="page">
+      <div className="admin-head">
+        <h2 className="page-title">用户与角色</h2>
+        <span className="muted">{users.length}</span>
+        <input
+          className="admin-search"
+          type="search"
+          aria-label="搜索用户"
+          placeholder="搜索用户"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+      </div>
       <div className="card">
         <h3>新建用户</h3>
         <form onSubmit={create}>
@@ -190,7 +207,7 @@ export default function AdminUsersPage() {
             </tr>
           </thead>
           <tbody>
-            {users.map((user) => (
+            {visibleUsers.map((user) => (
               <tr key={user.id}>
                 <td>{user.id}</td>
                 <td>{user.username}</td>

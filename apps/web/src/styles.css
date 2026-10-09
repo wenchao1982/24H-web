@@ -4971,3 +4971,21 @@ mark {
   background: var(--ds-surface-l1);
   font-size: var(--ds-font-size-sm);
 }
+
+/* ---------- 管理：头部（M23 对齐 Demo） ---------- */
+.admin-head {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  margin-bottom: var(--ds-space-3);
+}
+.admin-search {
+  margin-left: auto;
+  width: 240px;
+  padding: var(--ds-space-2);
+  border: var(--ds-hairline) solid var(--ds-border-l2);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-l1);
+  color: var(--ds-label-primary);
+  font: inherit;
+}
