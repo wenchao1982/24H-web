@@ -918,7 +918,16 @@ export default function ChatPage() {
         ) : null}
         <div className="chat-header">
           <h2 className="chat-title">{active ? active.title : "对话"}</h2>
+          {active && controls.selection.profile ? (
+            <span className="chat-header-pill">{controls.selection.profile}</span>
+          ) : null}
           <div className="chat-header-actions">
+            {active && controls.selection.model ? (
+              <span className="chat-header-pill">
+                <i className="dot" data-on aria-hidden="true" />
+                {controls.selection.model}
+              </span>
+            ) : null}
             {active ? (
               <SessionHeaderMenu
                 onConnect={() => setNotice(t("composer.header.connectUnavailable"))}

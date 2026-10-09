@@ -2568,7 +2568,7 @@ button.danger {
   min-height: var(--ds-header-h);
 }
 .chat-header .chat-title {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   margin: 0;
   font-size: var(--ds-font-size);
@@ -2581,6 +2581,18 @@ button.danger {
   display: flex;
   align-items: center;
   gap: var(--ds-space-2);
+  margin-left: auto;
+}
+.chat-header-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ds-space-1);
+  padding: 2px var(--ds-space-2);
+  border: var(--ds-hairline) solid var(--ds-border-l1);
+  border-radius: var(--ds-radius-pill);
+  color: var(--ds-label-secondary);
+  font-size: var(--ds-font-size-sm);
+  white-space: nowrap;
 }
 .sidebar-fab {
   position: fixed;
