@@ -141,7 +141,10 @@ export default function AgentsPage() {
     try {
       await gateway.connect().catch(() => undefined);
       const result = await gateway.request("profiles.list", { include_sessions: false });
-      setAgents(normalizeAgentList(result));
+      const next = normalizeAgentList(result);
+      setAgents(next);
+      // 默认选中默认 profile（对齐 Demo：进入即展示 SOUL）。
+      setSelected((prev) => prev ?? next.find((a) => a.isDefault)?.name ?? next[0]?.name ?? null);
       setListError(null);
     } catch {
       setListError("无法加载智能体列表");
@@ -449,6 +452,7 @@ export default function AgentsPage() {
               {listError}
             </p>
           ) : null}
+          <p className="agents-group-label">{t("agents.group.hermes")}</p>
           {listLoading ? (
             <p className="empty">加载智能体中…</p>
           ) : (

@@ -410,6 +410,7 @@
 | T29.4 | M23 | **逐屏对齐 Demo（Playwright 截图复核）**：① **侧栏**（「+ 新建会话」+ 分组可折叠箭头 + 通知徽标）；② **设置页 IA**（通用/模型与密钥合并/语音/配置中心/审批/服务商登录/GitHub/渠道/集成/高级/系统；移除已升一级的 监控/项目；分区加描述）；③ **任务页**改**列表+详情+新建弹窗**；④ **用量页**加缓存命中率条（按模型）/缓存命中列/缓存读取·请求指标；⑤ **系统统计归一化**（`/api/status.overall` 健康、`/api/system/stats.process` 进程）。看板/编排/智能体/群聊/监控/记忆/项目/文件/账户/通知已复核渲染正常 | T29.3 | 观感对齐、无 UI 库 | 已验收 |
 | T29.5 | M23 | `npm run check` 全绿（server 286 / web 518）；`check:demo` 不回归 | T29.2–4 | 全绿 | 已验收 |
 | T29.6 | M23 | **逐菜单界面核对**（Playwright 登录后逐路由截图审计 15/15）：修复 ① **Projects 404**（`/api/hermes/projects` 改走 L1 `projects.*` RPC 并重写测试）② **chat「gateway 未连接」**（`ws.ts` 断线自愈 + 请求排队，取代「未连接即拒绝」）③ 通知页标题回退（`ShellLayout` 补 `LABELS.notifications`） | T29.2–4 | 15 路由标题/内容正确、零 `.err` | 已验收（首轮） |
+| T29.10 | M23 | **视觉回填 · 智能体**：进入即**默认选中 default profile**（对齐 Demo，详情常显）；补 `HERMES · PROFILE` 分组标签 | T29.9 | 截图对照 Demo | 已验收（首轮） |
 | T29.9 | M23 | **视觉回填 · 对话 docked**：会话头加**智能体 pill + 模型 pill**（对齐 Demo；仅在有选中值时显示）；transcript 工具卡/思考/审批卡沿用既有样式 | T29.8 | 截图对照 Demo | 已验收（首轮） |
 | T29.8 | M23 | **视觉回填 · 对话 hero**：品牌 + `24H 智能工作台` + `Preview` 徽标 + 副标题；最近会话改**两列卡片**（置于输入框下方）；输入区 hero 去重（模型/权限仅在 pill 行，底行仅 ＋/mic/发送） | T29.4 | 截图对照 Demo | 已验收（首轮） |
 | T29.7 | M23 | **快收益优化**：① 用量「系统健康」取 `/api/hermes/status`（`overall`）② 用量「消息数」无 `messages` 时回退 `api_calls` ③ 外部 agent 探测失败显式报错 + 重试（`AgentsPage`）④ 账户页**头像**（`GET/PUT /api/auth/avatar`，PNG/JPEG ≤256KB）⑤ 设置「通用」**字号**（`fontSize.ts` 持久化 + 应用到 `--ds-font-size*`）。注：`display_name` 后端 schema 未实现（AGENTS.md §4 与实现漂移），i18n 英文未做（N04） | T29.4 | 单测 + `npm run check` 全绿 | 已验收 |

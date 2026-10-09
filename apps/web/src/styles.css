@@ -4871,3 +4871,11 @@ mark {
 .runtime-error button {
   margin-left: auto;
 }
+
+/* ---------- 智能体：分组标签（M23 对齐 Demo） ---------- */
+.agents-group-label {
+  margin: var(--ds-space-2) var(--ds-space-3) 0;
+  color: var(--ds-label-tertiary);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}

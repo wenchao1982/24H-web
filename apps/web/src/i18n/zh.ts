@@ -932,6 +932,7 @@ export const zh = {
   "personality.error.list": "加载人格预设失败",
   "personality.error.set": "应用人格失败",
 
+  "agents.group.hermes": "HERMES · PROFILE",
   "agents.tab.soul": "SOUL",
   "agents.tab.soul.intro": "智能体的角色系统提示词，定义其身份与行为准则。",
   "agents.tab.soul.hint": "SOUL 是智能体角色系统提示词；编辑请用右上角「编辑」。",
