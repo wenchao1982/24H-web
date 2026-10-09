@@ -99,6 +99,7 @@ describe("GroupChatPage T17.1 群聊（官方 groups.*）", () => {
     await screen.findByText("暂无房间。");
 
     const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "新建" }));
     await user.click(screen.getByRole("checkbox", { name: "选择成员 planner" }));
     await user.click(screen.getByRole("checkbox", { name: "选择成员 reviewer" }));
     await user.type(screen.getByLabelText("房间名称"), "新房间");

@@ -36,6 +36,8 @@ export default function GroupChatPage() {
   const [name, setName] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [memberSearch, setMemberSearch] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [roomQuery, setRoomQuery] = useState("");
   const [renameDraft, setRenameDraft] = useState("");
   const [disbandTarget, setDisbandTarget] = useState<GroupRoom | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -226,6 +228,9 @@ export default function GroupChatPage() {
   }
 
   const active = rooms.find((room) => room.id === activeId) ?? null;
+  const filteredRooms = rooms.filter((room) =>
+    room.name.toLowerCase().includes(roomQuery.trim().toLowerCase()),
+  );
   const query = memberSearch.trim().toLowerCase();
   const filteredProfiles = query
     ? profiles.filter(
@@ -244,6 +249,27 @@ export default function GroupChatPage() {
     <div className="chat groups-page">
       <aside className="chat-list">
         <div className="session-list">
+          <div className="groups-list-head">
+            <h1 className="groups-list-title">{t("groups.title")}</h1>
+            <span className="muted">{rooms.length}</span>
+            <button
+              type="button"
+              className="primary groups-new"
+              aria-label={t("groups.new")}
+              onClick={() => setCreating((value) => !value)}
+            >
+              ＋
+            </button>
+          </div>
+          <input
+            className="group-room-search"
+            type="search"
+            aria-label={t("groups.searchRooms")}
+            placeholder={t("groups.searchRooms")}
+            value={roomQuery}
+            onChange={(event) => setRoomQuery(event.target.value)}
+          />
+          {creating ? (
           <form className="card groups-create" onSubmit={createRoom}>
             <input
               aria-label={t("groups.name")}
@@ -303,11 +329,12 @@ export default function GroupChatPage() {
               {t("groups.create")}
             </button>
           </form>
-          {rooms.length === 0 ? (
+          ) : null}
+          {filteredRooms.length === 0 ? (
             <EmptyState title={t("groups.empty")} description={t("groups.emptyDescription")} />
           ) : (
             <ul className="session-items group-room-list">
-              {rooms.map((room) => (
+              {filteredRooms.map((room) => (
                 <li key={room.id}>
                   <button
                     type="button"

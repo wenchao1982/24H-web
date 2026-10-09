@@ -20,3 +20,6 @@ playwright-report/
 
 # VibeLoop local runtime state (machine-specific)
 .vibe-loop.json
+
+# 临时截图审计脚本（本地）
+scripts/shot.mjs

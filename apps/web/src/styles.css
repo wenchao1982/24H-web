@@ -4879,3 +4879,66 @@ mark {
   font-size: 11px;
   letter-spacing: 0.06em;
 }
+
+/* ---------- 群聊：列表头 + 房间搜索（M23 对齐 Demo） ---------- */
+.groups-list-head {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-2) var(--ds-space-3);
+}
+.groups-list-title {
+  margin: 0;
+  font-size: var(--ds-font-size);
+  font-weight: 600;
+}
+.groups-new {
+  margin-left: auto;
+  min-width: 28px;
+  padding: 0 var(--ds-space-2);
+}
+.group-room-search {
+  margin: 0 var(--ds-space-3) var(--ds-space-2);
+  padding: var(--ds-space-2);
+  border: var(--ds-hairline) solid var(--ds-border-l2);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-l1);
+  color: var(--ds-label-primary);
+  font: inherit;
+}
+
+/* ---------- 看板：列头/切换 pill 化（M23 对齐 Demo） ---------- */
+.kanban-column-head {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+}
+.kanban-column-name {
+  font-weight: 600;
+}
+.kanban-column-count {
+  padding: 0 6px;
+  border-radius: var(--ds-radius-pill);
+  background: var(--ds-surface-l3);
+  color: var(--ds-label-tertiary);
+  font-size: 11px;
+  line-height: 18px;
+}
+.kanban-board-tab {
+  border: var(--ds-hairline) solid var(--ds-border-l1);
+  border-radius: var(--ds-radius-pill);
+  padding: 2px var(--ds-space-3);
+  background: var(--ds-surface-l1);
+  color: var(--ds-label-secondary);
+}
+.kanban-board-tab[data-active="true"] {
+  border-color: transparent;
+  background: var(--ds-accent-weak);
+  color: var(--ds-accent);
+}
+.kanban-card {
+  transition: border-color 0.12s ease;
+}
+.kanban-card:hover {
+  border-color: var(--ds-border-l2);
+}
