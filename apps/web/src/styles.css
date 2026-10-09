@@ -4942,3 +4942,32 @@ mark {
 .kanban-card:hover {
   border-color: var(--ds-border-l2);
 }
+
+/* ---------- 项目：列表 + 详情（M23 对齐 Demo） ---------- */
+.projects-split {
+  display: flex;
+  gap: var(--ds-space-4);
+  align-items: flex-start;
+}
+.projects-list-col {
+  flex: 0 0 320px;
+}
+.projects-detail-col {
+  flex: 1;
+  min-width: 0;
+}
+.project-folder-list {
+  list-style: none;
+  margin: 0 0 var(--ds-space-3);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-1);
+}
+.project-folder-list li {
+  padding: var(--ds-space-2) var(--ds-space-3);
+  border: var(--ds-hairline) solid var(--ds-border-l1);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-l1);
+  font-size: var(--ds-font-size-sm);
+}

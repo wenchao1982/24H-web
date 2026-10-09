@@ -132,8 +132,11 @@ export default function ProjectsPanel() {
     return <p className="empty">{t("projects.loading")}</p>;
   }
 
+  const currentProject = projects.find((project) => project.id === current) ?? null;
+
   return (
-    <div className="settings-section">
+    <div className="projects-split">
+      <div className="projects-list-col">
       <div className="card">
         <h3>{t("projects.title")}</h3>
         <p className="muted">{t("projects.hint")}</p>
@@ -232,6 +235,39 @@ export default function ProjectsPanel() {
           </form>
         </div>
       ) : null}
+      </div>
+
+      <div className="projects-detail-col">
+        {currentProject ? (
+          <div className="card">
+            <h3>{currentProject.name}</h3>
+            <p className="muted">
+              {currentProject.folders.length > 0
+                ? currentProject.folders.join(" · ")
+                : currentProject.defaultDir ?? t("projects.noFolders")}
+            </p>
+            {currentProject.folders.length > 0 ? (
+              <ul className="project-folder-list">
+                {currentProject.folders.map((folder) => (
+                  <li key={folder} className="mono">
+                    {folder}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <div className="row">
+              <button type="button" className="ghost" onClick={() => openEdit(currentProject)}>
+                {t("projects.edit")}
+              </button>
+              <button type="button" className="danger" onClick={() => remove(currentProject)}>
+                {t("projects.delete")}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="empty">{t("projects.empty")}</p>
+        )}
+      </div>
     </div>
   );
 }
