@@ -123,7 +123,9 @@ export const zh = {
   "composer.rename.confirm": "确定",
   "composer.rename.cancel": "取消",
 
-  "chat.hero.title": "有什么可以帮你的？",
+  "chat.hero.title": "24H 智能工作台",
+  "chat.hero.subtitle": "选择智能体与工作区，开始一次对话",
+  "chat.hero.preview": "Preview",
   "chat.hero.recent": "最近会话",
   "chat.hero.empty": "还没有会话，直接输入开始吧。",
 

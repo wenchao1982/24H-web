@@ -102,13 +102,15 @@ export default function ComposerControls(props: ComposerControlsProps) {
           onSelectWorkspace={props.onSelectWorkspace}
           disabled={props.uploadDisabled}
         />
-        <PermissionPicker
-          value={props.permissionValue}
-          disabled={props.permissionDisabled}
-          onSelect={props.onSelectPermission}
-        />
+        {props.variant === "docked" ? (
+          <PermissionPicker
+            value={props.permissionValue}
+            disabled={props.permissionDisabled}
+            onSelect={props.onSelectPermission}
+          />
+        ) : null}
         <span className="composer-spacer" aria-hidden="true" />
-        {modelPicker}
+        {props.variant === "docked" ? modelPicker : null}
         {props.onMicToggle ? (
           <button
             type="button"

@@ -3480,36 +3480,40 @@ mark {
   border: 0;
 }
 
-.chat-hero {
+.chat-hero-head {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: var(--ds-space-4);
-  min-height: 320px;
-  padding: var(--ds-space-6) var(--ds-space-4);
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-5) var(--ds-space-4) var(--ds-space-4);
   text-align: center;
 }
 
 .chat-hero-brand {
-  font-size: var(--ds-font-size-xl);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--ds-accent);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ds-space-2);
 }
 
-.chat-hero-title {
-  margin: 0;
-  font-size: var(--ds-font-size-xl);
+.chat-hero-brand-name {
+  font-size: 22px;
+  font-weight: 700;
   color: var(--ds-label-primary);
 }
 
-.chat-hero-pills {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: var(--ds-space-2);
+.chat-hero-badge {
+  padding: 1px var(--ds-space-2);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-accent-weak);
+  color: var(--ds-accent);
+  font-size: var(--ds-font-size-xs);
+  font-weight: 500;
+}
+
+.chat-hero-subtitle {
+  margin: 0;
+  color: var(--ds-label-tertiary);
+  font-size: var(--ds-font-size-sm);
 }
 
 /* 双态同实例：仅切布局，不卸载 */
@@ -3693,10 +3697,12 @@ mark {
 .chat-hero-recent {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: var(--ds-space-2);
   width: 100%;
   max-width: 720px;
+  margin: 0 auto;
+  padding: var(--ds-space-4) var(--ds-space-4) 0;
+  text-align: left;
 }
 
 .chat-hero-recent-title {
@@ -3705,10 +3711,9 @@ mark {
   font-size: var(--ds-font-size-sm);
 }
 
-.chat-hero-recent-list {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
+.chat-hero-recent-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: var(--ds-space-2);
   margin: 0;
   padding: 0;
@@ -3716,20 +3721,32 @@ mark {
 }
 
 .chat-hero-recent-item {
-  padding: var(--ds-space-1) var(--ds-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: var(--ds-space-2) var(--ds-space-3);
   border: var(--ds-hairline) solid var(--ds-border-l1);
-  border-radius: var(--ds-radius-pill);
-  background: var(--ds-surface-l2);
-  color: var(--ds-label-secondary);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-l1);
+  color: var(--ds-label-primary);
   font: inherit;
-  font-size: var(--ds-font-size-sm);
+  text-align: left;
   cursor: pointer;
+}
+
+.chat-hero-recent-name {
+  font-size: var(--ds-font-size-sm);
+}
+
+.chat-hero-recent-meta {
+  color: var(--ds-label-tertiary);
+  font-size: var(--ds-font-size-xs);
 }
 
 .chat-hero-recent-item:hover,
 .chat-hero-recent-item:focus-visible {
   border-color: var(--ds-accent);
-  color: var(--ds-label-primary);
 }
 
 /* docked 输入区贴底常驻。 */

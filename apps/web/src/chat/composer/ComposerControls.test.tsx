@@ -42,6 +42,9 @@ const BOTTOM_ORDER = [
   "composer-send",
 ];
 
+// hero：权限/模型在 pill 行，底行仅 ＋ / spacer / 发送。
+const HERO_BOTTOM_ORDER = ["upload-menu", "composer-spacer", "composer-send"];
+
 function bottomOrder(container: HTMLElement): string[] {
   const row = container.querySelector(".composer-bottom-row");
   if (!row) {
@@ -82,7 +85,7 @@ describe("ComposerControls（REQ-002 / REQ-003）", () => {
     expect(pills?.querySelector(".agent-picker")).not.toBeNull();
     expect(pills?.querySelector(".workspace-picker")).not.toBeNull();
     expect(pills?.querySelector(".model-picker")).not.toBeNull();
-    expect(bottomOrder(container)).toEqual(BOTTOM_ORDER);
+    expect(bottomOrder(container)).toEqual(HERO_BOTTOM_ORDER);
   });
 
   it("默认（未提供 onMicToggle）不渲染语音与 git 分支 pill", () => {

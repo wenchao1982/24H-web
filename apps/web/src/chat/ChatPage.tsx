@@ -18,7 +18,7 @@ import CommandPanel from "./CommandPanel";
 import ContextFilesPanel from "./ContextFilesPanel";
 import PersonalityPanel from "./PersonalityPanel";
 import SessionHeaderMenu from "./SessionHeaderMenu";
-import HeroIntro from "./HeroIntro";
+import HeroIntro, { HeroRecent } from "./HeroIntro";
 import { ComposerControls, useSessionControls, type UploadPanelKind } from "./composer";
 import { useVoice } from "../voice/useVoice";
 import VoiceOverlay from "../voice/VoiceOverlay";
@@ -999,7 +999,7 @@ export default function ChatPage() {
           />
         ) : null}
         {controls.variant === "hero" ? (
-          <HeroIntro sessions={sessions} onSelect={selectSession} />
+          <HeroIntro />
         ) : (
           <>
             <Transcript items={items} onSpeak={voice.speak} />
@@ -1061,6 +1061,9 @@ export default function ChatPage() {
             />
           )}
         />
+        {controls.variant === "hero" ? (
+          <HeroRecent sessions={sessions} onSelect={selectSession} />
+        ) : null}
         <StatusBar status={status} />
         {voice.listening ? (
           <VoiceOverlay transcript={voice.transcript} onStop={voice.stop} />
